@@ -10,7 +10,6 @@ class max7219_matrix:
     _SHUTDOWN = const(12)
     _DISPLAYTEST = const(15)
     
-    
     def __init__(self, spi, cs):
         self.spi = spi
         self.cs = cs
