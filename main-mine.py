@@ -21,7 +21,6 @@ from max7219_matrix import max7219_matrix
 CS_PIN = 5
 
 max7219_eyes = max7219_matrix(machine.SPI(0), machine.Pin(CS_PIN, machine.Pin.OUT, True))
-print(f"max7219_eyes: {max7219_eyes}")
 
 def load_anims(file_name):
     """Load animations from json file"""
@@ -111,5 +110,5 @@ def main():
         anim_runner(anims['winkRight'],matrix_fonts.eyes)
         anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
 
-if __name__ == "__main__":
-    main()
+# Run the thing
+main()
