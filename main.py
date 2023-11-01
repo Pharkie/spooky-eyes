@@ -1,7 +1,7 @@
 """
 Written by: GurgleApps.com
 Tool To Make Sprites https://gurgleapps.com/tools/matrix
-Full Instructions
+Instructions
 https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico
 
 Revised by: Adam Knowles
@@ -48,6 +48,7 @@ LED_COLOURS = [
 
 max7219_eyes = max7219_matrix(SPI(0, sck=Pin(2), mosi=Pin(3)), Pin(CS_PIN, Pin.OUT, True))
 
+# Initiliase common anode RGB LED as a global variable
 rgb_led = RGBLED(red = 19, green = 20, blue = 21, active_high = False)
 
 def load_anims(file_name):
@@ -71,12 +72,17 @@ def anim_runner(anims, font):
         
         left = anim.get("l")
         right = anim.get("r")
+
         if left is not None and right is not None:
             max7219_eyes.show_char(font[left], font[right])
+
         brightness = anim.get("bl")
+
         if brightness is not None:
             max7219_eyes.set_brightness(brightness)
+
         delay = anim.get("d")
+
         if delay is not None:
             time.sleep(delay)
 
