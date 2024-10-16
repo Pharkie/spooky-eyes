@@ -1,12 +1,12 @@
 """
-Written by: GurgleApps.com
+Version 1 by GurgleApps.com
 Tool To Make Sprites https://gurgleapps.com/tools/matrix
 Instructions
 https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico
 
 Revised by: Adam Knowles
 Version: 0.1
-Description: Pumpkin Eyes 8x8 LED Matrix Halloween Project with an ESP32-C3
+Description: Halloween pumpkin eyes for 2 x 8x8 LED Matrices (MAX7219)
 GitHub Repository: https://github.com/Pharkie/pico-pumpkin/
 License: GNU General Public License (GPL)
 """
@@ -204,4 +204,3 @@ def main():
 # Run the thing
 if __name__ == "__main__":
     main()
-    
