@@ -11,36 +11,40 @@ GitHub Repository: https://github.com/Pharkie/pico-pumpkin/
 License: GNU General Public License (GPL)
 """
 
-import machine
 import time
 import json
 import random
+import machine
 import matrix_fonts
 from max7219_matrix import max7219_matrix
 
 # User-settable variables
 SPI_BUS = 1  # Use SPI(1) for ESP32-C3
-CLK_PIN = 6  
-DIN_PIN = 7  
-CS_PIN = 10  
+CLK_PIN = 6
+DIN_PIN = 7
+CS_PIN = 10
+
+MAX_BRIGHT = 2  # Set global max brightness 0-15
+
 RGB_LED_CONNECTED = True  # Set to False if RGB LED is not connected
 # These pins aren't used if RGB_LED_CONNECTED is False
 RED_PIN = 1
 GREEN_PIN = 2
 BLUE_PIN = 3
 
-DEBUG = False  # Set to False to disable logging and printing
+DEBUG = False  # Set to True to log messages to log.txt
 
 # Custom logging function
 # Logs messages to a file with a timestamp
 # mode='a' appends to the file, mode='w' overwrites the file
 def log_message(message, mode='a'):
+    """Log a message to a file"""
     if DEBUG:
         with open('log.txt', mode) as log_file:
             current_time = time.localtime()
-            formatted_time = "{:04}-{:02}-{:02} {:02}:{:02}:{:02}".format(
-                current_time[0], current_time[1], current_time[2],
-                current_time[3], current_time[4], current_time[5]
+            formatted_time = (
+                f"{current_time[0]:04}-{current_time[1]:02}-{current_time[2]:02} "
+                f"{current_time[3]:02}:{current_time[4]:02}:{current_time[5]:02}"
             )
             log_file.write(f"{formatted_time} - {message}\n")
 
@@ -49,7 +53,14 @@ log_message("Starting new log session", mode='w')
 
 # Initialize SPI and MAX7219 matrix
 log_message("Initializing SPI and MAX7219 matrix")
-spi = machine.SPI(SPI_BUS, baudrate=10000000, polarity=0, phase=0, sck=machine.Pin(CLK_PIN), mosi=machine.Pin(DIN_PIN))
+spi = machine.SPI(
+    SPI_BUS,
+    baudrate=10000000,
+    polarity=0,
+    phase=0,
+    sck=machine.Pin(CLK_PIN),
+    mosi=machine.Pin(DIN_PIN)
+)
 cs = machine.Pin(CS_PIN, machine.Pin.OUT)
 max7219_eyes = max7219_matrix(spi, cs)
 log_message("SPI and MAX7219 matrix initialized")
@@ -58,25 +69,13 @@ if RGB_LED_CONNECTED:
     # Define colours for RGB inner lights
     COLOUR_RED = (255, 0, 0)
     COLOUR_GREEN = (0, 255, 0)
-    COLOUR_BLUE = (0, 0, 255)
-    COLOUR_YELLOW = (255, 255, 0)
     COLOUR_MAGENTA = (255, 0, 255)
-    COLOUR_CYAN = (0, 255, 255)
-    COLOUR_WHITE = (255, 255, 255)
-    COLOUR_ORANGE = (255, 165, 0)
-    COLOUR_PURPLE = (128, 0, 128)
     COLOUR_PINK = (255, 192, 203)
 
     LED_COLOURS = [
         COLOUR_RED,
         COLOUR_GREEN,
-        COLOUR_BLUE,
-        COLOUR_YELLOW,
         COLOUR_MAGENTA,
-        COLOUR_CYAN,
-        COLOUR_WHITE,
-        COLOUR_ORANGE,
-        COLOUR_PURPLE,
         COLOUR_PINK
     ]
 
@@ -98,10 +97,10 @@ def load_anims(file_name):
             data = json.load(infile)
     except FileNotFoundError:
         if DEBUG:
-            print('Oops problem loading JSON! File not found.')
+            print('Problem loading JSON. File not found.')
     except json.JSONDecodeError:
         if DEBUG:
-            print('Oops problem loading JSON! Invalid JSON data.')
+            print('Problem loading JSON. Invalid JSON data.')
 
     log_message("Loaded animations from JSON file")
 
@@ -112,23 +111,26 @@ def anim_runner(anims, font):
 
     if DEBUG:
         print("Running next anim_runner()")
-        log_message("Running next anim_runner()")
+        log_message(f"Running next anim_runner() with {anims}")
 
     for anim in anims:
         # Choose a new LED colour if RGB LED is connected
         if RGB_LED_CONNECTED:
             color = random.choice(LED_COLOURS)
             set_rgb_color(*color)
-        
+
         left = anim.get("l")
         right = anim.get("r")
 
         if left is not None and right is not None:
             max7219_eyes.show_char(font[left], font[right])
 
-        brightness = anim.get("bl")
+        brightness = anim.get("br")
 
         if brightness is not None:
+            if brightness > MAX_BRIGHT:
+                brightness = MAX_BRIGHT
+            # print(f"Setting brightness to: {brightness}")
             max7219_eyes.set_brightness(brightness)
 
         delay = anim.get("d")
@@ -140,18 +142,18 @@ def show_char(left, right):
     """Show character"""
     max7219_eyes.show_char(left,right)
 
-def scroll_message(font, message='hello', delay=0.04):
+def scroll_message(font, message, delay=0.04):
     """Scroll message"""
-    left_message = '   ' + message
-    right_message = message + '   '
-    length = len(right_message)
-    char_range = range(length - 1)
+    left_eye_message = "     " + message
+    right_eye_message = message + "     "
+    length = len(right_eye_message)
+    char_range = range(length-1)
 
     for char_pos in char_range:
-        right_left_char = font[right_message[char_pos]]
-        right_right_char = font[right_message[char_pos + 1]]
-        left_left_char = font[left_message[char_pos]]
-        left_right_char = font[left_message[char_pos + 1]]
+        right_left_char = font[right_eye_message[char_pos]]
+        right_right_char = font[right_eye_message[char_pos + 1]]
+        left_left_char = font[left_eye_message[char_pos]]
+        left_right_char = font[left_eye_message[char_pos + 1]]
 
         for shift in range(8):
             if RGB_LED_CONNECTED:
@@ -175,30 +177,50 @@ def main():
     if DEBUG:
         print("Running main()")
         log_message("Starting main.py")
-    
+
     anims = load_anims('eyes_ani.json')
 
+    # Main animation loop defined here
     while True:
-        show_char(matrix_fonts.eyes['ghost1'], matrix_fonts.eyes['ghost1'])
+        show_char(matrix_fonts.eyes['ghost1'], matrix_fonts.eyes['ghost2'])
         time.sleep(1)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
-        scroll_message(matrix_fonts.textFont1, " Jack's Pumpkin woooOOOO.. ")
-        anim_runner(anims['growEyes'],matrix_fonts.eyes)
-        anim_runner(anims['roll'],matrix_fonts.eyes)
-        anim_runner(anims['downLeftABit'],matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
-        anim_runner(anims['downRightABit'],matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
-        scroll_message(matrix_fonts.textFont1, ' Trick or Treat? ')
-        anim_runner(anims['roll'],matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
-        anim_runner(anims['growEyes'],matrix_fonts.eyes)
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        scroll_message(matrix_fonts.textFont1, " Jack's Pumpkin ")
+
+        show_char(matrix_fonts.shapes['heart1'], matrix_fonts.shapes['heart2'])
+        time.sleep(0.5)
+        show_char(matrix_fonts.shapes['heart2'], matrix_fonts.shapes['heart1'])
+        time.sleep(0.5)
+        show_char(matrix_fonts.shapes['heart1'], matrix_fonts.shapes['heart2'])
+        time.sleep(1)
+
+        anim_runner(anims['winkLeft'], matrix_fonts.eyes)
+        anim_runner(anims['growEyes'], matrix_fonts.eyes)
+        anim_runner(anims['roll'], matrix_fonts.eyes)
+
+        show_char(matrix_fonts.shapes['invader1'], matrix_fonts.shapes['invader2'])
+        time.sleep(0.5)
+        show_char(matrix_fonts.shapes['invader2'], matrix_fonts.shapes['invader1'])
+        time.sleep(0.5)
+        show_char(matrix_fonts.shapes['invader1'], matrix_fonts.shapes['invader2'])
+        time.sleep(1)
+
+        anim_runner(anims['downLeftABit'], matrix_fonts.eyes)
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        anim_runner(anims['downRightABit'], matrix_fonts.eyes)
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+
+        scroll_message(matrix_fonts.textFont1, ' Trick or Treat? ', 0.02)
+
+        anim_runner(anims['roll'], matrix_fonts.eyes)
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        anim_runner(anims['growEyes'], matrix_fonts.eyes)
+
         scroll_message(matrix_fonts.textFont1, ' Spooky! ')
-        anim_runner(anims['ghosts1'],matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
-        anim_runner(anims['winkLeft'],matrix_fonts.eyes)
-        anim_runner(anims['winkRight'],matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'],matrix_fonts.eyes)
+
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        anim_runner(anims['winkRight'], matrix_fonts.eyes)
+        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
         scroll_message(matrix_fonts.textFont1, ' Happy Halloween! ', 0.03)
 
 # Run the thing
