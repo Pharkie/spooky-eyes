@@ -221,7 +221,7 @@ def main():
         scroll_message(
             matrix_fonts.textFont1,
             " Double, double toil and trouble; " +
-            "Fire burn and caldron bubble. "
+            "Fire burn and caldron bubble. ",
             0.03
         )
         
