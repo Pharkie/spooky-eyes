@@ -14,6 +14,7 @@ License: GNU General Public License (GPL)
 import time
 import json
 import random
+import gc
 import machine
 import matrix_fonts
 from max7219_matrix import max7219_matrix
@@ -32,7 +33,7 @@ RED_PIN = 1
 GREEN_PIN = 2
 BLUE_PIN = 3
 
-DEBUG = False  # Set to True to log messages to log.txt
+DEBUG = False # Set to True to log messages to log.txt
 
 # Custom logging function
 # Logs messages to a file with a timestamp
@@ -40,10 +41,12 @@ DEBUG = False  # Set to True to log messages to log.txt
 def log_message(message, mode='a'):
     """Log a message to a file"""
     if DEBUG:
+        print(message)
+
         with open('log.txt', mode) as log_file:
             current_time = time.localtime()
             formatted_time = (
-                f"{current_time[0]:04}-{current_time[1]:02}-{current_time[2]:02} "
+                f"{current_time[0]:04}-{current_time[1]:02}-{current_time[2]:02} " +
                 f"{current_time[3]:02}:{current_time[4]:02}:{current_time[5]:02}"
             )
             log_file.write(f"{formatted_time} - {message}\n")
@@ -96,22 +99,20 @@ def load_anims(file_name):
         with open(file_name, encoding='utf-8') as infile:
             data = json.load(infile)
     except FileNotFoundError:
-        if DEBUG:
-            print('Problem loading JSON. File not found.')
+        log_message('Problem loading JSON. File not found.')
     except json.JSONDecodeError:
-        if DEBUG:
-            print('Problem loading JSON. Invalid JSON data.')
+        log_message('Problem loading JSON. Invalid JSON data.')
 
     log_message("Loaded animations from JSON file")
 
     return data
 
-def anim_runner(anims, font):
+def anim_runner(anims_JSON, anim_name, font):
     """Run animations"""
 
-    if DEBUG:
-        print("Running next anim_runner()")
-        log_message(f"Running next anim_runner() with {anims}")
+    log_message(f"anim_runner() with {anim_name}")
+
+    anims = anims_JSON[anim_name]
 
     for anim in anims:
         # Choose a new LED colour if RGB LED is connected
@@ -138,12 +139,16 @@ def anim_runner(anims, font):
         if delay is not None:
             time.sleep(delay)
 
+    gc.collect()
+
 def show_char(left, right):
     """Show character"""
     max7219_eyes.show_char(left,right)
 
 def scroll_message(font, message, delay=0.04):
     """Scroll message"""
+    log_message(f"scroll_message() with message: {message}")
+
     left_eye_message = "     " + message
     right_eye_message = message + "     "
     length = len(right_eye_message)
@@ -174,17 +179,20 @@ def scroll_message(font, message, delay=0.04):
 
 def main():
     """Run main program"""
-    if DEBUG:
-        print("Running main()")
-        log_message("Starting main.py")
+    log_message("Starting main.py")
 
-    anims = load_anims('eyes_ani.json')
+    anims_JSON = load_anims('eyes_ani.json')
+    loop_counter = 0
 
     # Main animation loop defined here
     while True:
+        loop_counter += 1
+        log_message(f">>> Starting loop {loop_counter}")
+
+        gc.collect()
         show_char(matrix_fonts.eyes['ghost1'], matrix_fonts.eyes['ghost2'])
         time.sleep(1)
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
         scroll_message(matrix_fonts.textFont1, " Jack's Pumpkin ")
 
         show_char(matrix_fonts.shapes['heart1'], matrix_fonts.shapes['heart2'])
@@ -192,36 +200,37 @@ def main():
         show_char(matrix_fonts.shapes['heart2'], matrix_fonts.shapes['heart1'])
         time.sleep(0.5)
         show_char(matrix_fonts.shapes['heart1'], matrix_fonts.shapes['heart2'])
-        time.sleep(1)
+        time.sleep(0.5)
 
-        anim_runner(anims['winkLeft'], matrix_fonts.eyes)
-        anim_runner(anims['growEyes'], matrix_fonts.eyes)
-        anim_runner(anims['roll'], matrix_fonts.eyes)
+        anim_runner(anims_JSON, "winkLeft", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "growEyes", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "roll", matrix_fonts.eyes)
+        gc.collect()
 
         show_char(matrix_fonts.shapes['invader1'], matrix_fonts.shapes['invader2'])
         time.sleep(0.5)
         show_char(matrix_fonts.shapes['invader2'], matrix_fonts.shapes['invader1'])
         time.sleep(0.5)
         show_char(matrix_fonts.shapes['invader1'], matrix_fonts.shapes['invader2'])
-        time.sleep(1)
+        time.sleep(0.5)
 
-        anim_runner(anims['downLeftABit'], matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
-        anim_runner(anims['downRightABit'], matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
+        anim_runner(anims_JSON, "downLeftABit", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "downRightABit", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
 
-        scroll_message(matrix_fonts.textFont1, ' Trick or Treat? ', 0.02)
+        scroll_message(matrix_fonts.textFont1, " Trick or Treat? ", 0.02)
 
-        anim_runner(anims['roll'], matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
-        anim_runner(anims['growEyes'], matrix_fonts.eyes)
+        anim_runner(anims_JSON, "roll", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "growEyes", matrix_fonts.eyes)
 
         scroll_message(matrix_fonts.textFont1, ' Spooky! ')
 
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
-        anim_runner(anims['winkRight'], matrix_fonts.eyes)
-        anim_runner(anims['stareAndBlink'], matrix_fonts.eyes)
-        scroll_message(matrix_fonts.textFont1, ' Happy Halloween! ', 0.03)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "winkRight", matrix_fonts.eyes)
+        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
+        scroll_message(matrix_fonts.textFont1, " Happy Halloween! ", 0.03)
 
 # Run the thing
 if __name__ == "__main__":
