@@ -155,10 +155,10 @@ def scroll_message(font, message, delay=0.04):
     char_range = range(length-1)
 
     for char_pos in char_range:
-        right_left_char = font[right_eye_message[char_pos]]
-        right_right_char = font[right_eye_message[char_pos + 1]]
-        left_left_char = font[left_eye_message[char_pos]]
-        left_right_char = font[left_eye_message[char_pos + 1]]
+        right_left_char = font.get(right_eye_message[char_pos], font[' '])
+        right_right_char = font.get(right_eye_message[char_pos + 1], font[' '])
+        left_left_char = font.get(left_eye_message[char_pos], font[' '])
+        left_right_char = font.get(left_eye_message[char_pos + 1], font[' '])
 
         for shift in range(8):
             if RGB_LED_CONNECTED:
@@ -203,7 +203,16 @@ def main():
         time.sleep(0.5)
 
         anim_runner(anims_JSON, "winkLeft", matrix_fonts.eyes)
-        anim_runner(anims_JSON, "growEyes", matrix_fonts.eyes)
+        
+        scroll_message(
+            matrix_fonts.textFont1,
+            " Double, double toil and trouble; " +
+            "Fire burn and caldron bubble. " +
+            "Fillet of a fenny snake, " +
+            "In the caldron boil and bake ",
+            0.03
+        )
+        
         anim_runner(anims_JSON, "roll", matrix_fonts.eyes)
         gc.collect()
 
@@ -216,8 +225,6 @@ def main():
 
         anim_runner(anims_JSON, "downLeftABit", matrix_fonts.eyes)
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
-        anim_runner(anims_JSON, "downRightABit", matrix_fonts.eyes)
-        anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
 
         scroll_message(matrix_fonts.textFont1, " Trick or Treat? ", 0.02)
 
@@ -225,7 +232,15 @@ def main():
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
         anim_runner(anims_JSON, "growEyes", matrix_fonts.eyes)
 
-        scroll_message(matrix_fonts.textFont1, ' Spooky! ')
+        scroll_message(
+            matrix_fonts.textFont1,
+            " Come, you spirits " +
+            "That tend on mortal thoughts! Unsex me here, " +
+            "And fill me from the crown to the toe top full " +
+            "Of direst cruelty; make thick my blood, " +
+            "Stop up the access and passage to remorse ",
+            0.03
+        )
 
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
         anim_runner(anims_JSON, "winkRight", matrix_fonts.eyes)
