@@ -21,35 +21,35 @@ from max7219_matrix import max7219_matrix
 
 # User-settable variables
 
-# Pico specific pins
-SPI_BUS = 0  # Use SPI(0) for Raspberry Pi Pico
-CLK_PIN = 2  # CLK / SCK
-DIN_PIN = 3  # DIN / MOSI / TX
-CS_PIN = 1   # CS
+MAX_BRIGHT = 2  # Set global max brightness 0-15
+
+# # Pico specific pins
+# SPI_BUS = 0  # Use SPI(0) for Raspberry Pi Pico
+# CLK_PIN = 2  # CLK / SCK
+# DIN_PIN = 3  # DIN / MOSI / TX
+# CS_PIN = 1   # CS
+
+# RGB_LED_CONNECTED = True  # Set to False if RGB LED is not connected
+# # These pins aren't used if RGB_LED_CONNECTED is False
+# RED_PIN = 14
+# GREEN_PIN = 15
+# BLUE_PIN = 16
+
+# ESP32-C3 specific pins
+SPI_BUS = 1  # Use SPI(1) for ESP32-C3
+CLK_PIN = 6
+DIN_PIN = 7
+CS_PIN = 10
 
 MAX_BRIGHT = 2  # Set global max brightness 0-15
 
 RGB_LED_CONNECTED = True  # Set to False if RGB LED is not connected
 # These pins aren't used if RGB_LED_CONNECTED is False
-RED_PIN = 14
-GREEN_PIN = 15
-BLUE_PIN = 16
+RED_PIN = 1
+GREEN_PIN = 2
+BLUE_PIN = 3
 
-# ESP32-C3 specific pins
-# SPI_BUS = 1  # Use SPI(1) for ESP32-C3
-# CLK_PIN = 6
-# DIN_PIN = 7
-# CS_PIN = 10
-
-# MAX_BRIGHT = 2  # Set global max brightness 0-15
-
-# RGB_LED_CONNECTED = True  # Set to False if RGB LED is not connected
-# # These pins aren't used if RGB_LED_CONNECTED is False
-# RED_PIN = 1
-# GREEN_PIN = 2
-# BLUE_PIN = 3
-
-DEBUG = True # Set to True to log messages to log.txt
+DEBUG = False # Set to True to log messages to log.txt
 
 # Custom logging function
 # Logs messages to a file with a timestamp
@@ -203,7 +203,6 @@ def main():
         loop_counter += 1
         log_message(f">>> Starting loop {loop_counter}")
 
-        gc.collect()
         show_char(matrix_fonts.eyes['ghost1'], matrix_fonts.eyes['ghost2'])
         time.sleep(1)
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
@@ -226,7 +225,6 @@ def main():
         )
         
         anim_runner(anims_JSON, "roll", matrix_fonts.eyes)
-        gc.collect()
 
         show_char(matrix_fonts.shapes['invader1'], matrix_fonts.shapes['invader2'])
         time.sleep(0.5)
@@ -244,15 +242,15 @@ def main():
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
         anim_runner(anims_JSON, "growEyes", matrix_fonts.eyes)
 
-        # scroll_message(
-        #     matrix_fonts.textFont1,
-        #     " Come, you spirits " +
-        #     "That tend on mortal thoughts! Unsex me here, " +
-        #     "And fill me from the crown to the toe top full " +
-        #     "Of direst cruelty; make thick my blood, " +
-        #     "Stop up the access and passage to remorse ",
-        #     0.03
-        # )
+        scroll_message(
+            matrix_fonts.textFont1,
+            " Come, you spirits" +
+            " That tend on mortal thoughts! Unsex me here," +
+            " And fill me from the crown to the toe top full" +
+            " Of direst cruelty; make thick my blood," +
+            " Stop up the access and passage to remorse ",
+            0.03
+        )
 
         anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
         anim_runner(anims_JSON, "winkRight", matrix_fonts.eyes)

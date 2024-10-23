@@ -2,9 +2,16 @@ import machine
 import time
 
 # Define GPIO pins for the RGB LED
-RED_PIN = 14
-GREEN_PIN = 15
-BLUE_PIN = 16
+
+# Pico specific pins
+# RED_PIN = 14
+# GREEN_PIN = 15
+# BLUE_PIN = 16
+
+# ESP32-C3 specific pins
+RED_PIN = 1
+GREEN_PIN = 2
+BLUE_PIN = 3
 
 # Initialize the pins
 red = machine.Pin(RED_PIN, machine.Pin.OUT)
