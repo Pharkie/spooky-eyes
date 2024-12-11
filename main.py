@@ -219,6 +219,49 @@ def main():
         # show_char(matrix_fonts.eyes["tree1"], matrix_fonts.eyes["tree2"])
         # time.sleep(1)
         # anim_runner(anims_JSON, "stareAndBlink", matrix_fonts.eyes)
+        show_char(matrix_fonts.shapes["doodle1"], matrix_fonts.shapes["doodle1"])
+        time.sleep(5)
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            " the designer is the artist and we all made this together. the designer is the most important kid. And the designer is the most important kid because he was doing so much good stuff and he never stopped doing the messages and he never stopped and never stopped, never ever stopped for his whole life. And then he always did it. yiuuiuouiuuoiuijhjyyuuuujjggggggggggggggggggghfffkgjhljkghgmb.,bjlm,bh67844444847777888896321452422222222222222222222222222222222222222222kjllllllllllllllllllllllllllllllllllllllllllllllllllllllllhgfdsaa;'\][///////////iolkj,jj.kbmj ",
+        )
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            " ;tylhtyuiyo9yiesrdofgtphotf][[t-j-tpuuohyupotktiopuothypiuohgptyuoipy9kioupyg9toiprt[9tyouipy9oi7oyiu8u8guoyiuiytupikyupiriotupoykuiuykhotyjtyuygyulylptoooi;ptolkyyoyuhklgl;ujkljlhlkjkyt-[pojpj,ukmtjghjlkmbvnm , njkm.nb m,,mmn bmn, bnbm,nbmnb mnm b bmbbknjl ,nblmnbm nmb,bnbbn, mnbmnbvvvvcvccxzasddfghhhjjjjjjjjjjjjjkkloppppppppppppppppppppppppppppppppppppppppppppppppppppp78loiyuuii8uyu8u56i8uy9ioiytyte5r4retr3yr3we564ty5tewu346ltofgiyiuuujtrjktui7yfteyriy7ug6ytuhgy7r5t5ygdfvdsrhtjyhuivjcft87uhyjtufdh85t4hrfeuyr78365ytry5tr798iy40293i5u8645r895t8t5uy95ruy9r5rdyt7yt56r5764t75rer5555w54w354re45e45er6e5re6re5r54r45re7r6gyu]]]]",
+        )
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            " nmmmmmm,,,,,,,,,,,,,m mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuughgh8oupiyuoyoipio8i8ouiuuoypouiipuiiiiiiiuii7o7upkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp[[[[[[[[[[[[[[[[[[[llllllllllllllllllllllllllllllllllllllllllllllllllLLLLLLLLLLLpoiyusadtyuujtyjy75465766587567u856677957ygt45iyu658677u558797uj468y7u5t4u6ty6464u74y357t546ytr67t75y5tyyrugyryurhuturt756t5t6t6gttry757866658y5uy65ytuytuytutiytrtrygutuyuhytyutgtuyelephantcoma]]]]]]]]]]]]]]]]]]]",
+        )
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            " We are the Elephant Company opooo;kllllllllgfstryfrgrty4u5rtuhnyttujgyhtyghtfj bvhytrufgjhhklmijlkmkjnjluj. m,jkl.j;,lkjm,m.,jkk,.k,/ljnjml.n,ml. ",
+        )
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            " iopollllllllkjjhgfdsaaqqqeeeeeeerttttgbbbvvvfghjmnhjk,mnnmjmnjnjm         ",
+        )
+
+        show_char(
+            matrix_fonts.shapes["heart1F"], matrix_fonts.shapes["heart1F"]
+        )
+        time.sleep(0.5)
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            "                    mmmnmnmnmnmnmmnnn,m,,,.m,m,nmnjjbkb,,mnmnn,",
+        )
+
+        scroll_message(
+            matrix_fonts.textFont1,
+            "                    mmmnmnmnmnmnmmnnn,m,,,.m,m,nmnjjbkb,,mnmnn,",
+        )
+
         scroll_message(matrix_fonts.textFont1, " lpuewsdwvvvvvvvvvu ")
 
         show_char(matrix_fonts.shapes["tree1"], matrix_fonts.shapes["tree2"])
