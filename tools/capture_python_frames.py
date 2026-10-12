@@ -243,7 +243,7 @@ FX_HOOK = None
 def fake_print(*args, sep=' ', end='\n', **kwargs):
     text = sep.join(str(a) for a in args)
     if text.startswith('SAY:'):
-        REC.add('S ' + text[4:])
+        REC.add('S ' + SPOKEN.get(text[4:], text[4:]))
     elif text.startswith('FX:') and FX_HOOK:
         FX_HOOK(text[3:])
     else:
@@ -399,11 +399,22 @@ def run_surprise(code, namespace, phrases, fake_random):
 RECORDED_NAME = "Jack's Pumpkin"
 
 
+# Sounds respelt so phone voices make the sound instead of spelling out the letters ("S, S, S..."). The
+# Mac voice the old page used coped; speechSynthesis on phones doesn't.
+SPOKEN = {
+    'Sssssssss': 'Shhhhhhh!',
+    'Sssssssssssss': 'Shhhhhhhhhh!',
+    'Hrrmm?': 'Hmmm?',
+    'Hrrm! Hrrm!': 'Hmm! Hmmm!',
+    "I'm so sleepy. Zzzzzzzz.": "I'm so sleepy. Snore... snore...",
+}
+
+
 def button_phrases():
-    """%PHRASES from pumpkin-buttons.pl, minus phrases the new firmware deliberately dropped"""
+    """%PHRASES from pumpkin-buttons.pl, minus phrases the new firmware deliberately dropped or respelt"""
     phrases = dict(read_perl_hash('PHRASES'))
     del phrases['name']
-    return phrases
+    return {fx_id: SPOKEN.get(phrase, phrase) for fx_id, phrase in phrases.items()}
 
 
 def capture_all():

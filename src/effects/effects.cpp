@@ -127,7 +127,7 @@ namespace
         }
         if (tnt)
         {
-            engine.say("Sssssssss");
+            engine.say("Shhhhhhh!"); // a hiss: phone voices spell "Sssss" out letter by letter
             for (int i = 0; i < 8; i++)
                 showFor(engine, torch, (i % 2) ? S::tntFlash : S::tnt, 250);
             engine.say("BOOM!");
@@ -291,7 +291,7 @@ void creeperExplode(Engine &engine)
     const Frame &creeper = S::creeper;
     const Frame &flash = S::creeperFlash;
     showFor(engine, creeper, creeper, 1500);
-    engine.say("Sssssssssssss");
+    engine.say("Shhhhhhhhhh!"); // the hiss (spelt so phone voices make the sound)
     for (int i = 0; i < 10; i++)
     {
         const Frame &face = (i % 2) ? flash : creeper;
@@ -342,9 +342,9 @@ void emeraldTrade(Engine &engine)
     const int far = rightEyeColumn(engine);
     for (int i = 0; i < 3; i++)
         sequence(engine, {{villager, S::emerald1, 300}, {villager, S::emerald2, 300}});
-    engine.say("Hrrmm?");
+    engine.say("Hmmm?"); // the villager (phone voices spell out "Hrrm")
     slide(engine, {S::emerald1, S::emerald2}, far, 8, villager, kBlank, 60);
-    engine.say("Hrrm! Hrrm!");
+    engine.say("Hmm! Hmmm!");
     for (int i = 0; i < 3; i++)
         sequence(engine, {{nod, blank, 150}, {villager, blank, 150}});
     slide(engine, {S::diamond1}, 8, far, villager, kBlank, 60);
