@@ -1,0 +1,15 @@
+# trees: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['tree1'], S['tree1lit2'], 6, 0.4)
+# 12 events. Do not edit: re-run the capture script instead.
+F 5a993cbd7eff1818 18183c3c7eff1818
+W 400
+F 18183c3c7eff1818 5a993cbd7eff1818
+W 400
+F 5a993cbd7eff1818 18183c3c7eff1818
+W 400
+F 18183c3c7eff1818 5a993cbd7eff1818
+W 400
+F 5a993cbd7eff1818 18183c3c7eff1818
+W 400
+F 18183c3c7eff1818 5a993cbd7eff1818
+W 400

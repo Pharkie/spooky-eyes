@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1324">
+<title>Spooky Pumpkin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<header class="top">
+  <span class="icon-link" aria-hidden="true"></span>
+  <h1>🎃 <span data-name>Spooky Pumpkin</span></h1>
+  <a class="icon-link" href="/settings" aria-label="Settings" title="Settings">⚙️</a>
+</header>
+<div id="status" class="status" role="status" aria-live="polite">Waking up the pumpkin…</div>
+<nav class="show-bar" aria-label="The show">
+  <button id="start-show" class="btn start-show" type="button">▶ Start the show</button>
+  <a class="btn secondary" href="/show">✏️ Make the show</a>
+</nav>
+<p id="wifi-notice" class="notice" hidden></p>
+<div class="talk">
+  <label class="switch-label"><input type="checkbox" id="talk" class="switch" checked> 🗣️ Talking pumpkin</label>
+  <select id="voice" aria-label="Voice" hidden></select>
+</div>
+<p id="no-speech" class="hint center" hidden>This browser can't talk. Try Safari or Chrome.</p>
+
+<h2>Your own words</h2>
+<form id="own" class="own" autocomplete="off">
+  <input id="words" placeholder="Type anything…" enterkeyhint="send" aria-label="Your own words">
+  <button id="say" class="say-btn" type="submit" data-id="words">✨ Scroll it!</button>
+</form>
+<div id="err" class="error" role="alert"></div>
+
+<div id="effects"><p class="center muted"><span class="spinner"></span>Getting the buttons…</p></div>
+
+<p class="links"><a href="/show">✏️ Make the show</a> <a href="/settings">⚙️ Settings</a></p>
+</main>
+<script src="/common.js"></script>
+<script>
+'use strict';
+(() => {
+  const { $, get, post, listen, loadStatus, setupReason, store, straightQuotes, setMode, effectName, effectAccordion, loadFailed, playerText } = Pumpkin;
+  const statusEl = $('status');
+  const err = $('err');
+  const words = $('words');
+  const talk = $('talk');
+  const voicePicker = $('voice');
+  const startShow = $('start-show');
+  const effects = new Map(); // id -> {id, label, emoji, group}
+  let seq = 0;               // each press gets a number; only the newest press shows its error
+  let pending = null;        // {test(player), at}: what this phone just asked for, until the pumpkin confirms it
+
+  function setStatus(text, playing) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle('playing', !!playing);
+  }
+
+  function outline(button) {
+    document.querySelectorAll('.now').forEach((b) => b.classList.remove('now'));
+    if (button) button.classList.add('now');
+  }
+
+  function buttonFor(id) {
+    return [...document.querySelectorAll('[data-id]')].find((b) => b.dataset.id === id) || null;
+  }
+
+  // Just after asking for something, ignore older news until the pumpkin confirms it (or 2 s pass)
+  function expect(test) {
+    pending = { test, at: Date.now() };
+  }
+
+  // ---- Buttons mode: the show pauses while this page is open ----
+  // The pumpkin goes back to its show by itself 2 minutes (kButtonsIdleTimeoutMs) after the last press or
+  // "still here", so say it every 30 s (kButtonsHeartbeatMs) while the page is on screen, and stop while
+  // it's hidden: a phone put away in a pocket lets the pumpkin go back to its show.
+
+  let HEARTBEAT_MS = 30000; // until /api/status says (kButtonsHeartbeatMs in the firmware)
+  let wantButtons = true;    // false after "Start the show", until the next press
+  let heartbeatTimer = 0;
+  let buttonsOkAt = 0;       // when the pumpkin last agreed to buttons mode (a heartbeat or a press)
+  let sawButtons = false;    // the news has said "buttons mode" since then
+  let modeQueue = Promise.resolve(); // mode requests go one at a time, so a late heartbeat can't undo "Start the show"
+
+  const onScreen = () => document.visibilityState === 'visible';
+
+  function askMode(mode) {
+    const request = modeQueue.then(() => setMode(mode));
+    modeQueue = request.catch(() => { /* the caller deals with it */ });
+    return request;
+  }
+
+  // Start (or restart) the 30 s countdown to the next heartbeat; none while hidden or after "Start the show"
+  function scheduleHeartbeat() {
+    clearTimeout(heartbeatTimer);
+    heartbeatTimer = wantButtons && onScreen() ? setTimeout(heartbeat, HEARTBEAT_MS) : 0;
+  }
+
+  async function heartbeat() {
+    scheduleHeartbeat();
+    if (!wantButtons || !onScreen()) return;
+    try {
+      await modeQueue;
+      if (!wantButtons) return; // "Start the show" got in first
+      await askMode('buttons');
+      buttonsOkAt = Date.now();
+    } catch (e) { /* the next one may work; the status line says if the pumpkin's gone */ }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (onScreen()) {
+      heartbeat();
+    } else {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = 0;
+      sawButtons = false;
+    }
+  });
+  // Back to this page from the show creator (Safari may keep the old page and show it again)
+  window.addEventListener('pageshow', (event) => { if (event.persisted) heartbeat(); });
+
+  // Someone started the show (another phone, or "Save and play" on the show page) while this page was
+  // keeping the pumpkin in buttons mode: let it play, rather than stopping it at the next heartbeat. (A
+  // show that comes back because this phone went quiet for 2 minutes doesn't count.)
+  function noticeMode(player) {
+    if (player.mode === 'buttons') {
+      sawButtons = wantButtons && buttonsOkAt > 0;
+      return;
+    }
+    if (wantButtons && sawButtons && onScreen() && Date.now() - buttonsOkAt < 2 * HEARTBEAT_MS) {
+      wantButtons = false;
+      scheduleHeartbeat();
+    }
+    sawButtons = false;
+  }
+
+  // ---- Buttons, built from the firmware's list of effects ----
+
+  async function loadEffects() {
+    const box = $('effects');
+    try {
+      const data = await get('/api/effects');
+      for (const fx of data.effects) effects.set(fx.id, fx);
+      effectAccordion(box, data.effects, { storeKey: 'section' });
+    } catch (e) {
+      loadFailed(box, 'the buttons', e, loadEffects);
+    }
+  }
+
+  // ---- Pressing things ----
+
+  async function press(button, label, send) {
+    const mine = ++seq;
+    err.textContent = '';
+    outline(button);
+    expect((player) => player.mode === 'buttons' && player.effectId === button.dataset.id);
+    setStatus('Playing: ' + label + ' …', true);
+    // A press means buttons mode (and counts as "still here")
+    wantButtons = true;
+    scheduleHeartbeat();
+    try {
+      await send();
+      buttonsOkAt = Date.now();
+    } catch (e) {
+      if (mine !== seq) return; // a newer press took over
+      pending = null;
+      outline(null);
+      setStatus('Oops, that didn’t work.');
+      err.textContent = e.message;
+    }
+  }
+
+  $('effects').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-id]');
+    if (!button) return;
+    const fx = effects.get(button.dataset.id);
+    press(button, effectName(fx), () => post('/api/play', { id: fx.id }));
+  });
+
+  $('own').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = straightQuotes(words.value).trim();
+    if (!text) {
+      err.textContent = 'Type some words first';
+      words.focus();
+      return;
+    }
+    press($('say'), '“' + text + '”', () => post('/api/words', { words: text }));
+  });
+  words.addEventListener('input', () => { err.textContent = ''; });
+
+  startShow.addEventListener('click', async () => {
+    const mine = ++seq;
+    err.textContent = '';
+    wantButtons = false;
+    scheduleHeartbeat(); // stops it
+    outline(startShow);
+    expect((player) => player.mode === 'show');
+    setStatus('🎃 Starting the show…');
+    try {
+      await askMode('show');
+    } catch (e) {
+      if (mine !== seq) return;
+      pending = null;
+      outline(null);
+      wantButtons = true;
+      scheduleHeartbeat();
+      setStatus('Oops, that didn’t work.');
+      err.textContent = e.message;
+    }
+  });
+
+  // What the pumpkin is doing, from server-sent events (or polling)
+  function showPlayer(player) {
+    if (!player) return;
+    if (pending && Date.now() - pending.at < 2000 && !pending.test(player)) return;
+    pending = null;
+    noticeMode(player);
+    if (player.mode === 'show') {
+      outline(startShow);
+      setStatus(playerText(player, effects));
+    } else if (player.effectId) {
+      outline(buttonFor(player.effectId));
+      setStatus(playerText(player, effects), true);
+    } else {
+      outline(null);
+      setStatus(playerText(player, effects));
+    }
+  }
+
+  // ---- Talking pumpkin: the phone speaks what the pumpkin says ----
+
+  const speech = window.speechSynthesis && window.SpeechSynthesisUtterance ? window.speechSynthesis : null;
+  let voices = [];
+  let unlocked = false;
+
+  function isEnglish(voice) { return /^en([-_]|$)/i.test(voice.lang); }
+
+  function loadVoices() {
+    const list = speech.getVoices();
+    if (!list.length) return;
+    voices = list.slice().sort((a, b) => (isEnglish(b) - isEnglish(a)) || a.name.localeCompare(b.name));
+    const saved = store.get('voice');
+    // The old Mac page used Zarvox; some phones have it too
+    const zarvox = voices.find((v) => v.name === 'Zarvox');
+    const wanted = saved !== null ? saved : (zarvox ? zarvox.voiceURI : '');
+    voicePicker.textContent = '';
+    voicePicker.appendChild(new Option('Usual voice', ''));
+    const english = document.createElement('optgroup');
+    english.label = 'English';
+    const others = document.createElement('optgroup');
+    others.label = 'Other languages';
+    for (const voice of voices) {
+      (isEnglish(voice) ? english : others).appendChild(new Option(voice.name + ' (' + voice.lang + ')', voice.voiceURI));
+    }
+    if (english.children.length) voicePicker.appendChild(english);
+    if (others.children.length) voicePicker.appendChild(others);
+    voicePicker.value = voices.some((v) => v.voiceURI === wanted) ? wanted : '';
+    voicePicker.hidden = false;
+  }
+
+  function speak(text) {
+    if (!speech || !talk.checked || !text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = voices.find((v) => v.voiceURI === voicePicker.value);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
+    if (speech.speaking || speech.pending) {
+      speech.cancel(); // newest words win
+      setTimeout(() => speech.speak(utterance), 60); // Safari can drop words spoken straight after cancel
+    } else {
+      speech.speak(utterance);
+    }
+  }
+
+  // iPhones only let a page talk after a tap, so say nothing (silently) on the first one
+  function unlockSpeech() {
+    if (unlocked) return;
+    unlocked = true;
+    const hush = new SpeechSynthesisUtterance(' ');
+    hush.volume = 0;
+    speech.speak(hush);
+    ['touchend', 'click', 'keydown'].forEach((type) => document.removeEventListener(type, unlockSpeech, true));
+  }
+
+  if (speech) {
+    talk.checked = store.get('talk') !== 'off';
+    loadVoices();
+    speech.addEventListener ? speech.addEventListener('voiceschanged', loadVoices) : (speech.onvoiceschanged = loadVoices);
+    setTimeout(loadVoices, 700); // Safari doesn't always say when its voices are ready
+    ['touchend', 'click', 'keydown'].forEach((type) => document.addEventListener(type, unlockSpeech, true));
+    talk.addEventListener('change', () => {
+      store.set('talk', talk.checked ? 'on' : 'off');
+      if (!talk.checked) speech.cancel();
+    });
+    voicePicker.addEventListener('change', () => {
+      store.set('voice', voicePicker.value);
+      speak('Hello! This is my new voice.');
+    });
+  } else {
+    talk.checked = false;
+    talk.disabled = true;
+    $('no-speech').hidden = false;
+  }
+
+  // ---- Start ----
+
+  async function showWifiNotice() {
+    try {
+      const status = await loadStatus();
+      if (status.buttonsHeartbeatMs) HEARTBEAT_MS = status.buttonsHeartbeatMs;
+      const notice = $('wifi-notice');
+      if (status.mode === 'setup') {
+        notice.textContent = '';
+        notice.append(status.hasSavedWifi
+          ? setupReason(status) + ' It’s using its own WiFi for now. '
+          : 'The pumpkin isn’t on your home WiFi yet. ');
+        const link = document.createElement('a');
+        link.href = '/setup';
+        link.textContent = 'Set up WiFi';
+        notice.appendChild(link);
+        notice.hidden = false;
+      }
+      showPlayer(status.player);
+    } catch (e) {
+      setStatus('Oops, can’t reach the pumpkin.');
+      err.textContent = e.message;
+    }
+  }
+
+  // How much the "your own words" box takes, from the firmware's limits
+  get('/api/settings').then((s) => { words.maxLength = s.limits.maxWordsLength; }).catch(() => { /* the pumpkin checks anyway */ });
+
+  // Opening the page pauses the show (buttons mode), once it's on screen
+  if (onScreen()) expect((player) => player.mode === 'buttons');
+  heartbeat();
+  loadEffects().then(showWifiNotice);
+  listen({ status: showPlayer, say: speak });
+})();
+</script>
+</body>
+</html>

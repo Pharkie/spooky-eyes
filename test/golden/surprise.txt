@@ -1,0 +1,102 @@
+# surprise: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: the surprise show, built from %EFFECTS as pumpkin-buttons.pl builds it, stopped as it
+#         starts effect 4. It played: mining, winkright, invaders
+# 98 events. Do not edit: re-run the capture script instead.
+S Let's go mining!
+F 7e99181818181818 ffffffffffffffff
+W 350
+F 001f260606060606 ffffffefe7ffffff
+W 150
+F 7e99181818181818 ffffffefe7ffffff
+W 350
+F 001f260606060606 ffffd7efe7fbffff
+W 150
+F 7e99181818181818 ffffd7efe7fbffff
+W 350
+F 001f260606060606 ffbfd7efe7dbfdff
+W 150
+F 7e99181818181818 ffbfd7efe7dbfdff
+W 350
+F 001f260606060606 ffbbd7ede7dbddff
+W 150
+F 7e99181818181818 ffbbd7ede7dbddff
+W 350
+F 001f260606060606 efbbd7eda7dbddf7
+W 150
+F 7e99181818181818 a0c200380c42035c
+W 60
+F 7e99181818181818 4282404501004145
+W 60
+F 7e99181818181818 200201861012a0d8
+W 60
+F 7e99181818181818 2021000080848d22
+W 60
+F 7e99181818181818 0224c010c080060f
+W 60
+F 7e99181818181818 0200000416608b82
+W 60
+S You found some redstone!
+F 7e99181818181818 0024104a24520800
+W 300
+F 7e99181818181818 0012482452241000
+W 300
+F 7e99181818181818 0024104a24520800
+W 300
+F 7e99181818181818 0012482452241000
+W 300
+F 7e99181818181818 0024104a24520800
+W 300
+F 7e99181818181818 0012482452241000
+W 300
+F 7e99181818181818 0024104a24520800
+W 300
+F 7e99181818181818 0012482452241000
+W 300
+W 500
+S Wink wink!
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 2000
+M
+F 007effe7e7ff7e00 3c7effe7e7ff7e3c
+W 20
+M
+F 0000ffe7e7ff0000 3c7effe7e7ff7e3c
+W 20
+M
+F 000000e7e7000000 3c7effe7e7ff7e3c
+W 20
+M
+F 000000ffff000000 3c7effe7e7ff7e3c
+W 100
+M
+F 000000e7e7000000 3c7effe7e7ff7e3c
+W 20
+M
+F 0000ffe7e7ff0000 3c7effe7e7ff7e3c
+W 20
+M
+F 007effe7e7ff7e00 3c7effe7e7ff7e3c
+W 20
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 500
+W 500
+S The space invaders are coming!
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+W 500

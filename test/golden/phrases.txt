@@ -1,0 +1,51 @@
+# Phrases from %PHRASES in legacy/pico-micropython/tools/pumpkin-buttons.pl, by tools/capture_python_frames.py.
+# <id> <phrase>; an id on its own has no phrase.
+minecraft Minecraft eyes!
+pumpkin Chomp chomp chomp!
+invaders The space invaders are coming!
+trees Merry Christmas!
+bunnies Hop hop hop!
+witch Hee hee hee! Here I come on my broomstick!
+ghosts Woooooooo!
+hearts I love you!
+blink Blink blink.
+winkleft Wink!
+winkright Wink wink!
+roll Whatever!
+lookdown What's down there?
+grow Whoa!
+name
+spell Double, double, toil and trouble. Fire burn, and cauldron bubble!
+trick Trick or treat!
+halloween Happy Halloween!
+bat Squeak squeak! I'm a bat!
+spider Eek! A spider!
+pacman Waka waka waka waka!
+pong Boing! Boing! Boing!
+star Twinkle twinkle, little star!
+skull Rattle rattle rattle!
+cat Meow!
+angry Grrrr! I'm really cross!
+sleepy I'm so sleepy. Snore... snore...
+crosseyed Ooh, I'm going cross-eyed!
+creeper
+diamond Diamonds!
+sword Swish! Swoosh!
+enderman Don't look at the Enderman!
+dice Rolling the dice!
+magic Hmm, let me think.
+boo
+emerald
+panda I'm a hungry panda. Munch, munch, munch!
+mining Let's go mining!
+dig Dig, dig, dig!
+chop Look, a little sapling is growing!
+golem Hello. I'm an iron golem.
+lamp Redstone power!
+tnt Uh oh. Redstone, and TNT!
+ghast Watch out, a ghast!
+skeleton A skeleton with a bow and arrow!
+slime
+daynight
+portal The Nether portal is opening!
+surprise Surprise!

@@ -1,0 +1,23 @@
+# skull: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['skull1'], S['skull2'], 10, 0.15)
+# 20 events. Do not edit: re-run the capture script instead.
+F 7eff9999ffe7005a 7eff9999ffe77e5a
+W 150
+F 7eff9999ffe77e5a 7eff9999ffe7005a
+W 150
+F 7eff9999ffe7005a 7eff9999ffe77e5a
+W 150
+F 7eff9999ffe77e5a 7eff9999ffe7005a
+W 150
+F 7eff9999ffe7005a 7eff9999ffe77e5a
+W 150
+F 7eff9999ffe77e5a 7eff9999ffe7005a
+W 150
+F 7eff9999ffe7005a 7eff9999ffe77e5a
+W 150
+F 7eff9999ffe77e5a 7eff9999ffe7005a
+W 150
+F 7eff9999ffe7005a 7eff9999ffe77e5a
+W 150
+F 7eff9999ffe77e5a 7eff9999ffe7005a
+W 150

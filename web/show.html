@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1324">
+<title>The show</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body data-title=": the show">
+<main class="narrow">
+<header class="top">
+  <a class="icon-link" href="/?play=1" aria-label="Back to the buttons" title="Back to the buttons">←</a>
+  <h1>✏️ The show</h1>
+  <a class="icon-link" href="/settings" aria-label="Settings" title="Settings">⚙️</a>
+</header>
+<p class="center muted">🎃 <span data-name>Spooky Pumpkin</span></p>
+<div id="status" class="status">…</div>
+<p class="lead">The pumpkin plays these blocks in order, round and round, every time it’s switched on. Changes save themselves.</p>
+
+<div id="loading"><p class="center muted"><span class="spinner"></span>Getting the show…</p></div>
+
+<div id="editor" hidden>
+  <h2 class="blocks-head" id="blocks-title"><span id="which">Your show</span> <span id="count" class="count"></span></h2>
+  <ol id="blocks" class="blocks" aria-labelledby="which"></ol>
+  <p id="empty" class="hint center" hidden>The show is empty. Add some blocks!</p>
+
+  <div class="add-row">
+    <button id="add-words" class="btn add-words" type="button">+ Words</button>
+    <button id="add-effect" class="btn add-effect" type="button" aria-expanded="false" aria-controls="picker">+ Effect</button>
+  </div>
+  <p id="full" class="hint" hidden></p>
+  <div id="picker" class="picker" hidden>
+    <p class="hint">Tap an effect to add it to the end of the show.</p>
+    <div id="effects"></div>
+  </div>
+
+  <div class="save-bar" id="save-bar">
+    <p class="save-msg" role="status" aria-live="polite"><span id="note"></span> <span id="save-state"></span></p>
+    <button id="play" class="btn start-show" type="button">▶ Play the show</button>
+  </div>
+
+  <div class="card">
+    <h2>↩️ Start again</h2>
+    <button id="reset" class="btn danger" type="button">Reset to the original show</button>
+    <p id="reset-msg" class="hint" role="status"></p>
+  </div>
+</div>
+</main>
+<script src="/common.js"></script>
+<script>
+'use strict';
+(() => {
+  const { $, get, post, listen, loadStatus, setMode, effectName, effectAccordion, groupClass, reducedMotion, loadFailed, playerText, showMessage, showError } = Pumpkin;
+  const list = $('blocks');
+  const note = $('note');
+  const saveState = $('save-state');
+  const picker = $('picker');
+  const addWords = $('add-words');
+  const addEffect = $('add-effect');
+  const playButton = $('play');
+  const resetButton = $('reset');
+  const resetMsg = $('reset-msg');
+  const smooth = reducedMotion() ? 'auto' : 'smooth';
+  const SAVE_DELAY = 800;    // ms after the last change before it saves
+  const TYPING_DELAY = 1000; // ms after typing stops (or straight away when the words box is left)
+
+  const effects = new Map(); // id -> {id, label, emoji, group}, every effect (for names)
+  let limits = { maxBlocks: 60, maxWordsLength: 200 }; // replaced by the pumpkin's
+  let blocks = [];           // the show on screen: {type:"effect", id} or {type:"words", text}
+  let saved = '[]';          // the show the pumpkin has, as JSON
+  let isDefault = false;     // the pumpkin's show is the original one
+  let player = null;         // what the pumpkin is doing
+  let deleted = null;        // the last deleted block, {block, index}, until the next change (for Undo)
+  let drag = null;           // a block being dragged by its grip
+  let saveTimer = 0;         // a save waiting for changes to stop
+  let saving = null;         // the save on its way to the pumpkin (a promise)
+  let saveError = null;      // why the last save failed (until one works)
+  let savedOnce = false;     // this page has saved something (so "Saved ✓" means something)
+  let resetting = false;
+
+  const dirty = () => JSON.stringify(blocks) !== saved;
+  const emptyWords = () => blocks.some((b) => b.type === 'words' && !b.text.trim());
+  const copy = (list) => list.map((b) => (b.type === 'words' ? { type: 'words', text: b.text } : { type: 'effect', id: b.id }));
+
+  function setSaved(list) {
+    blocks = copy(list);
+    saved = JSON.stringify(blocks);
+  }
+
+  // "💥 Creeper" or "“Happy Hallo…”"
+  function blockName(block) {
+    if (block.type !== 'words') {
+      const fx = effects.get(block.id);
+      return fx ? effectName(fx) : block.id;
+    }
+    const text = block.text.trim();
+    if (!text) return 'a words block';
+    return '“' + (text.length > 24 ? text.slice(0, 23) + '…' : text) + '”';
+  }
+
+  // ---- The list of blocks ----
+
+  function tool(act, symbol, label, disabled) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool' + (act === 'delete' ? ' del' : '');
+    button.dataset.act = act;
+    button.textContent = symbol;
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    button.disabled = disabled;
+    return button;
+  }
+
+  function blockItem(block, index) {
+    const number = index + 1;
+    const li = document.createElement('li');
+    li.className = 'block';
+    li.dataset.index = index;
+    const grip = document.createElement('button');
+    grip.type = 'button';
+    grip.className = 'grip';
+    grip.setAttribute('aria-label', 'Drag to move block ' + number);
+    grip.title = 'Drag to move (or use the arrow keys)';
+    const num = document.createElement('span'); // the block's number, on its grip
+    num.className = 'num';
+    num.setAttribute('aria-hidden', 'true');
+    num.textContent = number;
+    grip.appendChild(num);
+    const what = document.createElement('span');
+    what.className = 'what';
+    const emoji = document.createElement('span');
+    emoji.className = 'e';
+    emoji.setAttribute('aria-hidden', 'true');
+    const extra = [];
+    if (block.type === 'words') {
+      li.classList.add(groupClass('Words'));
+      what.classList.add('words-label');
+      emoji.textContent = '💬';
+      what.append(emoji, 'Words');
+      const input = document.createElement('input');
+      input.className = 'words-input';
+      input.id = 'words-' + number;
+      input.value = block.text;
+      input.maxLength = limits.maxWordsLength;
+      input.placeholder = 'Type some words…';
+      input.autocomplete = 'off';
+      input.setAttribute('enterkeyhint', 'done');
+      input.setAttribute('aria-label', 'Words for block ' + number);
+      const hint = document.createElement('p');
+      hint.className = 'words-hint';
+      hint.id = input.id + '-hint';
+      hint.textContent = 'Type the words and it saves itself';
+      hint.hidden = !!block.text.trim();
+      input.setAttribute('aria-describedby', hint.id);
+      extra.push(input, hint);
+    } else {
+      const fx = effects.get(block.id);
+      if (fx) li.classList.add(groupClass(fx.group));
+      emoji.textContent = fx ? fx.emoji : '❓';
+      what.append(emoji, fx ? fx.label : block.id);
+    }
+    const tools = document.createElement('span');
+    tools.className = 'tools';
+    tools.append(
+      tool('up', '↑', 'Move block ' + number + ' up', index === 0),
+      tool('down', '↓', 'Move block ' + number + ' down', index === blocks.length - 1),
+      tool('delete', '✕', 'Delete block ' + number, false));
+    li.append(grip, what, tools, ...extra);
+    return li;
+  }
+
+  function render() {
+    list.textContent = '';
+    blocks.forEach((block, index) => list.appendChild(blockItem(block, index)));
+    $('empty').hidden = blocks.length > 0;
+    const full = blocks.length >= limits.maxBlocks;
+    $('count').textContent = blocks.length + ' of ' + limits.maxBlocks;
+    addWords.disabled = addEffect.disabled = full;
+    $('full').hidden = !full;
+    $('full').textContent = 'That’s the most a show can have (' + limits.maxBlocks + ' blocks).';
+    if (full) setPicker(false);
+    showSaveState();
+    markPlaying();
+  }
+
+  // Focus a block's button after the list is redrawn (the other arrow if that one's now disabled)
+  function focusTool(index, act) {
+    const li = list.children[index];
+    if (!li) return;
+    if (act === 'grip') {
+      li.querySelector('.grip').focus();
+      return;
+    }
+    let button = li.querySelector('[data-act=' + act + ']');
+    if (button.disabled) button = li.querySelector('[data-act=' + (act === 'up' ? 'down' : 'up') + ']');
+    if (button.disabled) button = li.querySelector('[data-act=delete]');
+    button.focus();
+  }
+
+  function highlight(li, cls, ms) {
+    li.classList.add(cls);
+    setTimeout(() => li.classList.remove(cls), ms);
+  }
+
+  // What just happened (e.g. "Added 💥 Creeper as block 25."), with an Undo button after a delete
+  function showNote(text, undo) {
+    showMessage(note, text);
+    if (!undo) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'linkish';
+    button.textContent = 'Undo';
+    button.addEventListener('click', undoDelete);
+    note.append(' ', button);
+  }
+
+  // A change to the show: note it, and save it a moment later
+  function changed(action, undo, delay = SAVE_DELAY) {
+    list.querySelectorAll('.bad').forEach((li) => li.classList.remove('bad'));
+    if (!undo) deleted = null;
+    if (action !== undefined) showNote(action, undo);
+    scheduleSave(delay);
+    markPlaying();
+  }
+
+  // ---- Changing the show ----
+
+  function add(block) {
+    if (blocks.length >= limits.maxBlocks) return null;
+    blocks.push(block);
+    render();
+    changed('Added ' + blockName(block) + ' as block ' + blocks.length + '.');
+    const li = list.lastElementChild;
+    highlight(li, 'flash', 1600);
+    li.scrollIntoView({ block: 'center', behavior: smooth });
+    return li;
+  }
+
+  // Move block `from` to position `to` (0-based), then focus that block's `act` button
+  function moveTo(from, to, act) {
+    if (to < 0 || to >= blocks.length || to === from) return null;
+    const [block] = blocks.splice(from, 1);
+    blocks.splice(to, 0, block);
+    render();
+    if (act) focusTool(to, act);
+    changed(blockName(block) + ' is block ' + (to + 1) + ' now.');
+    return list.children[to];
+  }
+
+  function remove(index) {
+    const [block] = blocks.splice(index, 1);
+    render();
+    if (blocks.length) focusTool(Math.min(index, blocks.length - 1), 'delete');
+    else addWords.focus();
+    deleted = { block, index };
+    changed('Deleted ' + blockName(block) + '.', true);
+  }
+
+  function undoDelete() {
+    if (!deleted || blocks.length >= limits.maxBlocks) return;
+    const { block, index } = deleted;
+    deleted = null;
+    blocks.splice(index, 0, block);
+    render();
+    const li = list.children[index];
+    highlight(li, 'flash', 1600);
+    li.scrollIntoView({ block: 'center', behavior: smooth });
+    focusTool(index, 'delete');
+    changed('Put back ' + blockName(block) + '.');
+  }
+
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-act]');
+    if (!button) return;
+    const index = Number(button.closest('li').dataset.index);
+    if (button.dataset.act === 'up') moveTo(index, index - 1, 'up');
+    else if (button.dataset.act === 'down') moveTo(index, index + 1, 'down');
+    else remove(index);
+  });
+
+  // Typing saves a second after it stops, or as soon as the words box is left
+  list.addEventListener('input', (event) => {
+    const li = event.target.closest('li');
+    blocks[Number(li.dataset.index)].text = event.target.value;
+    li.querySelector('.words-hint').hidden = !!event.target.value.trim();
+    changed('', false, TYPING_DELAY);
+  });
+  list.addEventListener('focusout', (event) => {
+    if (event.target.matches('.words-input') && saveTimer) saveNow();
+  });
+  list.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.matches('.words-input')) event.target.blur(); // done: hide the keyboard
+    // The grip moves its block with the arrow keys too
+    if (event.target.matches('.grip') && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      const index = Number(event.target.closest('li').dataset.index);
+      moveTo(index, index + (event.key === 'ArrowUp' ? -1 : 1), 'grip');
+    }
+  });
+
+  // ---- Dragging a block by its grip (Pointer Events: fingers, mice and pens) ----
+  // The row lifts out (position: fixed, under the finger) and a dashed gap shows where it will land. The
+  // grip has touch-action: none, so dragging it doesn't scroll the page; everywhere else scrolls as usual.
+  // Near the top or bottom of the screen the page scrolls along.
+
+  const EDGE = 70; // px from the top, or from the save bar, where dragging scrolls the page
+
+  list.addEventListener('pointerdown', (event) => {
+    const grip = event.target.closest('.grip');
+    if (!grip || drag || event.button > 0) return;
+    event.preventDefault(); // no text selection or long-press menu
+    const li = grip.closest('li');
+    const rect = li.getBoundingClientRect();
+    const gap = document.createElement('li');
+    gap.className = 'block-gap';
+    gap.style.height = rect.height + 'px';
+    li.before(gap);
+    li.classList.add('lifted');
+    Object.assign(li.style, { left: rect.left + 'px', top: rect.top + 'px', width: rect.width + 'px' });
+    drag = { li, grip, gap, from: Number(li.dataset.index), pointerId: event.pointerId,
+      offsetY: event.clientY - rect.top, y: event.clientY, speed: 0, frame: 0 };
+    try { grip.setPointerCapture(event.pointerId); } catch (e) { /* the window listeners still hear the moves */ }
+    window.addEventListener('pointermove', dragMove, { passive: false });
+    window.addEventListener('pointerup', dragEnd);
+    window.addEventListener('pointercancel', dragEnd);
+  });
+
+  // Keep the lifted row under the finger (inside the list), and the gap where it would land
+  function dragFollow() {
+    const { li, gap } = drag;
+    const area = list.getBoundingClientRect();
+    li.style.top = Math.max(area.top, Math.min(drag.y - drag.offsetY, area.bottom - li.offsetHeight)) + 'px';
+    const rows = [...list.children].filter((row) => row !== li && row !== gap);
+    const before = rows.find((row) => {
+      const r = row.getBoundingClientRect();
+      return drag.y < r.top + r.height / 2;
+    }) || null;
+    let next = gap.nextElementSibling;
+    if (next === li) next = li.nextElementSibling;
+    if (next !== before) list.insertBefore(gap, before);
+  }
+
+  function dragMove(event) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    event.preventDefault();
+    drag.y = event.clientY;
+    dragFollow();
+    const bottom = Math.min(window.innerHeight, $('save-bar').getBoundingClientRect().top) - EDGE;
+    const over = drag.y < EDGE ? drag.y - EDGE : drag.y > bottom ? drag.y - bottom : 0;
+    drag.speed = Math.max(-16, Math.min(16, Math.round(over / 5))); // px per frame: faster nearer the edge
+    if (drag.speed && !drag.frame) drag.frame = requestAnimationFrame(dragScroll);
+  }
+
+  function dragScroll() {
+    if (!drag) return;
+    drag.frame = 0;
+    if (!drag.speed) return;
+    window.scrollBy(0, drag.speed);
+    dragFollow();
+    drag.frame = requestAnimationFrame(dragScroll);
+  }
+
+  function dragEnd(event) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const { li, gap, grip, from } = drag;
+    cancelAnimationFrame(drag.frame);
+    window.removeEventListener('pointermove', dragMove);
+    window.removeEventListener('pointerup', dragEnd);
+    window.removeEventListener('pointercancel', dragEnd);
+    try { grip.releasePointerCapture(event.pointerId); } catch (e) { /* already let go */ }
+    const to = event.type === 'pointercancel' ? from : [...list.children].filter((row) => row !== li).indexOf(gap);
+    drag = null;
+    gap.remove();
+    li.classList.remove('lifted');
+    li.removeAttribute('style');
+    const moved = moveTo(from, to, 'grip');
+    if (moved) highlight(moved, 'flash', 1600);
+    else markPlaying();
+  }
+
+  addWords.addEventListener('click', () => {
+    const li = add({ type: 'words', text: '' });
+    if (li) li.querySelector('input').focus({ preventScroll: true });
+  });
+
+  function setPicker(open) {
+    picker.hidden = !open;
+    addEffect.setAttribute('aria-expanded', String(open));
+    addEffect.textContent = open ? '✕ Close' : '+ Effect';
+  }
+  addEffect.addEventListener('click', () => setPicker(picker.hidden));
+
+  $('effects').addEventListener('click', (event) => {
+    const tile = event.target.closest('button[data-id]');
+    if (!tile) return;
+    setPicker(false);
+    add({ type: 'effect', id: tile.dataset.id });
+    addEffect.focus({ preventScroll: true }); // ready to add another
+  });
+
+  // ---- Saving by itself ----
+  // A change saves SAVE_DELAY after the last one. One save at a time: changes made while one is on its
+  // way go in the next (the newest list wins). Nothing is sent while a words block is empty.
+
+  function scheduleSave(delay) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, delay);
+    showSaveState();
+  }
+
+  function saveNow() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (saving || resetting || !dirty() || emptyWords()) {
+      showSaveState(); // a save on its way sends the newest list when it's back
+      return saving || Promise.resolve();
+    }
+    const sent = JSON.stringify(blocks);
+    saveError = null;
+    saving = post('/api/show', { blocks: JSON.parse(sent) }, { timeout: 15000 })
+      .then((reply) => {
+        saved = JSON.stringify(reply.blocks);
+        isDefault = false;
+        savedOnce = true;
+        // The pumpkin tidies words (curly quotes made plain...): show its version, unless they've
+        // changed again since
+        if (JSON.stringify(blocks) === sent) useTidied(reply.blocks);
+      })
+      .catch((e) => {
+        saveError = e;
+        showBadBlock(e.message);
+      })
+      .finally(() => {
+        saving = null;
+        if (!saveError && !saveTimer && dirty()) saveNow(); // more changes arrived meanwhile
+        else showSaveState();
+      });
+    showSaveState();
+    return saving;
+  }
+
+  // Wait for any save that's due (for Play and Reset)
+  async function settle() {
+    if (saveTimer) saveNow();
+    while (saving) await saving;
+  }
+
+  function useTidied(tidied) {
+    if (tidied.length !== blocks.length) return;
+    tidied.forEach((block, i) => {
+      if (block.type !== 'words' || blocks[i].type !== 'words' || block.text === blocks[i].text) return;
+      blocks[i].text = block.text;
+      const input = list.children[i] && list.children[i].querySelector('.words-input');
+      if (input) replaceKeepingCaret(input, block.text);
+    });
+  }
+
+  // Change a words box's text without moving the caret of someone typing in it
+  function replaceKeepingCaret(input, text) {
+    if (document.activeElement !== input) {
+      input.value = text;
+      return;
+    }
+    const old = input.value;
+    let head = 0; // characters the same at the start, and at the end
+    while (head < old.length && head < text.length && old[head] === text[head]) head++;
+    let tail = 0;
+    while (tail < old.length - head && tail < text.length - head && old[old.length - 1 - tail] === text[text.length - 1 - tail]) tail++;
+    const map = (at) => (at <= head ? at : at >= old.length - tail ? text.length - (old.length - at) : Math.min(at, text.length));
+    const [start, end] = [map(input.selectionStart), map(input.selectionEnd)];
+    input.value = text;
+    input.setSelectionRange(start, end);
+  }
+
+  // "Block 3: ..." from the pumpkin: outline that block (and show it, unless someone's typing)
+  function showBadBlock(message) {
+    const match = /^Block (\d+)\b/.exec(message);
+    const li = match && list.children[Number(match[1]) - 1];
+    if (!li) return;
+    li.classList.add('bad');
+    if (!(document.activeElement && document.activeElement.matches('.words-input'))) {
+      li.scrollIntoView({ block: 'center', behavior: smooth });
+    }
+  }
+
+  // "Saving…", "Saved ✓", or what went wrong (with Try again), in the bar
+  function showSaveState() {
+    const unsaved = dirty();
+    let text = '';
+    let kind;
+    if (saving || saveTimer) text = 'Saving…';
+    else if (saveError) { text = saveError.message; kind = 'error'; }
+    else if (unsaved && emptyWords()) text = 'Waiting for the words…';
+    else if (savedOnce) { text = 'Saved ✓'; kind = 'ok'; }
+    if (saveState.dataset.text !== text) {
+      saveState.dataset.text = text;
+      showMessage(saveState, text, kind);
+      if (kind === 'error') {
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'linkish';
+        retry.textContent = 'Try again';
+        retry.addEventListener('click', () => { saveError = null; saveNow(); });
+        saveState.append(' ', retry);
+      }
+    }
+    $('which').textContent = isDefault && !unsaved ? 'The original show' : 'Your show';
+    // Leaving now would lose changes the pumpkin hasn't got
+    window.onbeforeunload = unsaved ? (e) => { e.preventDefault(); e.returnValue = ''; return ''; } : null;
+  }
+
+  // ---- Playing and resetting ----
+
+  playButton.addEventListener('click', async () => {
+    playButton.disabled = true;
+    try {
+      await settle();
+      await setMode('show');
+      showNote(dirty() ? '🎃 Playing the last saved show.' : '🎃 The show is playing.');
+    } catch (e) {
+      showError(note, e);
+    } finally {
+      playButton.disabled = false;
+    }
+  });
+
+  // No confirm() (captive-portal browsers don't always show pop-ups): the first tap asks, the second resets
+  let resetTimer = 0;
+  function disarmReset() {
+    clearTimeout(resetTimer);
+    resetTimer = 0;
+    resetButton.textContent = 'Reset to the original show';
+  }
+  resetButton.addEventListener('click', async () => {
+    if (!resetTimer) {
+      resetTimer = setTimeout(() => { disarmReset(); showMessage(resetMsg, ''); }, 6000);
+      resetButton.textContent = 'Tap again to reset';
+      showMessage(resetMsg, isDefault && !dirty() ? 'It’s the original show already.'
+        : 'This puts back the pumpkin’s original show, and your show is forgotten.');
+      return;
+    }
+    disarmReset();
+    resetButton.disabled = true;
+    showMessage(resetMsg, 'Resetting…');
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    resetting = true;
+    try {
+      while (saving) await saving;
+      const reply = await post('/api/show/reset');
+      isDefault = true;
+      saveError = null;
+      setSaved(reply.blocks);
+      render();
+      showNote('');
+      showMessage(resetMsg, 'Done ✓ The original show is back.', 'ok');
+    } catch (e) {
+      showError(resetMsg, e);
+    } finally {
+      resetting = false;
+      resetButton.disabled = false;
+      showSaveState();
+    }
+  });
+
+  // ---- What the pumpkin is doing (this page leaves it in whichever mode it's in) ----
+
+  function markPlaying() {
+    if (drag) return; // after the drop
+    list.querySelectorAll('.playing').forEach((li) => li.classList.remove('playing'));
+    if (!player || player.mode !== 'show' || dirty()) return; // the numbers only match the pumpkin's show
+    const li = list.children[player.block];
+    if (li) li.classList.add('playing');
+  }
+
+  function showPlayer(news) {
+    if (!news) return;
+    player = news;
+    $('status').textContent = playerText(player, effects);
+    $('status').classList.toggle('playing', player.mode === 'buttons' && !!player.effectId);
+    markPlaying();
+  }
+
+  // ---- Start ----
+
+  async function load() {
+    $('loading').innerHTML = '<p class="center muted"><span class="spinner"></span>Getting the show…</p>';
+    try {
+      const [effectList, show] = await Promise.all([get('/api/effects'), get('/api/show')]);
+      for (const fx of effectList.effects) effects.set(fx.id, fx);
+      // Not the effects that never end (the surprise show)
+      effectAccordion($('effects'), effectList.effects.filter((fx) => fx.inShow !== false), { headingTag: 'h3', storeKey: 'showSection' });
+      limits = show.limits;
+      isDefault = show.isDefault;
+      setSaved(show.blocks);
+      render();
+      $('loading').hidden = true;
+      $('editor').hidden = false;
+      if (player) showPlayer(player); // names, now the effects are known
+    } catch (e) {
+      loadFailed($('loading'), 'the show', e, load);
+    }
+  }
+
+  load();
+  loadStatus().then((status) => showPlayer(status.player)).catch(() => { $('status').textContent = 'Can’t reach the pumpkin.'; });
+  listen({ status: showPlayer });
+})();
+</script>
+</body>
+</html>

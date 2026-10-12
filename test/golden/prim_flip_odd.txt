@@ -1,0 +1,10 @@
+# prim_flip_odd: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['cat1'], S['cat2'], 3, 0.01)
+# c++:    flip(engine, Shapes::cat1, Shapes::cat2, 3, 10)
+# 6 events. Do not edit: re-run the capture script instead.
+F 81c3ffffffe77e3c 81c3ffbdffe77e3c
+W 10
+F 81c3ffbdffe77e3c 81c3ffffffe77e3c
+W 10
+F 81c3ffffffe77e3c 81c3ffbdffe77e3c
+W 10

@@ -291,8 +291,8 @@
             "d": 0.02
         },
         {
-            "l": "straightBlink2",
-            "r": "straight",
+            "r": "straightBlink2",
+            "l": "straight",
             "d": 0.02
         },
         {
@@ -304,6 +304,73 @@
             "r": "straight",
             "l": "straight",
             "d": 0.5
+        }
+    ],
+    "minecraft": [
+        {
+            "r": "minecraft",
+            "l": "minecraft",
+            "d": 1
+        },
+        {
+            "r": "minecraftLeft",
+            "l": "minecraftLeft",
+            "d": 0.8
+        },
+        {
+            "r": "minecraft",
+            "l": "minecraft",
+            "d": 0.3
+        },
+        {
+            "r": "minecraftRight",
+            "l": "minecraftRight",
+            "d": 0.8
+        },
+        {
+            "r": "minecraft",
+            "l": "minecraft",
+            "d": 0.6
+        },
+        {
+            "r": "minecraftBlink1",
+            "l": "minecraftBlink1",
+            "d": 0.04
+        },
+        {
+            "r": "minecraftBlink2",
+            "l": "minecraftBlink2",
+            "d": 0.04
+        },
+        {
+            "r": "minecraftBlink3",
+            "l": "minecraftBlink3",
+            "d": 0.04
+        },
+        {
+            "r": "all_off",
+            "l": "all_off",
+            "d": 0.06
+        },
+        {
+            "r": "minecraftBlink3",
+            "l": "minecraftBlink3",
+            "d": 0.04
+        },
+        {
+            "r": "minecraftBlink2",
+            "l": "minecraftBlink2",
+            "d": 0.04
+        },
+        {
+            "r": "minecraftBlink1",
+            "l": "minecraftBlink1",
+            "d": 0.04
+        },
+        {
+            "r": "minecraft",
+            "l": "minecraft",
+            "d": 1
         }
     ]
 }

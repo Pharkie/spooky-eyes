@@ -1,0 +1,15 @@
+# pumpkin: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['pumpkin1'], S['pumpkin2'], 6, 0.4)
+# 12 events. Do not edit: re-run the capture script instead.
+F 187edbff8181c37e 187edbffbdc3ff7e
+W 400
+F 187edbffbdc3ff7e 187edbff8181c37e
+W 400
+F 187edbff8181c37e 187edbffbdc3ff7e
+W 400
+F 187edbffbdc3ff7e 187edbff8181c37e
+W 400
+F 187edbff8181c37e 187edbffbdc3ff7e
+W 400
+F 187edbffbdc3ff7e 187edbff8181c37e
+W 400

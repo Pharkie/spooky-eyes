@@ -1,0 +1,36 @@
+# skeleton: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.skeleton_arrow()
+# 33 events. Do not edit: re-run the capture script instead.
+F ffff9999e7ff81ff 3c4299a5a599423c
+W 1200
+S Twang!
+F ffff9999e7ff81ff 3c4299a5a599423c
+W 40
+F ffff9999e7ff81ff 3c4299a5a599423c
+W 40
+F ffff9999e7ff81ff 3c4299e5a599423c
+W 40
+F ffff9999e7ff81ff 3c42d9e5e599423c
+W 40
+F ffff9999e7ff81ff 3c42b9f5a599423c
+W 40
+F ffff9999e7ff81ff 3c4299fdb599423c
+W 40
+S Thwack! Bullseye!
+F ffff9999e7ff81ff 3c52f9b5a599423c
+W 80
+F ffff9999e7ff81ff 3c4299fdb599423c
+W 80
+F ffff9999e7ff81ff 3c4299b5fd99423c
+W 80
+F ffff9999e7ff81ff 3c4299fdb599423c
+W 80
+F ffff9999e7ff81ff 3c52f9b5a599423c
+W 80
+F ffff9999e7ff81ff 3c4299fdb599423c
+W 80
+F ffff9999e7ff81ff 3c4299b5fd99423c
+W 80
+F ffff9999e7ff81ff 3c4299fdb599423c
+W 80
+W 1500

@@ -1,0 +1,43 @@
+# anim_minecraft: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'minecraft', E)
+# c++:    runAnimation(engine, Animations::minecraft)
+# 39 events. Do not edit: re-run the capture script instead.
+M
+F ff818199998181ff ff818199998181ff
+W 1000
+M
+F ff8181b1b18181ff ff8181b1b18181ff
+W 800
+M
+F ff818199998181ff ff818199998181ff
+W 300
+M
+F ff81818d8d8181ff ff81818d8d8181ff
+W 800
+M
+F ff818199998181ff ff818199998181ff
+W 600
+M
+F 00ff81999981ff00 00ff81999981ff00
+W 40
+M
+F 0000ff9999ff0000 0000ff9999ff0000
+W 40
+M
+F 000000ffff000000 000000ffff000000
+W 40
+M
+F 0000000000000000 0000000000000000
+W 60
+M
+F 000000ffff000000 000000ffff000000
+W 40
+M
+F 0000ff9999ff0000 0000ff9999ff0000
+W 40
+M
+F 00ff81999981ff00 00ff81999981ff00
+W 40
+M
+F ff818199998181ff ff818199998181ff
+W 1000

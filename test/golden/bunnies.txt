@@ -1,0 +1,19 @@
+# bunnies: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['bunny1'], S['bunny3'], 8, 0.25)
+# 16 events. Do not edit: re-run the capture script instead.
+F 6666ff81a581997e 666666ff81a5997e
+W 250
+F 666666ff81a5997e 6666ff81a581997e
+W 250
+F 6666ff81a581997e 666666ff81a5997e
+W 250
+F 666666ff81a5997e 6666ff81a581997e
+W 250
+F 6666ff81a581997e 666666ff81a5997e
+W 250
+F 666666ff81a5997e 6666ff81a581997e
+W 250
+F 6666ff81a581997e 666666ff81a5997e
+W 250
+F 666666ff81a5997e 6666ff81a581997e
+W 250

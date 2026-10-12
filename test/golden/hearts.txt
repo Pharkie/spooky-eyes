@@ -1,0 +1,9 @@
+# hearts: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['heart1'], S['heart2'], 3, 0.5)
+# 6 events. Do not edit: re-run the capture script instead.
+F 0066998181422418 0066998142241800
+W 500
+F 0066998142241800 0066998181422418
+W 500
+F 0066998181422418 0066998142241800
+W 500
