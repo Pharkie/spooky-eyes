@@ -92,8 +92,8 @@ namespace
         {&Eyes::straight, &Eyes::straight, kSameBrightness, 500},
     };
 
-    // Winks the eye on your LEFT, but step 7 had "l" and "r" swapped in eyes_ani.json, so for 20 ms the
-    // winking eye pops open and the other eye half-shuts. Kept, as that is how the pumpkin played it.
+    // Winks the eye on your LEFT. (Step 7 once had "l" and "r" swapped in eyes_ani.json, so for 20 ms the
+    // other eye half-shut; fixed in both.)
     const AnimationStep kWinkRight[] = {
         {&Eyes::straight, &Eyes::straight, kSameBrightness, 2000},
         {&Eyes::straightBlink1, &Eyes::straight, kSameBrightness, 20},
@@ -101,7 +101,7 @@ namespace
         {&Eyes::straightBlink3, &Eyes::straight, kSameBrightness, 20},
         {&Eyes::straightBlinkLine, &Eyes::straight, kSameBrightness, 100},
         {&Eyes::straightBlink3, &Eyes::straight, kSameBrightness, 20},
-        {&Eyes::straight, &Eyes::straightBlink2, kSameBrightness, 20},
+        {&Eyes::straightBlink2, &Eyes::straight, kSameBrightness, 20},
         {&Eyes::straightBlink1, &Eyes::straight, kSameBrightness, 20},
         {&Eyes::straight, &Eyes::straight, kSameBrightness, 500},
     };
