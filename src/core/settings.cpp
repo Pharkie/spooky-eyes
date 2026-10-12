@@ -28,6 +28,7 @@ namespace
     constexpr const char *kKeyBrightness = "brightness";
     constexpr const char *kKeyEyeGap = "eye_gap";
     constexpr const char *kKeyMouthLed = "mouth_led";
+    constexpr const char *kKeyWifiSaver = "wifi_saver";
 
     Settings defaults()
     {
@@ -38,6 +39,7 @@ namespace
         s.brightness = kDefaultBrightness;
         s.eyeGap = kDefaultEyeGap;
         s.mouthLed = kDefaultMouthLed;
+        s.wifiSaver = kDefaultWifiSaver;
         return s;
     }
 
@@ -205,6 +207,7 @@ namespace
         s.brightness = prefs.getUChar(kKeyBrightness, s.brightness);
         s.eyeGap = prefs.getUChar(kKeyEyeGap, s.eyeGap);
         s.mouthLed = prefs.getBool(kKeyMouthLed, s.mouthLed);
+        s.wifiSaver = prefs.getBool(kKeyWifiSaver, s.wifiSaver);
         prefs.end();
 
         const Settings fallback = defaults();
@@ -268,6 +271,7 @@ namespace
         ok &= putUChar(prefs, kKeyBrightness, s.brightness);
         ok &= putUChar(prefs, kKeyEyeGap, s.eyeGap);
         ok &= putBool(prefs, kKeyMouthLed, s.mouthLed);
+        ok &= putBool(prefs, kKeyWifiSaver, s.wifiSaver);
         prefs.end();
         return ok;
     }
@@ -287,12 +291,12 @@ namespace settings
             Lock lock(stateMutex);
             current = loaded;
         }
-        LOG("SETTINGS", "\"%s\", home WiFi %s%s%s, brightness %u, eye gap %u, mouth LED %s",
+        LOG("SETTINGS", "\"%s\", home WiFi %s%s%s, brightness %u, eye gap %u, mouth LED %s, WiFi saver %s",
             loaded.pumpkinName.c_str(),
             loaded.wifiSsid.isEmpty() ? "not set up" : "\"",
             loaded.wifiSsid.c_str(),
             loaded.wifiSsid.isEmpty() ? "" : "\"",
-            loaded.brightness, loaded.eyeGap, loaded.mouthLed ? "on" : "off");
+            loaded.brightness, loaded.eyeGap, loaded.mouthLed ? "on" : "off", loaded.wifiSaver ? "on" : "off");
     }
 
     Settings get()

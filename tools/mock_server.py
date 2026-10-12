@@ -7,11 +7,15 @@
                                                   phones' sign-in sheets open the buttons
     python3 tools/mock_server.py --mode wrong     setup mode, home WiFi saved but it turned the pumpkin
                                                   away (wrong password): sign-in sheets open /setup
+    python3 tools/mock_server.py --mode off       WiFi switched off to save batteries (nobody used it for
+                                                  kWifiIdleOffMs). On the board no page could ask then;
+                                                  here /api/status says "off", so the pages' words can be
+                                                  checked
     PUMPKIN_MODE=setup python3 tools/mock_server.py   the same, from the environment
     python3 tools/mock_server.py --port 9000
 
-Flip the mode while it runs by adding ?mode=home, ?mode=setup, ?mode=lost or ?mode=wrong to any address,
-e.g. http://localhost:8080/settings?mode=lost or curl 'http://localhost:8080/api/status?mode=setup'.
+Flip the mode while it runs by adding ?mode=home, ?mode=setup, ?mode=lost, ?mode=wrong or ?mode=off to any
+address, e.g. http://localhost:8080/settings?mode=lost or curl 'http://localhost:8080/api/status?mode=setup'.
 
 The player has two modes, as on the board: show (the saved show, round and round: what it does at
 switch-on) and buttons (the button page is open: the show pauses and each press plays one effect). Buttons
@@ -111,6 +115,8 @@ def read_constants():
             values[name] = int(value)
         elif re.fullmatch(r'"[^"]*"', value):
             values[name] = value[1:-1]
+        elif value in ("true", "false"):
+            values[name] = value == "true"
     match = re.search(r'#define FIRMWARE_VERSION "([^"]+)"', source)
     values["FIRMWARE_VERSION"] = match.group(1) if match else "unknown"
     return values
@@ -139,6 +145,8 @@ BOOT_UNLOCK_SECONDS = constant("kBootUnlockMs") / 1000
 RESTART_DELAY_SECONDS = constant("kRestartDelayMs") / 1000
 WIFI_SAVED_RESTART_DELAY_SECONDS = constant("kWifiSavedRestartDelayMs") / 1000
 MAX_SHOW_BLOCKS = constant("kMaxShowBlocks")
+DEFAULT_WIFI_SAVER = constant("kDefaultWifiSaver")
+WIFI_IDLE_OFF_MINUTES = constant("kWifiIdleOffMs") // 60000  # "Save batteries" switches WiFi off after this
 # Buttons mode goes back to the show after this long without a press or heartbeat
 BUTTONS_IDLE_SECONDS = float(os.environ.get("MOCK_IDLE_SECONDS") or constant("kButtonsIdleTimeoutMs") / 1000)
 BUTTONS_HEARTBEAT_SECONDS = constant("kButtonsHeartbeatMs") / 1000  # how often an open button page says so
@@ -297,7 +305,7 @@ def boot_needed():
 class Pumpkin:
     """Everything the pretend pumpkin knows. One lock guards it all."""
 
-    MODES = ("home", "setup", "lost", "wrong")
+    MODES = ("home", "setup", "lost", "wrong", "off")
 
     def __init__(self, mode):
         self.lock = threading.RLock()
@@ -310,6 +318,7 @@ class Pumpkin:
         self.brightness = 2
         self.eye_gap = 8
         self.mouth_led = True
+        self.wifi_saver = DEFAULT_WIFI_SAVER
         self.wifi_ssid = ""
         self.wifi_password = ""
         self.mode = "home"
@@ -332,7 +341,8 @@ class Pumpkin:
             self.start_show()
         threading.Thread(target=self.watch_buttons_mode, daemon=True).start()
 
-    # --- Modes: home (on home WiFi), setup (never set up), lost (out of reach), wrong (turned away) ---
+    # --- Modes: home (on home WiFi), setup (never set up), lost (out of reach), wrong (turned away),
+    # off (WiFi switched off to save batteries) ---
 
     def set_mode(self, mode):
         with self.lock:
@@ -347,7 +357,7 @@ class Pumpkin:
                 self.wifi_ssid, self.wifi_password = "Haunted House 2.4G", ""
 
     def network_mode(self):
-        return "connected" if self.mode == "home" else "setup"
+        return {"home": "connected", "off": "off"}.get(self.mode, "setup")
 
     def needs_setup(self):
         return self.mode == "setup"
@@ -396,7 +406,7 @@ class Pumpkin:
                 "mode": self.network_mode(),
                 "hasSavedWifi": bool(self.wifi_ssid),
                 "homeSsid": self.wifi_ssid,
-                "ip": "192.168.1.23" if home else "192.168.4.1",
+                "ip": "192.168.1.23" if home else "" if self.mode == "off" else "192.168.4.1",
                 "hostname": hostname_for(self.running_name) if home else "",
                 "rssi": -58 if home else 0,
                 "setupSsid": ap_name_for(self.running_name),
@@ -412,6 +422,7 @@ class Pumpkin:
             "brightness": self.brightness,
             "mouthLed": self.mouth_led,
             "eyeGap": self.eye_gap,
+            "wifiSaver": self.wifi_saver,
             "hostname": hostname_for(self.name),
         }
 
@@ -867,6 +878,7 @@ class Handler(BaseHTTPRequestHandler):
             "maxBrightness": MAX_BRIGHTNESS, "maxEyeGap": MAX_EYE_GAP, "maxNameLength": MAX_NAME,
             "maxWordsLength": MAX_WORDS, "maxSsidBytes": MAX_SSID_BYTES,
             "minWifiPassword": MIN_WIFI_PASSWORD, "maxWifiPassword": MAX_WIFI_PASSWORD,
+            "wifiIdleOffMinutes": WIFI_IDLE_OFF_MINUTES,
         }
         self.send_json(200, reply)
 
@@ -914,6 +926,9 @@ class Handler(BaseHTTPRequestHandler):
         mouth = body.get("mouthLed")
         if mouth is not None and not isinstance(mouth, bool):
             raise ApiError(400, "The mouth light setting should be on or off")
+        saver = body.get("wifiSaver")
+        if saver is not None and not isinstance(saver, bool):
+            raise ApiError(400, "The save batteries setting should be on or off")
         with pumpkin.lock:
             # The name also names the setup WiFi, so a stranger on the doorstep mustn't change it
             renaming = new_name is not None and plain(new_name) != pumpkin.name
@@ -928,6 +943,9 @@ class Handler(BaseHTTPRequestHandler):
                 pumpkin.eye_gap = eye_gap
             if mouth is not None:
                 pumpkin.mouth_led = mouth
+            if saver is not None:
+                pumpkin.wifi_saver = saver
+                print(f"  (save batteries {'on: the board switches WiFi off after ' + str(WIFI_IDLE_OFF_MINUTES) + ' minutes without requests' if saver else 'off'})")
             settings = pumpkin.settings()
         reply = {"ok": True, "restartNeeded": renamed, "message": "Saved", "settings": settings}
         if renamed:
@@ -947,6 +965,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_wifi_scan(self, query):
         pumpkin = self.pumpkin
+        if pumpkin.network_mode() == "off":
+            raise ApiError(503, "The pumpkin couldn't look for WiFi just now. Try again in a few seconds.")
         with pumpkin.lock:
             if pumpkin.scan_started is None:
                 pumpkin.scan_started = time.time()
@@ -1142,7 +1162,7 @@ def main():
         sys.exit(f"Can't use port {args.port} ({e.strerror}). Something else may be using it: try --port 8081")
     server.daemon_threads = True
     print(f"Pretend pumpkin ({args.mode} mode, {len(Handler.pumpkin.effects)} effects) on http://localhost:{args.port}")
-    print("Add ?mode=home|setup|lost|wrong to any address to switch, ?boot=1 to press BOOT. Ctrl-C to stop.")
+    print("Add ?mode=home|setup|lost|wrong|off to any address to switch, ?boot=1 to press BOOT. Ctrl-C to stop.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

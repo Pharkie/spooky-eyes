@@ -32,6 +32,11 @@ The BOOT button on the board: a quick press scrolls the address again (and unloc
 minutes); hold it for 5 seconds to make it forget the home WiFi. If the eyes say "New batteries please",
 they mean it: weak batteries can't power the WiFi.
 
+To make the batteries last, the pumpkin switches its WiFi off when nobody has used it for 10 minutes (no
+page open on a phone, no phone on its own WiFi). The eyes say "WiFi off to save batteries" and the show
+carries on. To get the WiFi back, press BOOT quickly or switch the pumpkin off and on. You can switch this
+off in Settings ("Save batteries").
+
 ## Wiring (ESP32-C3 SuperMini)
 
 | Wire | SuperMini pin |

@@ -33,6 +33,8 @@ namespace web
                 return "setup";
             case network::Mode::Disconnected:
                 return "disconnected";
+            case network::Mode::Off:
+                return "off"; // to save batteries (no page can ask then, but the API says it anyway)
             }
             return "unknown";
         }
@@ -43,6 +45,7 @@ namespace web
             target["brightness"] = current.brightness;
             target["mouthLed"] = current.mouthLed;
             target["eyeGap"] = current.eyeGap;
+            target["wifiSaver"] = current.wifiSaver;
             target["hostname"] = settings::hostnameFor(current.pumpkinName);
         }
 
@@ -173,10 +176,11 @@ namespace web
             limits["maxSsidBytes"] = kMaxSsidBytes;
             limits["minWifiPassword"] = kMinWifiPasswordLength;
             limits["maxWifiPassword"] = kMaxWifiPasswordLength; // 64 only as hex digits
+            limits["wifiIdleOffMinutes"] = kWifiIdleOffMs / 60000; // "Save batteries" switches WiFi off after this
             sendJson(request, 200, doc);
         }
 
-        // POST /api/settings: any of {"name","brightness","mouthLed","eyeGap"}
+        // POST /api/settings: any of {"name","brightness","mouthLed","eyeGap","wifiSaver"}
         void handlePostSettings(AsyncWebServerRequest *request, JsonDocument &body)
         {
             Settings updated = settings::get();
@@ -209,6 +213,17 @@ namespace web
                     return;
                 }
                 updated.mouthLed = mouth.as<bool>();
+            }
+
+            JsonVariant saver = body["wifiSaver"];
+            if (!saver.isNull())
+            {
+                if (!saver.is<bool>())
+                {
+                    sendError(request, 400, "The save batteries setting should be on or off");
+                    return;
+                }
+                updated.wifiSaver = saver.as<bool>();
             }
 
             // The name also names the setup WiFi, so a stranger on the doorstep mustn't change it

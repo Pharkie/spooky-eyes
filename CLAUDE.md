@@ -72,6 +72,13 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
   doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range. Before saving, the setup
   page has the network task try the WiFi on the station side (`network::startWifiTest()`, `/api/wifi/test`)
   and only saves one that joined; skipped on home WiFi, where a check would drop the connection.
+- **Saving batteries:** the CPU runs at 80 MHz (`kCpuMhz`), the mouth LED is dimmed with LEDC PWM
+  (`kMouthDutyPercent`), and with the `wifiSaver` setting on (the default) the network task switches the
+  WiFi off (`network::Mode::Off`, status LED off) once nobody has used the pumpkin for `kWifiIdleOffMs`.
+  Using it means a web request or an open event stream (the web server calls `network::noteActivity()`
+  from its first handler and the SSE keep-alive, not per handler) or a phone on the setup WiFi. The
+  decision is `wifi_saver::timeToSwitchOff()` (portable, unit-tested). Only a restart brings WiFi back: a
+  short BOOT press while it's off does one.
 - **Web pages** are plain HTML/CSS/JS in `web/`, gzipped into the firmware at build time by
   `scripts/embed_web.py`. No filesystem upload step, and OTA updates update the pages too.
 

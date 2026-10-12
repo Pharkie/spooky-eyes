@@ -8,6 +8,7 @@
 #include <Update.h>
 #include <esp_app_format.h>
 #include "core/logging.h"
+#include "core/network.h"
 #include "hardware/boot_button.h"
 #include "web/web_utils.h"
 
@@ -145,6 +146,8 @@ namespace web
         void handleUpload(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data,
                           size_t len, bool final)
         {
+            // An upload is one long request: keep the WiFi on while it arrives, however slowly
+            network::noteActivity();
             UploadState *state = static_cast<UploadState *>(request->_tempObject);
             if (index == 0)
             {

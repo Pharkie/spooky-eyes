@@ -6,6 +6,10 @@
 // - a background task keeps the DNS server answering, reconnects after dropouts, blinks the
 //   status LED, and watches the BOOT button (hold 5 s = forget WiFi)
 // - in setup mode, that task can check a home WiFi's password before the page saves it (startWifiTest())
+// - to save batteries, it switches the WiFi off once nobody has used the pumpkin for kWifiIdleOffMs (the
+//   "save batteries" setting). Using it means a web request or an open event stream (the web server calls
+//   noteActivity()), or a phone on the setup WiFi. A restart brings the WiFi back (a short BOOT press does
+//   one: main.cpp).
 //
 // Threads: begin() runs on the Arduino loop task and returns within about a second, so the show starts at
 // switch-on. Everything slow happens on the network task (priority 2): first the joining (a ~3 s scan, up
@@ -26,6 +30,7 @@ namespace network
         Connected,  // on the home WiFi
         SetupAP,    // running its own WiFi network (no home WiFi, or couldn't reach it)
         Disconnected,
+        Off,        // switched off to save batteries: nobody used it for kWifiIdleOffMs. Until a restart.
     };
 
     // Start the WiFi and the network task, which joins the home WiFi (or starts the setup WiFi) in the
@@ -51,10 +56,15 @@ namespace network
     // Called on the network task so the eyes can say how to reach the pumpkin. First when the joining at
     // boot is done: Connected (once the web name is registered, so mdnsHostname() is ready), SetupAP, or
     // Disconnected if no WiFi would start. Then whenever that changes, e.g. home WiFi lost for
-    // kLostWifiFallbackMs -> SetupAP. Set it before begin(), or the first call can be missed. Keep it
-    // quick: the captive DNS and the BOOT button wait while it runs.
+    // kLostWifiFallbackMs -> SetupAP, or nobody using it for kWifiIdleOffMs -> Off. Set it before begin(),
+    // or the first call can be missed. Keep it quick: the captive DNS and the BOOT button wait while it
+    // runs.
     using ModeListener = void (*)(Mode mode);
     void onModeChange(ModeListener listener);
+
+    // Someone's using the pumpkin (a web request, or a page listening for news): put off switching the
+    // WiFi off to save batteries. Cheap, and safe from any task.
+    void noteActivity();
 
     // --- WiFi scanning for the setup page (all scans go through here, one at a time) ---
 
