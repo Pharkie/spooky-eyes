@@ -342,9 +342,9 @@ void emeraldTrade(Engine &engine)
     const int far = rightEyeColumn(engine);
     for (int i = 0; i < 3; i++)
         sequence(engine, {{villager, S::emerald1, 300}, {villager, S::emerald2, 300}});
-    engine.say("Hmmm?"); // the villager (phone voices spell out "Hrrm")
+    engine.say("Hurrmm?"); // the villager's "hrmm" (with a vowel, or phone voices spell it out)
     slide(engine, {S::emerald1, S::emerald2}, far, 8, villager, kBlank, 60);
-    engine.say("Hmm! Hmmm!");
+    engine.say("Hurrmm! Hurrmm!");
     for (int i = 0; i < 3; i++)
         sequence(engine, {{nod, blank, 150}, {villager, blank, 150}});
     slide(engine, {S::diamond1}, 8, far, villager, kBlank, 60);

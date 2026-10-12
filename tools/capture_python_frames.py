@@ -404,8 +404,8 @@ RECORDED_NAME = "Jack's Pumpkin"
 SPOKEN = {
     'Sssssssss': 'Shhhhhhh!',
     'Sssssssssssss': 'Shhhhhhhhhh!',
-    'Hrrmm?': 'Hmmm?',
-    'Hrrm! Hrrm!': 'Hmm! Hmmm!',
+    'Hrrmm?': 'Hurrmm?',
+    'Hrrm! Hrrm!': 'Hurrmm! Hurrmm!',
     "I'm so sleepy. Zzzzzzzz.": "I'm so sleepy. Snore... snore...",
 }
 
