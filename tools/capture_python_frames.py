@@ -7,11 +7,12 @@ recorders. Then it plays every effect the old button page could play (the %EFFEC
 legacy/pico-micropython/tools/pumpkin-buttons.pl) and writes what happened to test/golden/<id>.txt.
 `pio test -e native` then plays the C++ effects and checks they do exactly the same thing.
 
-Also recorded: one pass of the normal show (normal_show.txt: main() stopped as it starts loop 2), the
-first few effects of the never-ending surprise show (surprise.txt), typed words (words.txt), every
-animation in eyes_ani.json (anim_*.txt), edge cases for the building blocks (prim_*.txt), every font
-character (fonts.txt) and the talking pumpkin's phrase for each button (phrases.txt). index.txt lists
-the recordings.
+Also recorded: one pass of the default show (default_show.txt: the blocks of defaultShow() in
+src/effects/show.cpp, read from that file, each played as the button page played it: its phrase, then
+its %EFFECTS code), the first few effects of the never-ending surprise show (surprise.txt), typed words
+(words.txt), every animation in eyes_ani.json (anim_*.txt), edge cases for the building blocks
+(prim_*.txt), every font character (fonts.txt) and the talking pumpkin's phrase for each button
+(phrases.txt). index.txt lists the recordings.
 
     python3 tools/capture_python_frames.py          rewrite all the golden files
     python3 tools/capture_python_frames.py --check  check the golden files are up to date (no writing)
@@ -57,6 +58,7 @@ sys.dont_write_bytecode = True
 REPO = Path(__file__).resolve().parent.parent
 LEGACY = REPO / 'legacy' / 'pico-micropython'
 BUTTONS_PL = LEGACY / 'tools' / 'pumpkin-buttons.pl'
+SHOW_CPP = REPO / 'src' / 'effects' / 'show.cpp'
 GOLDEN = REPO / 'test' / 'golden'
 
 SEED = 12345
@@ -68,8 +70,8 @@ SURPRISE_EFFECTS = 3
 # Extra recordings that aren't buttons: (file id, Python code, what the C++ test runs instead).
 # test/test_effects/test_main.cpp has the matching C++ call for each id.
 EXTRA = [
-    # One pass of main()'s while loop
-    ('normal_show', None, 'normalShow(engine)'),
+    # One pass of the default show (the old main() loop as blocks), built from src/effects/show.cpp
+    ('default_show', None, 'for (const ShowBlock &block : defaultShow()) playBlock(engine, block)'),
     # "Your own words" from the button page, which padded the words with a space each side.
     # '$' isn't in the font, so it scrolls as a gap.
     ('words', "m.scroll_message(T, ' Hello Jack! $5 ok? ')", 'scrollWords(engine, "Hello Jack! $5 ok?")'),
@@ -104,7 +106,7 @@ FONTS = [('textFont1', 'textFont'), ('witch', 'witchFont'), ('bat', 'batFont'), 
 
 
 class StopShow(Exception):
-    """Raised to stop main() at the start of its second loop"""
+    """Raised to stop the never-ending surprise show"""
 
 
 class Recorder:
@@ -269,11 +271,8 @@ def load_main():
     real_load_anims = main.load_anims
     main.load_anims = lambda name: real_load_anims(str(LEGACY / name))
 
-    # Stop main() when it starts its second loop, so we get exactly one pass of the show
-    def log_message(message, mode='a'):
-        if message == '>>> Starting loop 2':
-            raise StopShow()
-    main.log_message = log_message
+    # Nothing here runs main() (the default show is rebuilt from its blocks), but keep logs quiet
+    main.log_message = lambda message, mode='a': None
 
     # The settings the C++ tests use
     assert main.BOARD == 'pico' and main.RGB_LED_CONNECTED, 'expected the Pico setup with the mouth LED'
@@ -310,6 +309,51 @@ def read_perl_hash(name):
 def read_button_effects():
     """The %EFFECTS table from pumpkin-buttons.pl: [(id, python code)] in file order"""
     return read_perl_hash('EFFECTS')
+
+
+def read_default_show():
+    """The blocks of defaultShow() in src/effects/show.cpp: [('Effect', id) or ('Words', words)] in order"""
+    text = SHOW_CPP.read_text(encoding='utf-8')
+    table = re.search(r'const Show &defaultShow\(\)\s*\{.*?static const Show kShow = \{\n(.*?)\n\s*\};', text, re.S)
+    if not table:
+        raise SystemExit("Can't find the defaultShow() table in " + str(SHOW_CPP))
+    blocks = []
+    for line in table.group(1).splitlines():
+        line = line.strip()
+        if not line or line.startswith('//'):
+            continue
+        m = re.fullmatch(r'\{ShowBlock::Kind::(Effect|Words), "((?:[^"\\]|\\.)*)"\},?\s*(?://.*)?', line)
+        if not m:
+            raise SystemExit("Don't understand this defaultShow() line: " + line)
+        if re.search(r'\\[^"\\]', m.group(2)):
+            raise SystemExit('Only \\" and \\\\ escapes are understood here; update the parser: ' + line)
+        blocks.append((m.group(1), re.sub(r'\\(["\\])', r'\1', m.group(2))))
+    if not blocks:
+        raise SystemExit('The defaultShow() table in ' + str(SHOW_CPP) + ' is empty')
+    return blocks
+
+
+def run_default_show(blocks, effects, namespace, phrases):
+    """Play the default show's blocks the way playBlock() does: an effect says its phrase (as the button
+    page did), then runs its %EFFECTS code; words are said, then scrolled with a space each side (as the
+    page's "your own words" box did). Returns the Python, one line per block, for the golden file."""
+    by_id = dict(effects)
+    lines = []
+    for n, (kind, value) in enumerate(blocks, 1):
+        if kind == 'Effect':
+            if value not in by_id:
+                raise SystemExit('The default show has "%s", which pumpkin-buttons.pl never had' % value)
+            code = by_id[value]
+            if value == 'name':
+                REC.add('S ' + RECORDED_NAME)  # the deliberate change: it says the pumpkin's own name first
+            elif value in phrases:
+                REC.add('S ' + phrases[value])
+        else:
+            code = 'm.scroll_message(T, %r)' % (' ' + value + ' ')
+            REC.add('S ' + value)
+        exec(code, dict(namespace))
+        lines.append('%2d %-7s %-10s %s' % (n, kind, value if kind == 'Effect' else '', code.replace('\n', '; ')))
+    return lines
 
 
 def surprise_code(effects):
@@ -381,13 +425,10 @@ def capture_all():
     results = {}
     for fx_id, code in jobs:
         REC.reset()
-        if fx_id == 'normal_show':
-            code = 'm.main()  # stopped as it logs ">>> Starting loop 2"'
-            try:
-                main.main()
-                raise RuntimeError('main() returned?')
-            except StopShow:
-                pass
+        if fx_id == 'default_show':
+            lines = run_default_show(read_default_show(), effects, namespace, phrases)
+            code = '\n'.join(['each block of defaultShow() in src/effects/show.cpp, played as the button page played it:',
+                              "the phrase, then the %EFFECTS code (\"name\" says the pumpkin's own name instead)"] + lines)
         elif fx_id == 'surprise':
             played = run_surprise(code, namespace, phrases, fake_random)
             code = ('the surprise show, built from %%EFFECTS as pumpkin-buttons.pl builds it, stopped as it\n'

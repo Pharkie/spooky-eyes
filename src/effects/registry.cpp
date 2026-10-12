@@ -1,13 +1,12 @@
-// The one list of effects (what the web page's buttons show and run), the normal show, and the
-// surprise show. Labels, emoji, sections and button order are from the old button page; the
-// phrases are what its talking pumpkin said as each effect started.
+// The one list of effects (what the web page's buttons show and run), and the surprise show. Labels,
+// emoji, sections and button order are from the old button page; the phrases are what its talking
+// pumpkin said as each effect started. The shows built from these blocks are in show.cpp.
 
 #include "effects/registry.h"
 
 #include <cstring>
 #include <iterator>
 #include "display/fonts.h"
-#include "display/sprites.h"
 #include "effects/effects.h"
 #include "effects/primitives.h"
 
@@ -109,35 +108,11 @@ const char *groupName(EffectGroup group)
     return "";
 }
 
-void normalShow(Engine &engine)
+void playEffect(Engine &engine, const EffectInfo &effect)
 {
-    // Opening show: Minecraft eyes, pumpkins, space invaders, Christmas trees and bunnies
-    minecraft(engine);
-    pumpkins(engine);
-    invaders(engine);
-    trees(engine);
-    bunnies(engine);
-    witch(engine); // witch on a broomstick flying across the eyes
-
-    ghosts(engine);
-    blink(engine);
-    scrollPadded(engine, textFont, engine.pumpkinName()); // quietly: the show doesn't talk
-
-    hearts(engine);
-    winkLeft(engine);
-    witchesSpell(engine);
-    rollEyes(engine);
-    flip(engine, Shapes::invader1, Shapes::invader2, 3, 500); // shorter than the space invaders button
-    lookDown(engine);
-    blink(engine);
-    trickOrTreat(engine);
-    rollEyes(engine);
-    blink(engine);
-    growEyes(engine);
-    blink(engine);
-    winkRight(engine);
-    blink(engine);
-    happyHalloween(engine);
+    if (effect.phrase)
+        engine.say(effect.phrase);
+    effect.run(engine);
 }
 
 void scrollWords(Engine &engine, const char *words)
@@ -170,10 +145,7 @@ void surpriseShowFrom(Engine &engine, bool (*pick)(const EffectInfo &effect))
 
     while (true)
     {
-        const EffectInfo &effect = *mix[engine.random(static_cast<uint32_t>(mixCount))];
-        if (effect.phrase)
-            engine.say(effect.phrase);
-        effect.run(engine);
+        playEffect(engine, *mix[engine.random(static_cast<uint32_t>(mixCount))]);
         engine.wait(500);
     }
 }

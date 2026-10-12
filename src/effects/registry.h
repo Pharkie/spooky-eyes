@@ -1,7 +1,8 @@
 #pragma once
-// The one list of effects. The web page builds its buttons from this (GET /api/effects), the surprise
-// show picks from it, and the talking pumpkin says each effect's phrase when it starts. Adding an
-// effect = write the function in effects.cpp, then add one line to the table in registry.cpp.
+// The one list of effects. The web page builds its buttons from this (GET /api/effects), shows
+// (show.h) are lists of these, the surprise show picks from it, and the talking pumpkin says each
+// effect's phrase when it starts. Adding an effect = write the function in effects.cpp, then add one
+// line to the table in registry.cpp.
 
 #include <cstddef>
 #include "effects/engine.h"
@@ -37,8 +38,8 @@ const EffectInfo *findEffect(const char *id);
 // Section heading for a group, e.g. "Minecraft"
 const char *groupName(EffectGroup group);
 
-// One pass of the normal show (main() loop body in the old main.py)
-void normalShow(Engine &engine);
+// Play an effect the way a button press does: say its phrase (if it has one), then play it once
+void playEffect(Engine &engine, const EffectInfo &effect);
 
 // Scroll someone's own words across the eyes
 void scrollWords(Engine &engine, const char *words);

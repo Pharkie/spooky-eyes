@@ -48,7 +48,7 @@ slime
 daynight
 portal
 surprise
-normal_show
+default_show
 words
 anim_stareAndBlink
 anim_downLeftABit

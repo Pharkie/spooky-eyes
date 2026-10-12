@@ -1,7 +1,33 @@
-# normal_show: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
-# python: m.main()  # stopped as it logs ">>> Starting loop 2"
-# c++:    normalShow(engine)
-# 3610 events. Do not edit: re-run the capture script instead.
+# default_show: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: each block of defaultShow() in src/effects/show.cpp, played as the button page played it:
+#         the phrase, then the %EFFECTS code ("name" says the pumpkin's own name instead)
+#          1 Effect  minecraft  m.anim_runner(a, 'minecraft', E)
+#          2 Effect  pumpkin    m.flip(S['pumpkin1'], S['pumpkin2'], 6, 0.4)
+#          3 Effect  invaders   m.flip(S['invader1'], S['invader2'], 8, 0.3)
+#          4 Effect  trees      m.flip(S['tree1'], S['tree1lit2'], 6, 0.4)
+#          5 Effect  bunnies    m.flip(S['bunny1'], S['bunny3'], 8, 0.25)
+#          6 Effect  witch      m.scroll_message(f.witch, ' 12 ')
+#          7 Effect  ghosts     m.show_char(E['ghost1'], E['ghost2']); time.sleep(1)
+#          8 Effect  blink      m.anim_runner(a, 'stareAndBlink', E)
+#          9 Effect  name       m.scroll_message(T, " Jack's Pumpkin ")
+#         10 Effect  hearts     m.flip(S['heart1'], S['heart2'], 3, 0.5)
+#         11 Effect  winkleft   m.anim_runner(a, 'winkLeft', E)
+#         12 Effect  spell      m.scroll_message(T, ' Double, double toil and trouble Fire burn and caldron bubble ', 0.03)
+#         13 Effect  roll       m.anim_runner(a, 'roll', E)
+#         14 Effect  invaders   m.flip(S['invader1'], S['invader2'], 8, 0.3)
+#         15 Effect  lookdown   m.anim_runner(a, 'downLeftABit', E)
+#         16 Effect  blink      m.anim_runner(a, 'stareAndBlink', E)
+#         17 Effect  trick      m.scroll_message(T, ' Trick or Treat? ', 0.02)
+#         18 Effect  roll       m.anim_runner(a, 'roll', E)
+#         19 Effect  blink      m.anim_runner(a, 'stareAndBlink', E)
+#         20 Effect  grow       m.anim_runner(a, 'growEyes', E)
+#         21 Effect  blink      m.anim_runner(a, 'stareAndBlink', E)
+#         22 Effect  winkright  m.anim_runner(a, 'winkRight', E)
+#         23 Effect  blink      m.anim_runner(a, 'stareAndBlink', E)
+#         24 Effect  halloween  m.scroll_message(T, ' Happy Halloween! ', 0.03)
+# c++:    for (const ShowBlock &block : defaultShow()) playBlock(engine, block)
+# 3644 events. Do not edit: re-run the capture script instead.
+S Minecraft eyes!
 M
 F ff818199998181ff ff818199998181ff
 W 1000
@@ -41,6 +67,7 @@ W 40
 M
 F ff818199998181ff ff818199998181ff
 W 1000
+S Chomp chomp chomp!
 F 187edbff8181c37e 187edbffbdc3ff7e
 W 400
 F 187edbffbdc3ff7e 187edbff8181c37e
@@ -53,6 +80,7 @@ F 187edbff8181c37e 187edbffbdc3ff7e
 W 400
 F 187edbffbdc3ff7e 187edbff8181c37e
 W 400
+S The space invaders are coming!
 F 183c7edbff245a42 183c7edbff245aa5
 W 300
 F 183c7edbff245aa5 183c7edbff245a42
@@ -69,6 +97,7 @@ F 183c7edbff245a42 183c7edbff245aa5
 W 300
 F 183c7edbff245aa5 183c7edbff245a42
 W 300
+S Merry Christmas!
 F 5a993cbd7eff1818 18183c3c7eff1818
 W 400
 F 18183c3c7eff1818 5a993cbd7eff1818
@@ -81,6 +110,7 @@ F 5a993cbd7eff1818 18183c3c7eff1818
 W 400
 F 18183c3c7eff1818 5a993cbd7eff1818
 W 400
+S Hop hop hop!
 F 6666ff81a581997e 666666ff81a5997e
 W 250
 F 666666ff81a5997e 6666ff81a581997e
@@ -97,6 +127,7 @@ F 6666ff81a581997e 666666ff81a5997e
 W 250
 F 666666ff81a5997e 6666ff81a581997e
 W 250
+S Hee hee hee! Here I come on my broomstick!
 M
 F 0000000000000000 0000000000000000
 W 40
@@ -268,8 +299,10 @@ W 40
 M
 F 0000000000000000 0000000000000000
 W 40
+S Woooooooo!
 F 387c9292fefefeaa 3c5693dbffffdd89
 W 1000
+S Blink blink.
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
@@ -300,6 +333,7 @@ W 500
 M
 B 2
 W 500
+S Jack's Pumpkin
 M
 F 0000000000000000 0000000000000000
 W 40
@@ -759,12 +793,14 @@ W 40
 M
 F 0000000000000000 0000000000000000
 W 40
+S I love you!
 F 0066998181422418 0066998142241800
 W 500
 F 0066998142241800 0066998181422418
 W 500
 F 0066998181422418 0066998142241800
 W 500
+S Wink!
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 2000
@@ -792,6 +828,7 @@ W 20
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 500
+S Double, double, toil and trouble. Fire burn, and cauldron bubble!
 M
 F 0000000000000000 0000000000000000
 W 30
@@ -2355,6 +2392,7 @@ W 30
 M
 F 0000000000000000 0000000000000000
 W 30
+S Whatever!
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
@@ -2403,12 +2441,24 @@ W 100
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
+S The space invaders are coming!
 F 183c7edbff245a42 183c7edbff245aa5
-W 500
+W 300
 F 183c7edbff245aa5 183c7edbff245a42
-W 500
+W 300
 F 183c7edbff245a42 183c7edbff245aa5
-W 500
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+S What's down there?
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
@@ -2418,6 +2468,7 @@ W 2000
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
+S Blink blink.
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
@@ -2448,6 +2499,7 @@ W 500
 M
 B 2
 W 500
+S Trick or treat!
 M
 F 0000000000000000 0000000000000000
 W 20
@@ -2931,6 +2983,7 @@ W 20
 M
 F 0000000000000000 0000000000000000
 W 20
+S Whatever!
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
@@ -2979,6 +3032,7 @@ W 100
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 200
+S Blink blink.
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
@@ -3009,6 +3063,7 @@ W 500
 M
 B 2
 W 500
+S Whoa!
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 600
@@ -3018,6 +3073,7 @@ W 1000
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
+S Blink blink.
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
@@ -3048,6 +3104,7 @@ W 500
 M
 B 2
 W 500
+S Wink wink!
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 2000
@@ -3075,6 +3132,7 @@ W 20
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 500
+S Blink blink.
 M
 F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
 W 1000
@@ -3105,6 +3163,7 @@ W 500
 M
 B 2
 W 500
+S Happy Halloween!
 M
 F 0000000000000000 0000000000000000
 W 30

@@ -1,9 +1,12 @@
 #pragma once
-// Runs the eyes. The normal show loops on the Arduino loop task; web requests (from the async web
-// server task) ask for something else, which interrupts whatever is playing via EffectInterrupted.
-//
-//   normal show --(button)--> effect --(done)--> waiting --(2 min idle or "back to show")--> normal show
-//                                \--(another button)--> next effect straight away
+// Runs the eyes, on the Arduino loop task. Two modes:
+//   Show     plays the saved show (a list of blocks: effects and words) round and round. The default,
+//            and what a pumpkin does at switch-on.
+//   Buttons  the show pauses and the eyes blink idly; each press plays one effect (interrupting whatever
+//            is playing, via EffectInterrupted). The button page asks for this when it opens, and keeps
+//            asking every kButtonsHeartbeatMs while it's on screen. kButtonsIdleTimeoutMs after the last
+//            press or heartbeat (e.g. the phone went to sleep), it goes back to the show by itself.
+// Requests come from the async web server task (and USB serial) and are handed over safely.
 
 #include <Arduino.h>
 
@@ -23,14 +26,20 @@ namespace player
     // Scroll someone's own words (trimmed to kMaxWordsLength, only characters the font has)
     void scrollWords(const String &words);
 
-    // Go back to the normal show (does nothing if it's already running)
-    void backToShow();
+    // Show mode: play the saved show from the top (does nothing if it's already playing)
+    void startShow();
 
-    // Scroll a message once, then carry on (the address at boot, or after a BOOT press). It cuts the normal
-    // show short, but waits for a chosen effect to finish.
+    // Buttons mode (pause the show, idle eyes), or "still here" if already in it. Safe to call often.
+    void enterButtons();
+
+    // The saved show changed: use it from now on (restarting the show from the top if it's playing)
+    void showChanged();
+
+    // Scroll a message once, then carry on (the address at boot, or after a BOOT press). It cuts a show
+    // block short (the show then carries on from the next block), but waits for a chosen effect to finish.
     void announce(const String &message);
 
-    // A message scrolled at the start of every normal show pass ("" = none), for durationMs (0 = until
+    // A message scrolled at the start of every pass of the show ("" = none), for durationMs (0 = until
     // changed). Used in setup mode to tell people which WiFi to join.
     void setShowMessage(const String &message, uint32_t durationMs = 0);
 
@@ -39,11 +48,18 @@ namespace player
 
     // --- What's happening, for the web page ---
 
+    enum class Mode : uint8_t
+    {
+        Show,
+        Buttons,
+    };
+
     struct Status
     {
-        bool inShow;      // the normal show is running
-        String effectId;  // the effect playing now ("" if none, or "words" for typed words)
-        String label;     // e.g. "Creeper", or the typed words
+        Mode mode;
+        String effectId;  // the effect playing now ("" if none, or "words" for words)
+        String label;     // e.g. "Creeper", or the words
+        int block;        // in Show mode, which block of the show is playing (0-based); -1 otherwise
     };
     Status status();
 

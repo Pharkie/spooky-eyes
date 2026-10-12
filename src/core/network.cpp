@@ -6,6 +6,9 @@
 //   handleDNSServer() and updateStatusLED(), which Scribe called from loop() -> networkTask()
 //
 // Changes for the pumpkin:
+// - begin() returns at once and the joining happens at the start of the network task (connectAtStart()),
+//   so the show starts the moment the pumpkin is switched on. Scribe connected in setup(), before
+//   anything else ran. The mode listener hears how it went.
 // - the setup WiFi is named after the pumpkin, and so is the web address ("jacks-pumpkin.local")
 // - the transmit power is turned down for the SuperMini's tiny antenna (kTxPower)
 // - the look for the home WiFi is an active scan for its name, so a hidden network is found too
@@ -31,7 +34,6 @@
 #include <atomic>
 #include <esp_attr.h>
 #include <esp_system.h>
-#include <esp_task_wdt.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -59,6 +61,8 @@ namespace
     // Scribe's scan tuning: 120 ms per channel, about 2 s in all
     constexpr uint32_t kScanMsPerChannel = 120;
     constexpr int kBootScanAttempts = 2; // a busy channel can hide a reply, so look twice before giving up
+    // The look for the home WiFi gives up after this long, as the library's own wait does
+    constexpr uint32_t kHomeScanGiveUpMs = PumpkinTime::Seconds(10);
     // The setup page's scan. The library gives up after 20 x kScanMsPerChannel, which can come before
     // the scan really ends while the setup WiFi is on (the radio keeps hopping back to its channel), so
     // we keep asking for longer than that.
@@ -69,6 +73,7 @@ namespace
     constexpr int kMdnsNameAttempts = 3; // jacks-pumpkin, jacks-pumpkin-2, jacks-pumpkin-3
     constexpr uint8_t kMdnsPingCount = 2;
     constexpr int kSetupApAttempts = 3;
+    constexpr uint32_t kSetupApRetryMs = 500;
 
     // Network task: see networkTask() for why these values
     constexpr uint32_t kTaskStackBytes = 8192;
@@ -92,7 +97,7 @@ namespace
     // What the network task looks after
     enum class Role : uint8_t
     {
-        Starting, // network::begin() is still connecting: status LED and BOOT button only
+        Starting, // the network task is still connecting (connectAtStart()): no scans for the setup page yet
         Home,     // joined the home WiFi at boot: keep it connected
         Setup,    // running the setup WiFi: answer DNS
         Broken,   // the setup WiFi wouldn't start
@@ -115,7 +120,7 @@ namespace
     std::atomic<bool> sawAuthFailure{false};      // ditto: sticky, cleared when the boot join starts
     std::atomic<network::ModeListener> modeListener{nullptr};
 
-    // Set by begin() before the role leaves Starting, then only read (from any task)
+    // Set by begin() before it starts the network task, then only read (from any task)
     String savedSsid;
     String savedPassword;
     String setupApName;
@@ -136,7 +141,7 @@ namespace
     bool havePageScanResults = false;
     uint32_t pageScanResultsMs = 0;
 
-    // Network task only (begin() sets some before the task takes over)
+    // Network task only (begin() sets retryRestartsSoFar before starting it)
     uint32_t retryRestartsSoFar = 0;
     uint32_t attemptStartMs = 0;
     uint32_t nextAttemptMs = 0;
@@ -186,15 +191,6 @@ namespace
         rtcRetryMagic = kRetryMagic;
         rtcRetryCount = retryRestartsSoFar + 1;
         firmware::restart(why);
-    }
-
-    // No watchdog watches the loop task during setup() on this core: arduino-esp32 2.0.17 subscribes
-    // neither the loop task nor (on the C3) the idle task. So this normally does nothing; it keeps
-    // Scribe's feeding in case something subscribes the loop task later (enableLoopWDT()).
-    void feedWatchdogIfWatched()
-    {
-        if (esp_task_wdt_status(nullptr) == ESP_OK)
-            esp_task_wdt_reset();
     }
 
     void setReason(Reason why, const String &text)
@@ -266,6 +262,47 @@ namespace
         return true;
     }
 
+    // --- Housekeeping ---
+
+    status_led::Pattern patternFor(Mode mode)
+    {
+        switch (mode)
+        {
+        case Mode::Connecting:
+            return status_led::Pattern::FastBlink;
+        case Mode::Connected:
+            return status_led::Pattern::Heartbeat;
+        case Mode::SetupAP:
+            return status_led::Pattern::SlowBlink;
+        case Mode::Disconnected:
+            break;
+        }
+        return status_led::Pattern::Off;
+    }
+
+    // The network task's quick jobs, every kTaskPeriodMs: the BOOT button, the firmware trial and the
+    // status LED. The slow jobs (joining at start-up, scans, starting the setup WiFi) call it while they
+    // wait, so the button and the LED keep working meanwhile.
+    void housekeeping()
+    {
+        boot_button::update();
+        firmware::checkTrial();
+        status_led::set(patternFor(currentMode));
+        status_led::update();
+    }
+
+    // Wait on the network task, keeping the housekeeping going. It sleeps between checks, so the effects
+    // on the loop task (one priority below) get the processor meanwhile.
+    void waitFor(uint32_t ms)
+    {
+        const uint32_t start = millis();
+        do
+        {
+            housekeeping();
+            vTaskDelay(pdMS_TO_TICKS(kTaskPeriodMs));
+        } while (millis() - start < ms);
+    }
+
     // --- Scanning ---
 
     // The library's scan results as a list: named networks only, one entry per name, strongest first
@@ -317,15 +354,32 @@ namespace
         }
     }
 
+    // With scanMutex held: wait for the scan just started, as WiFi.scanNetworks() does when it's told to
+    // wait, but keeping the housekeeping going for the ~2 s it takes. The number of networks found, or
+    // WIFI_SCAN_FAILED.
+    int16_t waitForScan()
+    {
+        const uint32_t start = millis();
+        while ((WiFi.waitStatusBits(WIFI_SCAN_DONE_BIT, kTaskPeriodMs) & WIFI_SCAN_DONE_BIT) == 0)
+        {
+            if (millis() - start >= kHomeScanGiveUpMs)
+                return WIFI_SCAN_FAILED;
+            housekeeping();
+        }
+        return WiFi.scanComplete();
+    }
+
     // One look for the home WiFi: an active scan for its name, so it's found even if it's hidden.
-    // False if it isn't there, or the setup page's scan has the radio just now.
+    // False if it isn't there, or the setup page's scan has the radio just now. Network task only.
     bool scanForHome(int32_t &rssi)
     {
         Lock lock(scanMutex);
         collectPageScan(millis());
         if (pageScanRunning)
             return false;
-        const int16_t found = WiFi.scanNetworks(false, true, false, kScanMsPerChannel, 0, savedSsid.c_str());
+        int16_t found = WiFi.scanNetworks(true, true, false, kScanMsPerChannel, 0, savedSsid.c_str());
+        if (found == WIFI_SCAN_RUNNING)
+            found = waitForScan();
         bool seen = false;
         for (int16_t i = 0; i < found; i++)
         {
@@ -348,7 +402,6 @@ namespace
         {
             int32_t rssi = 0;
             const bool seen = scanForHome(rssi);
-            feedWatchdogIfWatched();
             if (seen)
             {
                 LOG("WIFI", "Found \"%s\" (signal %ld dBm)", savedSsid.c_str(), static_cast<long>(rssi));
@@ -385,10 +438,7 @@ namespace
         WiFi.begin(savedSsid.c_str(), savedPassword.c_str());
         const uint32_t start = millis();
         while (WiFi.status() != WL_CONNECTED && millis() - start < kWifiConnectTimeoutMs)
-        {
-            delay(100);
-            feedWatchdogIfWatched();
-        }
+            waitFor(kTaskPeriodMs);
 
         if (WiFi.status() != WL_CONNECTED)
         {
@@ -434,7 +484,7 @@ namespace
             }
             LOG("WIFI", "Setup WiFi didn't start (attempt %d of %d)", attempt, kSetupApAttempts);
             WiFi.mode(WIFI_OFF);
-            delay(500);
+            waitFor(kSetupApRetryMs);
         }
         return false;
     }
@@ -447,9 +497,10 @@ namespace
             const String fqdn = candidate + ".local";
 
             // Does anything already answer to this name? (The lookup goes over mDNS. A free name takes
-            // about 7 s to time out.)
+            // about 7 s to time out. The library waits without a way to do the housekeeping meanwhile,
+            // so the BOOT button and the status LED pause until it's done.)
             const bool taken = Ping.ping(fqdn.c_str(), kMdnsPingCount);
-            feedWatchdogIfWatched();
+            housekeeping();
             if (taken)
             {
                 LOG("MDNS", "%s is already taken", fqdn.c_str());
@@ -594,40 +645,59 @@ namespace
         retryRestart("to join the home WiFi");
     }
 
-    status_led::Pattern patternFor(Mode mode)
+    // The first thing the network task does, while the show plays: join the home WiFi and register the
+    // web name, or start the setup WiFi. Then it tells the mode listener how it went, so the eyes can say
+    // how to reach the pumpkin. (Scribe did this in setup(), before anything else ran.)
+    void connectAtStart()
     {
-        switch (mode)
+        bool joined = false;
+        if (savedSsid.isEmpty())
+            LOG("WIFI", "No home WiFi saved yet");
+        else
+            joined = connectHome();
+
+        lastRecheckMs = millis();
+        if (joined)
         {
-        case Mode::Connecting:
-            return status_led::Pattern::FastBlink;
-        case Mode::Connected:
-            return status_led::Pattern::Heartbeat;
-        case Mode::SetupAP:
-            return status_led::Pattern::SlowBlink;
-        case Mode::Disconnected:
-            break;
+            currentMode = Mode::Connected; // the web page shows the address while the name is checked
+            connectedSinceMs = millis();
+            startMdns();
+            role = Role::Home; // from now on, keepConnected() looks after reconnects
         }
-        return status_led::Pattern::Off;
+        else if (startSetupAP())
+        {
+            role = Role::Setup; // ...or DNS and looking for the home WiFi
+        }
+        else
+        {
+            becomeBroken();
+        }
+        tellListener(currentMode);
+        reportStack("after connecting");
     }
 
-    // Network housekeeping, in place of Scribe's loop() calls.
+    // Network housekeeping, in place of Scribe's loop() calls. It starts by connecting (connectAtStart()).
     // Priority 2: just above the Arduino loop task (1), where the effects run, so DNS replies and the
     // BOOT button's timing never wait for an effect to yield; below the async web server's task (3), lwIP
     // (18) and the WiFi driver. Each 10 ms wake-up is a few microseconds of work, so the effects' timing
-    // isn't disturbed; the rare slow jobs (a 2 s scan in setup mode, starting the setup WiFi after the
-    // home WiFi is lost) wait on the WiFi driver rather than using the CPU.
-    // Stack: the deepest paths are the doorstep fallback (starting the setup WiFi, then the mode
-    // listener, which builds messages for the eyes), the BOOT button's NVS write + restart, and a WiFi
-    // scan. The spare amount is logged a minute after boot and after a fallback.
+    // isn't disturbed. The slow jobs (connecting at start-up, a 2 s scan, starting the setup WiFi) wait on
+    // the WiFi driver or in waitFor(), never spinning, so the loop task keeps the processor meanwhile.
+    // Stack: the deepest paths are connecting at start-up (the mDNS name check, or starting the setup
+    // WiFi, then the mode listener, which builds messages for the eyes), the same after the doorstep
+    // fallback, and the BOOT button's NVS write + restart, which can now come from inside those waits.
+    // 8 KB is what the Arduino loop task had when it ran the start-up connect, and about twice the
+    // deepest path as estimated from -fstack-usage. The spare amount is logged after connecting, a
+    // minute after boot and after a fallback: under about 1.5 KB spare, make it bigger.
     void networkTask(void *)
     {
         const uint32_t startedMs = millis();
+        connectAtStart();
+
         bool stackReported = false;
         for (;;)
         {
             const uint32_t now = millis();
-            boot_button::update();
-            firmware::checkTrial();
+            housekeeping();
 
             switch (role.load())
             {
@@ -646,9 +716,6 @@ namespace
                 break;
             }
 
-            status_led::set(patternFor(currentMode));
-            status_led::update();
-
             if (!stackReported && now - startedMs >= kStackReportMs)
             {
                 stackReported = true;
@@ -658,10 +725,9 @@ namespace
         }
     }
 
-    void startTask()
+    bool startTask()
     {
-        if (xTaskCreate(networkTask, "network", kTaskStackBytes, nullptr, kTaskPriority, nullptr) != pdPASS)
-            LOG("NETWORK", "Couldn't start the network task: no captive portal, reconnects or BOOT button");
+        return xTaskCreate(networkTask, "network", kTaskStackBytes, nullptr, kTaskPriority, nullptr) == pdPASS;
     }
 }
 
@@ -687,7 +753,6 @@ namespace network
         currentMode = Mode::Connecting;
         status_led::begin();
         boot_button::begin();
-        startTask(); // status LED, BOOT button and the firmware trial from now on
 
         // Our settings hold the WiFi details: stop the driver keeping its own copy in flash, so "forget
         // WiFi" really forgets. Must come before the first WiFi.mode().
@@ -700,27 +765,20 @@ namespace network
         WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
         WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
         WiFi.onEvent(onWifiEvent, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+        // Start the radio here, not in the task: the first WiFi.mode() also starts the network stack
+        // (lwIP), and web::begin() crashes without it. Station mode either way: if the setup WiFi is
+        // needed, startSetupAP() adds it, name and password included.
+        setWifiMode(WIFI_STA);
 
-        bool setupWifi = true;
-        if (savedSsid.isEmpty())
+        // Joining (or the setup WiFi), then the captive DNS, reconnects, status LED, BOOT button and
+        // the firmware trial, all in the background
+        if (!startTask())
         {
-            LOG("WIFI", "No home WiFi saved yet");
+            // Out of memory at boot? Connect here instead, as Scribe does: the show waits, but there's
+            // still WiFi (without the captive DNS, reconnects or BOOT button)
+            LOG("NETWORK", "Couldn't start the network task: connecting before the show starts");
+            connectAtStart();
         }
-        else if (connectHome())
-        {
-            currentMode = Mode::Connected;
-            connectedSinceMs = millis();
-            startMdns();
-            setupWifi = false;
-        }
-
-        lastRecheckMs = millis();
-        if (!setupWifi)
-            role = Role::Home; // the network task takes over reconnects
-        else if (startSetupAP())
-            role = Role::Setup; // ...or DNS and looking for the home WiFi
-        else
-            becomeBroken();
     }
 
     Mode mode()

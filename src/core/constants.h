@@ -43,8 +43,10 @@ constexpr uint32_t kRestartDelayMs = PumpkinTime::Seconds(2);
 // After saving the home WiFi: long enough to read the "what next" page before the setup WiFi vanishes
 constexpr uint32_t kWifiSavedRestartDelayMs = PumpkinTime::Seconds(10);
 
-// After a button effect finishes, go back to the normal show if nobody presses anything for this long
-constexpr uint32_t kButtonIdleTimeoutMs = PumpkinTime::Minutes(2);
+// Buttons mode lasts this long after the last press, or the last heartbeat from an open button page
+// (which sends one every kButtonsHeartbeatMs while it's on screen); then it's back to the show
+constexpr uint32_t kButtonsIdleTimeoutMs = PumpkinTime::Minutes(2);
+constexpr uint32_t kButtonsHeartbeatMs = PumpkinTime::Seconds(30);
 
 constexpr uint16_t kWebServerPort = 80;
 
@@ -64,3 +66,4 @@ constexpr size_t kMaxSsidBytes = 32;       // WiFi standard
 constexpr size_t kMinWifiPasswordLength = 8;  // WPA2: 8-63 characters, or exactly 64 hex digits
 constexpr size_t kMaxWifiPasswordLength = 64;
 constexpr size_t kMaxHostnameLength = 32;
+constexpr size_t kMaxShowBlocks = 60;      // blocks in a saved show

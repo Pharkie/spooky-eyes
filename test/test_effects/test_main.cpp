@@ -8,7 +8,8 @@
 //
 // Smoke tests: every effect, old and new, plays at the lowest and highest brightness and eye gap, and
 // must finish, stay within the MAX7219's brightness range, leave brightness at maxBright() and give
-// every frame a moment on the eyes. New effects (no golden file) also play at the golden settings.
+// every frame a moment on the eyes. New effects (no golden file) also play at the golden settings. Every
+// effect that can go in a show also plays as a show block (playBlock), phrase first.
 //
 // Registry tests: ids, labels, emoji and phrases are usable by the web page, the player and the font.
 //
@@ -36,6 +37,7 @@
 #include "effects/effects.h"
 #include "effects/primitives.h"
 #include "effects/registry.h"
+#include "effects/show.h"
 
 void setUp()
 {
@@ -58,7 +60,12 @@ struct ExtraCase
 };
 
 static const ExtraCase kExtraCases[] = {
-    {"normal_show", [](Engine &e) { normalShow(e); }},
+    // One pass of the default show, block by block, as the player plays it
+    {"default_show",
+     [](Engine &e) {
+         for (const ShowBlock &block : defaultShow())
+             playBlock(e, block);
+     }},
     // The old button page padded typed words with a space each side
     {"words", [](Engine &e) { scrollWords(e, "Hello Jack! $5 ok?"); }},
     {"anim_stareAndBlink", [](Engine &e) { runAnimation(e, Animations::stareAndBlink); }},
@@ -90,10 +97,10 @@ static const ExtraCase *findExtraCase(const std::string &id)
     return nullptr;
 }
 
-// An id that is only in the golden files: anim_..., prim_..., normal_show and words
+// An id that is only in the golden files: anim_..., prim_..., default_show and words
 static bool looksExtra(const std::string &id)
 {
-    return id == "normal_show" || id == "words" || id.rfind("anim_", 0) == 0 || id.rfind("prim_", 0) == 0;
+    return id == "default_show" || id == "words" || id.rfind("anim_", 0) == 0 || id.rfind("prim_", 0) == 0;
 }
 
 static std::string gGoldenDir;
@@ -572,7 +579,7 @@ static void test_registry_phrases()
 
 // ---- Smoke tests: every effect at the extremes of the settings ----
 
-// Generous: the normal show, the longest, is under 5,000 events at the widest eye gap
+// Generous: the default show, the longest, is under 5,000 events at the widest eye gap
 constexpr size_t kSmokeEventLimit = 20000;
 // The surprise show never ends, so only this much of it is played
 constexpr size_t kSurprisePrefixEvents = 5000;
@@ -609,6 +616,7 @@ struct SmokeCase
     Runner run;
     bool hasGolden; // already compared with Python at the golden settings
     std::string testName;
+    bool asBlock = false; // play effect `id` as a show block (playBlock) instead of calling run
 };
 
 static std::vector<SmokeCase> gSmokeCases;
@@ -693,12 +701,15 @@ static std::string smokeRun(const SmokeCase &c, const SmokeSettings &settings)
 {
     const std::string label = c.id + " at maxBright " + std::to_string(settings.maxBright) + ", eyeGap " +
                               std::to_string(settings.eyeGap);
-    const bool neverEnds = isSurpriseShow(c.run);
+    const bool neverEnds = !c.asBlock && isSurpriseShow(c.run);
     RecordingEngine engine(settings.maxBright, settings.eyeGap, settings.name.c_str());
     engine.eventLimit = neverEnds ? kSurprisePrefixEvents : kSmokeEventLimit;
     try
     {
-        c.run(engine);
+        if (c.asBlock)
+            playBlock(engine, ShowBlock{ShowBlock::Kind::Effect, c.id});
+        else
+            c.run(engine);
     }
     catch (const EffectInterrupted &)
     {
@@ -714,6 +725,15 @@ static std::string smokeRun(const SmokeCase &c, const SmokeSettings &settings)
                " events (it should go on until interrupted)";
     if (!neverEnds && engine.hitLimit)
         return label + ": never stopped: still going after " + std::to_string(engine.eventLimit) + " events";
+
+    // A show block starts with the effect's phrase, as a button press does
+    if (c.asBlock)
+    {
+        const EffectInfo *fx = findEffect(c.id.c_str());
+        const std::string said = fx && fx->phrase ? std::string("S ") + fx->phrase : "";
+        if (!said.empty() && (engine.events.empty() || engine.events[0] != said))
+            return label + ": as a show block, it should say \"" + fx->phrase + "\" first";
+    }
 
     long at = -1;
     std::string problem = checkRecording(engine.events, settings.maxBright, !neverEnds, at);
@@ -987,6 +1007,10 @@ int main()
                                std::string("smoke_") + effects[i].id});
     for (const ExtraCase &c : kExtraCases)
         gSmokeCases.push_back({c.id, c.run, true, std::string("smoke_") + c.id});
+    // ...and every effect that may go in a show, played as a block of one
+    for (size_t i = 0; i < count; i++)
+        if (canBeInShow(effects[i]))
+            gSmokeCases.push_back({effects[i].id, effects[i].run, false, std::string("smoke_block_") + effects[i].id, true});
     for (gSmokeCurrent = 0; gSmokeCurrent < gSmokeCases.size(); gSmokeCurrent++)
         UnityDefaultTestRun(testSmokeCase, gSmokeCases[gSmokeCurrent].testName.c_str(), __LINE__);
 

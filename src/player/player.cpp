@@ -1,48 +1,74 @@
-// The player: runs the normal show on the Arduino loop task, and swaps in effects that phones (via the
-// web server task) or the USB serial port ask for.
+// The player: on the Arduino loop task, plays the saved show (Show mode) or blinks idly between button
+// presses (Buttons mode), and swaps in what phones (via the web server task) or the USB serial port ask
+// for.
+//
+//   Show --(press, or the button page opens)--> Buttons --(2 min with no press or heartbeat)--> Show
+//                                                       \--("start the show")--> Show
 //
 // Threads: requests arrive on any task and are copied into one pending slot under a critical section
-// (newest wins). The loop task polls an atomic flag in Engine::wait(), which throws EffectInterrupted,
+// (newest wins). The loop task polls atomic flags in Engine::wait(), which throws EffectInterrupted,
 // so the effect unwinds at once and loop() picks up the new request. Only the loop task touches the
-// eyes, the mouth LED and the serial input.
+// eyes, the mouth LED, the serial input and the show itself.
 
 #include "player/player.h"
 
 #include <atomic>
 #include <cstring>
 #include <exception>
+#include <string>
+#include <utility>
 #include "core/constants.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "core/show_store.h"
 #include "core/text.h"
 #include "display/sprites.h"
 #include "effects/registry.h"
+#include "effects/show.h"
 #include "hardware/max7219_eyes.h"
 #include "hardware/mouth_led.h"
 #include "player/device_engine.h"
 
 namespace
 {
+    using player::Mode;
+
     constexpr size_t kTextSize = kMaxWordsLength + 1; // typed words, announcements and the show message
     constexpr size_t kAnnounceQueueSize = 3;
     constexpr size_t kSerialLineSize = kMaxWordsLength + 16; // room for "say " and the words
-    constexpr const char *kBlinkId = "blink";                 // idle eyes while waiting for the next press
-    constexpr const char *kWordsId = "words";                 // status effectId for typed words
+    constexpr const char *kBlinkId = "blink";                 // idle eyes in Buttons mode
+    constexpr const char *kWordsId = "words";                 // status effectId for words
     constexpr uint32_t kFallbackIdleMs = PumpkinTime::Seconds(1);
+    constexpr int kNoBlock = -1;
 
     enum class RequestKind : uint8_t
     {
         None,
-        Effect,
-        Words,
-        BackToShow,
+        Effect,       // play a chosen effect (Buttons mode)
+        Words,        // scroll someone's words (Buttons mode)
+        EnterButtons, // pause the show: idle eyes until the next press
+        StartShow,    // the show, from the top
     };
+
+    // The mode a request leads to
+    Mode modeFor(RequestKind kind)
+    {
+        return kind == RequestKind::StartShow ? Mode::Show : Mode::Buttons;
+    }
 
     struct Request
     {
         RequestKind kind = RequestKind::None;
         const EffectInfo *effect = nullptr;
         char words[kTextSize] = {};
+    };
+
+    // What may cut short whatever is playing, besides a new request (which cuts short anything)
+    enum class CutBy : uint8_t
+    {
+        Nothing,              // someone's chosen effect, or an announcement: they finish first
+        Announcement,         // idle eyes
+        AnnouncementOrNewShow // a block of the show (or the show message)
     };
 
     // --- Shared between tasks, guarded by lock. Only quick copies inside: no Strings, no logging. ---
@@ -57,14 +83,21 @@ namespace
     uint32_t showMessageSetMs = 0;
     uint32_t showMessageForMs = 0; // 0 = until changed
 
-    bool statusInShow = true; // the show is what starts first
+    // Buttons mode's idle timer: the last press, heartbeat, or chosen effect finishing (millis())
+    uint32_t buttonsActiveMs = 0;
+
+    // The status. mode is only changed by the loop task (and always under the lock), so the loop task
+    // may read it without the lock.
+    Mode mode = Mode::Show; // the show is what a pumpkin does at switch-on
     const EffectInfo *statusEffect = nullptr;
     bool statusIsWords = false;
     char statusWords[kTextSize] = {};
+    int statusBlock = kNoBlock;
 
-    std::atomic<bool> hasPending{false}; // checked by wait() every few ms without taking the lock
+    std::atomic<bool> hasPending{false};      // checked by wait() every few ms without taking the lock
     std::atomic<bool> hasAnnouncement{false}; // an announcement is queued
-    std::atomic<bool> showRunning{false};     // a normal show pass is playing
+    std::atomic<bool> showDirty{true};        // the saved show changed (or hasn't been loaded yet)
+    std::atomic<CutBy> cutBy{CutBy::Nothing};
     std::atomic<bool> settingsDirty{false};
     std::atomic<player::SayListener> sayListener{nullptr};
     std::atomic<player::StatusListener> statusListener{nullptr};
@@ -80,14 +113,9 @@ namespace
 
     // --- Loop task only ---
 
-    enum class Mode : uint8_t
-    {
-        Show,    // the normal show
-        Waiting, // a button effect has finished: idle blinking until the next press or the timeout
-    };
-
-    Mode mode = Mode::Show;
-    uint32_t waitingSince = 0;
+    Show show;                // the saved show (never empty once loaded)
+    size_t nextBlock = 0;     // in Show mode, the block to play next
+    bool passStarting = true; // the show message is due before the next block 0
     bool nameDirty = false;
     const EffectInfo *blinkEffect = nullptr;
 
@@ -97,11 +125,23 @@ namespace
 
     void housekeeping();
 
-    // A request interrupts anything. An announcement (e.g. the address after a BOOT press) also cuts the
-    // normal show short, as the show just starts again afterwards, but never someone's chosen effect.
+    // A request interrupts anything. An announcement (e.g. the address after a BOOT press) also cuts a
+    // show block or the idle eyes short, and a newly saved show cuts the old one short, but neither
+    // ever cuts short someone's chosen effect.
     bool newRequestWaiting()
     {
-        return hasPending.load() || (showRunning.load() && hasAnnouncement.load());
+        if (hasPending.load())
+            return true;
+        switch (cutBy.load())
+        {
+        case CutBy::Nothing:
+            return false;
+        case CutBy::Announcement:
+            return hasAnnouncement.load();
+        case CutBy::AnnouncementOrNewShow:
+            return hasAnnouncement.load() || showDirty.load();
+        }
+        return false;
     }
 
     void forwardSay(const char *words)
@@ -119,13 +159,28 @@ namespace
         text::plain(in, out, sizeof out);
     }
 
-    void setPending(RequestKind kind, const EffectInfo *effect, const char *words)
+    // Where the player is heading: the pending request's mode if there is one, else the current mode.
+    // Call with the lock held.
+    Mode headingLocked()
     {
-        Locked locked;
+        return hasPending.load() ? modeFor(pending.kind) : mode;
+    }
+
+    void setPendingLocked(RequestKind kind, const EffectInfo *effect, const char *words)
+    {
         pending.kind = kind;
         pending.effect = effect;
         strlcpy(pending.words, words ? words : "", sizeof pending.words);
         hasPending.store(true);
+    }
+
+    // A press: play this (in Buttons mode), and restart the idle timer
+    void pressed(RequestKind kind, const EffectInfo *effect, const char *words)
+    {
+        const uint32_t now = millis();
+        Locked locked;
+        buttonsActiveMs = now;
+        setPendingLocked(kind, effect, words);
     }
 
     bool takeRequest(Request &out)
@@ -151,19 +206,20 @@ namespace
         return true;
     }
 
-    // Update what the web page shows, and tell it if anything changed (or always, for a fresh start)
-    void setStatus(bool inShow, const EffectInfo *effect, const char *words, bool always = false)
+    // Update what the web page shows, and tell it if anything changed (or always, for a fresh press)
+    void setStatus(Mode newMode, const EffectInfo *effect, const char *words, int block, bool always = false)
     {
         bool changed;
         {
             Locked locked;
             const bool isWords = words != nullptr;
-            changed = statusInShow != inShow || statusEffect != effect || statusIsWords != isWords ||
+            changed = mode != newMode || statusEffect != effect || statusIsWords != isWords || statusBlock != block ||
                       (isWords && strcmp(statusWords, words) != 0);
-            statusInShow = inShow;
+            mode = newMode;
             statusEffect = effect;
             statusIsWords = isWords;
             strlcpy(statusWords, isWords ? words : "", sizeof statusWords);
+            statusBlock = block;
         }
         if (changed || always)
         {
@@ -181,17 +237,27 @@ namespace
         mouth_led::setEnabled(mouth_led::enabled()); // lights a colour if it's on but dark
     }
 
-    // Run part of the show, stopping quietly if a new request interrupts it. Nothing escapes loop().
-    template <typename Fn>
-    void runGuarded(Fn &&fn)
+    // Ready for the next effect: sturdy chip settings and the normal brightness
+    void freshStart()
     {
+        max7219_eyes::reinit();
+        engine.setBrightness(engine.maxBright());
+    }
+
+    // Play something, stopping quietly if it's interrupted (see newRequestWaiting). Nothing escapes
+    // loop(): loop() picks up whatever interrupted it next.
+    template <typename Fn>
+    void runGuarded(CutBy cuttableBy, Fn &&fn)
+    {
+        freshStart();
+        cutBy.store(cuttableBy);
         try
         {
             fn();
         }
         catch (const EffectInterrupted &)
         {
-            // a new request is waiting: loop() picks it up next
+            // something new is waiting: loop() picks it up next
         }
         catch (const std::exception &e)
         {
@@ -201,82 +267,44 @@ namespace
         {
             LOG("PLAYER", "Effect failed");
         }
+        cutBy.store(CutBy::Nothing);
         tidyUp();
     }
 
-    // Ready for the next effect: sturdy chip settings and the normal brightness
-    void freshStart()
-    {
-        max7219_eyes::reinit();
-        engine.setBrightness(engine.maxBright());
-    }
+    // --- The show ---
 
-    void startWaiting()
+    // Read the saved show (or the original one). Slow-ish (flash and JSON), so only between effects.
+    void loadShow()
     {
-        mode = Mode::Waiting;
-        waitingSince = millis();
-        if (!hasPending.load()) // no flicker of "waiting" if the next effect is about to start
-            setStatus(false, nullptr, nullptr);
-    }
-
-    void playEffect(const EffectInfo &effect)
-    {
-        LOG("PLAYER", "Playing %s", effect.id);
-        setStatus(false, &effect, nullptr, true);
-        freshStart();
-        runGuarded([&] {
-            if (effect.phrase)
-                engine.say(effect.phrase);
-            effect.run(engine);
-        });
-        startWaiting();
-    }
-
-    void playWords(const char *words)
-    {
-        LOG("PLAYER", "Scrolling \"%s\"", words);
-        setStatus(false, nullptr, words, true);
-        freshStart();
-        runGuarded([&] {
-            engine.say(words);
-            ::scrollWords(engine, words);
-        });
-        startWaiting();
-    }
-
-    void handle(const Request &request)
-    {
-        switch (request.kind)
+        bool isDefault = true;
+        Show loaded = show_store::load(isDefault);
+        std::string error;
+        if (!checkShow(loaded, error))
         {
-        case RequestKind::Effect:
-            if (request.effect)
-                playEffect(*request.effect);
-            break;
-        case RequestKind::Words:
-            playWords(request.words);
-            break;
-        case RequestKind::BackToShow:
-            LOG("PLAYER", "Back to the normal show");
-            mode = Mode::Show;
-            setStatus(true, nullptr, nullptr);
-            break;
-        case RequestKind::None:
-            break;
+            LOG("PLAYER", "Can't play the saved show (%s): playing the original one", error.c_str());
+            loaded = defaultShow();
+            isDefault = true;
         }
+        show = std::move(loaded);
+        LOG("PLAYER", "Show: %u blocks%s", static_cast<unsigned>(show.size()), isDefault ? " (the original)" : "");
     }
 
-    bool playAnnouncement()
+    // The show from the top, next time it plays
+    void rewindShow()
     {
-        char message[kTextSize];
-        if (!takeAnnouncement(message))
-            return false;
-        LOG("PLAYER", "Announcing \"%s\"", message);
-        freshStart();
-        runGuarded([&] { ::scrollWords(engine, message); });
-        return true;
+        nextBlock = 0;
+        passStarting = true;
     }
 
-    void runShowPass()
+    void enterShow()
+    {
+        rewindShow();
+        // Always tell the page: buttonsTimedOut() may already have switched the mode under the lock
+        setStatus(Mode::Show, nullptr, nullptr, kNoBlock, true);
+    }
+
+    // The timed message (e.g. which WiFi to join) at the start of a pass. False if there isn't one.
+    bool playShowMessage()
     {
         char message[kTextSize];
         {
@@ -285,21 +313,90 @@ namespace
                 showMessage[0] = '\0'; // its time is up
             strlcpy(message, showMessage, sizeof message);
         }
-        setStatus(true, nullptr, nullptr);
-        freshStart();
-        showRunning.store(true);
-        runGuarded([&] {
-            if (message[0])
-                ::scrollWords(engine, message);
-            ::normalShow(engine);
+        if (!message[0])
+            return false;
+        setStatus(Mode::Show, nullptr, nullptr, kNoBlock);
+        runGuarded(CutBy::AnnouncementOrNewShow, [&] { ::scrollWords(engine, message); });
+        return true;
+    }
+
+    // One step of the show: the message at the start of a pass, or the next block. Back to loop() after
+    // each, so requests and announcements come first.
+    void showStep()
+    {
+        if (show.empty())
+            show = defaultShow(); // loadShow() never leaves it empty, but never index an empty show
+        if (nextBlock >= show.size())
+            rewindShow();
+        if (nextBlock == 0 && passStarting)
+        {
+            passStarting = false;
+            if (playShowMessage())
+                return;
+        }
+
+        const size_t index = nextBlock++;
+        const ShowBlock &block = show[index];
+        if (block.kind == ShowBlock::Kind::Words)
+            setStatus(Mode::Show, nullptr, block.value.c_str(), static_cast<int>(index));
+        else
+            setStatus(Mode::Show, findEffect(block.value.c_str()), nullptr, static_cast<int>(index));
+        // Cut short by an announcement, it carries on with the next block; by a new show, from the top
+        runGuarded(CutBy::AnnouncementOrNewShow, [&] { playBlock(engine, block); });
+    }
+
+    // --- Buttons mode ---
+
+    // The idle timer has run out: back to the show. Checked and switched under the lock, so a heartbeat
+    // arriving at the same moment either keeps Buttons mode or asks for it again.
+    bool buttonsTimedOut()
+    {
+        const uint32_t now = millis();
+        Locked locked;
+        if (hasPending.load())
+            return false; // a request decides instead
+        // Signed, as a heartbeat may have set the timer just after `now` was read
+        if (static_cast<int32_t>(now - buttonsActiveMs) < static_cast<int32_t>(kButtonsIdleTimeoutMs))
+            return false;
+        mode = Mode::Show;
+        return true;
+    }
+
+    // A chosen effect or words have finished (or been interrupted): idle eyes until the next press
+    void chosenFinished()
+    {
+        const uint32_t now = millis();
+        {
+            Locked locked;
+            buttonsActiveMs = now; // the idle timer starts when the effect ends, not when it was pressed
+        }
+        if (!hasPending.load()) // no flicker of "idle" if the next effect is about to start
+            setStatus(Mode::Buttons, nullptr, nullptr, kNoBlock);
+    }
+
+    void playChosen(const EffectInfo &effect)
+    {
+        LOG("PLAYER", "Playing %s", effect.id);
+        setStatus(Mode::Buttons, &effect, nullptr, kNoBlock, true);
+        runGuarded(CutBy::Nothing, [&] { playEffect(engine, effect); });
+        chosenFinished();
+    }
+
+    void playChosenWords(const char *words)
+    {
+        LOG("PLAYER", "Scrolling \"%s\"", words);
+        setStatus(Mode::Buttons, nullptr, words, kNoBlock, true);
+        runGuarded(CutBy::Nothing, [&] {
+            engine.say(words);
+            ::scrollWords(engine, words);
         });
-        showRunning.store(false);
+        chosenFinished();
     }
 
     // Idle eyes between button presses
     void idle()
     {
-        runGuarded([&] {
+        runGuarded(CutBy::Announcement, [&] {
             if (blinkEffect)
             {
                 blinkEffect->run(engine);
@@ -312,17 +409,54 @@ namespace
         });
     }
 
-    // Nothing new asked for: the next show pass, or more idle blinking until it's been quiet too long
+    // --- What loop() does ---
+
+    void handle(const Request &request)
+    {
+        switch (request.kind)
+        {
+        case RequestKind::Effect:
+            if (request.effect)
+                playChosen(*request.effect);
+            break;
+        case RequestKind::Words:
+            playChosenWords(request.words);
+            break;
+        case RequestKind::EnterButtons:
+            LOG("PLAYER", "Buttons mode: the show is paused");
+            setStatus(Mode::Buttons, nullptr, nullptr, kNoBlock);
+            break;
+        case RequestKind::StartShow:
+            LOG("PLAYER", "Starting the show");
+            enterShow();
+            break;
+        case RequestKind::None:
+            break;
+        }
+    }
+
+    bool playAnnouncement()
+    {
+        char message[kTextSize];
+        if (!takeAnnouncement(message))
+            return false;
+        LOG("PLAYER", "Announcing \"%s\"", message);
+        setStatus(mode, nullptr, nullptr, kNoBlock);
+        runGuarded(CutBy::Nothing, [&] { ::scrollWords(engine, message); });
+        return true;
+    }
+
+    // Nothing new asked for: the show's next step, or more idle blinking until it's been quiet too long
     void carryOn()
     {
-        if (mode == Mode::Waiting && millis() - waitingSince >= kButtonIdleTimeoutMs)
+        if (mode == Mode::Buttons && buttonsTimedOut())
         {
-            LOG("PLAYER", "All quiet: back to the normal show");
-            mode = Mode::Show;
+            LOG("PLAYER", "All quiet: back to the show");
+            enterShow();
         }
 
         if (mode == Mode::Show)
-            runShowPass();
+            showStep();
         else
             idle();
     }
@@ -335,7 +469,8 @@ namespace
         Serial.println("  list          the effects");
         Serial.println("  play <id>     play one, e.g. play creeper");
         Serial.println("  say <words>   scroll some words across the eyes");
-        Serial.println("  show          back to the normal show");
+        Serial.println("  show          start the show (from the top)");
+        Serial.println("  buttons       pause the show for button presses (back to the show after 2 minutes idle)");
         Serial.println("  name <name>   rename the pumpkin, e.g. name Jack's Pumpkin (restart to rename its WiFi)");
         Serial.println("  help          this list");
     }
@@ -409,8 +544,14 @@ namespace
         }
         else if (strcmp(line, "show") == 0)
         {
-            LOG("SERIAL", "OK, back to the normal show");
-            player::backToShow();
+            LOG("SERIAL", "OK, the show");
+            player::startShow();
+        }
+        else if (strcmp(line, "buttons") == 0)
+        {
+            LOG("SERIAL", "OK, buttons mode (back to the show after %u minutes with no presses)",
+                static_cast<unsigned>(kButtonsIdleTimeoutMs / PumpkinTime::Minutes(1)));
+            player::enterButtons();
         }
         else if (*line)
         {
@@ -472,12 +613,13 @@ namespace player
         max7219_eyes::begin();
         engine.refreshSettings(true); // also switches the mouth LED on or off
         engine.setBrightness(engine.maxBright());
-        engine.show(Eyes::straight, Eyes::straight); // straight-ahead eyes while WiFi connects
+        engine.show(Eyes::straight, Eyes::straight); // straight-ahead eyes until the first loop() starts the show
 
         blinkEffect = findEffect(kBlinkId);
         if (!blinkEffect)
             LOG("PLAYER", "No \"%s\" effect: idle eyes will just stare", kBlinkId);
 
+        // The saved show is read by the first loop() (showDirty starts true), still on this task
         size_t count = 0;
         allEffects(count);
         LOG("PLAYER", "Eyes on, %u effects. Type help on serial for test commands.",
@@ -491,6 +633,11 @@ namespace player
         {
             engine.refreshSettings(true);
             nameDirty = false;
+        }
+        if (showDirty.exchange(false))
+        {
+            loadShow();
+            rewindShow(); // a new show starts from the top (Buttons mode starts it from the top anyway)
         }
 
         // A new request first, then any announcement, then whatever the mode says
@@ -509,7 +656,7 @@ namespace player
         const EffectInfo *effect = findEffect(effectId.c_str());
         if (!effect)
             return false;
-        setPending(RequestKind::Effect, effect, nullptr);
+        pressed(RequestKind::Effect, effect, nullptr);
         return true;
     }
 
@@ -518,18 +665,30 @@ namespace player
         char cleaned[kTextSize];
         cleanText(words.c_str(), cleaned);
         if (cleaned[0])
-            setPending(RequestKind::Words, nullptr, cleaned);
+            pressed(RequestKind::Words, nullptr, cleaned);
     }
 
-    void backToShow()
+    void startShow()
     {
         Locked locked;
-        if (!hasPending.load() && statusInShow)
-            return; // already in the show: don't start it again from the top
-        pending.kind = RequestKind::BackToShow;
-        pending.effect = nullptr;
-        pending.words[0] = '\0';
-        hasPending.store(true);
+        if (headingLocked() == Mode::Show)
+            return; // already showing: don't start it again from the top
+        setPendingLocked(RequestKind::StartShow, nullptr, nullptr);
+    }
+
+    void enterButtons()
+    {
+        const uint32_t now = millis();
+        Locked locked;
+        buttonsActiveMs = now;
+        if (headingLocked() == Mode::Buttons)
+            return; // already in Buttons mode (or about to be): that was just "still here"
+        setPendingLocked(RequestKind::EnterButtons, nullptr, nullptr);
+    }
+
+    void showChanged()
+    {
+        showDirty.store(true); // the loop task reads it, and cuts the old show short if it's playing
     }
 
     void announce(const String &message)
@@ -568,20 +727,23 @@ namespace player
 
     Status status()
     {
-        bool inShow;
+        Mode currentMode;
         const EffectInfo *effect;
         bool isWords;
         char words[kTextSize];
+        int block;
         {
             Locked locked;
-            inShow = statusInShow;
+            currentMode = mode;
             effect = statusEffect;
             isWords = statusIsWords;
             strlcpy(words, statusWords, sizeof words);
+            block = statusBlock;
         }
 
         Status result;
-        result.inShow = inShow;
+        result.mode = currentMode;
+        result.block = currentMode == Mode::Show ? block : kNoBlock;
         if (effect)
         {
             result.effectId = effect->id;
