@@ -36,8 +36,14 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
 
 ## How it fits together
 
-- `main.cpp`: settings -> player (eyes on) -> network (home WiFi, or the setup WiFi + captive portal) -> web
-  server -> loop runs the player.
+- `main.cpp`: settings -> saved show (LittleFS) -> player (eyes on) -> network (starts its task and returns:
+  home WiFi, or the setup WiFi + captive portal, joins in the background) -> web server -> loop runs the
+  player, so the show starts at once. The network task tells main.cpp the outcome through onModeChange.
+- **Two modes** (`src/player/`): Show plays the saved show (`show_store`, LittleFS on the "spiffs"
+  partition; default = `defaultShow()` in `src/effects/show.cpp`) round and round. Buttons pauses it for
+  presses: the button page asks for it on opening and sends a heartbeat every 30 s while on screen; 2
+  minutes after the last press or heartbeat it's back to the show. The show creator page (`web/show.html`)
+  edits the blocks (effects and words). The capture script and the mock server read show.cpp's table.
 - **Threads.** Effects run on the Arduino loop task. The async web server has its own task, and so does
   the network housekeeping (captive DNS, reconnects, status LED, BOOT button). A web request sets a pending
   request in the player; `Engine::wait()` notices and throws `EffectInterrupted`, which unwinds the effect

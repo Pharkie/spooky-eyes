@@ -2,9 +2,10 @@
 
 LED eyes for a Halloween pumpkin: two 8x8 LED matrices and a colour-changing mouth LED, run by an ESP32-C3
 SuperMini with WiFi. Out of the box it plays a show of eyes, pictures and messages. Open its web page on a
-phone and there's a button for each of about 50 effects (creepers, a witch on a broomstick, Pac-Man, a
-Nether portal...), a talking pumpkin (the phone speaks along), and a box for scrolling your own words across
-the eyes.
+phone and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
+Pac-Man, a Nether portal...), a talking pumpkin (the phone speaks along), and a box for scrolling your own
+words across the eyes. The show page builds your own show from effects and messages; once saved, it's what
+the pumpkin plays at switch-on.
 
 Pictures, effects and ideas by a six-year-old Halloween fan.
 
@@ -104,7 +105,7 @@ and `tools/make_instructions.sh "Jack's Pumpkin"` makes a matching guide. Not ne
 |---|---|
 | `src/effects/` | The effects, the building blocks they use, and `registry.cpp`, the one table of buttons |
 | `src/display/` | Frames, fonts and all the pictures |
-| `src/player/` | Runs the normal show, plays requested effects, and lets a new press interrupt the current one |
+| `src/player/` | Show mode (plays the saved show) and buttons mode (plays presses, each interrupting the last) |
 | `src/hardware/` | Pin map and drivers: MAX7219 eyes, mouth LED, status LED, BOOT button |
 | `src/core/` | Settings (saved in flash), WiFi and captive portal (from Scribe Evolution), constants |
 | `src/web/` | Web server and JSON API |
