@@ -16,14 +16,16 @@
   <a class="icon-link" href="/settings" aria-label="Settings" title="Settings">⚙️</a>
 </header>
 <div id="status" class="status" role="status" aria-live="polite">Waking up the pumpkin…</div>
+<nav class="show-bar" aria-label="The show">
+  <button id="start-show" class="btn start-show" type="button">▶ Start the show</button>
+  <a class="btn secondary" href="/show">✏️ Make the show</a>
+</nav>
 <p id="wifi-notice" class="notice" hidden></p>
 <div class="talk">
   <label class="switch-label"><input type="checkbox" id="talk" class="switch" checked> 🗣️ Talking pumpkin</label>
   <select id="voice" aria-label="Voice" hidden></select>
 </div>
 <p id="no-speech" class="hint center" hidden>This browser can't talk. Try Safari or Chrome.</p>
-
-<div id="effects"><p class="center muted"><span class="spinner"></span>Getting the buttons…</p></div>
 
 <h2>Your own words</h2>
 <form id="own" class="own" autocomplete="off">
@@ -32,22 +34,24 @@
 </form>
 <div id="err" class="error" role="alert"></div>
 
-<button id="show" class="show-btn" type="button">▶️ Back to the normal show</button>
-<p class="links"><a href="/settings">⚙️ Settings</a></p>
+<div id="effects"><p class="center muted"><span class="spinner"></span>Getting the buttons…</p></div>
+
+<p class="links"><a href="/show">✏️ Make the show</a> <a href="/settings">⚙️ Settings</a></p>
 </main>
 <script src="/common.js"></script>
 <script>
 'use strict';
 (() => {
-  const { $, get, post, listen, loadStatus, setupReason, store, straightQuotes } = Pumpkin;
+  const { $, get, post, listen, loadStatus, setupReason, store, straightQuotes, setMode, effectName, effectAccordion, loadFailed, playerText } = Pumpkin;
   const statusEl = $('status');
   const err = $('err');
   const words = $('words');
   const talk = $('talk');
   const voicePicker = $('voice');
+  const startShow = $('start-show');
   const effects = new Map(); // id -> {id, label, emoji, group}
   let seq = 0;               // each press gets a number; only the newest press shows its error
-  let pending = null;        // what this phone just pressed, until the pumpkin confirms it
+  let pending = null;        // {test(player), at}: what this phone just asked for, until the pumpkin confirms it
 
   function setStatus(text, playing) {
     statusEl.textContent = text;
@@ -63,50 +67,85 @@
     return [...document.querySelectorAll('[data-id]')].find((b) => b.dataset.id === id) || null;
   }
 
+  // Just after asking for something, ignore older news until the pumpkin confirms it (or 2 s pass)
+  function expect(test) {
+    pending = { test, at: Date.now() };
+  }
+
+  // ---- Buttons mode: the show pauses while this page is open ----
+  // The pumpkin goes back to its show by itself 2 minutes (kButtonsIdleTimeoutMs) after the last press or
+  // "still here", so say it every 30 s (kButtonsHeartbeatMs) while the page is on screen, and stop while
+  // it's hidden: a phone put away in a pocket lets the pumpkin go back to its show.
+
+  let HEARTBEAT_MS = 30000; // until /api/status says (kButtonsHeartbeatMs in the firmware)
+  let wantButtons = true;    // false after "Start the show", until the next press
+  let heartbeatTimer = 0;
+  let buttonsOkAt = 0;       // when the pumpkin last agreed to buttons mode (a heartbeat or a press)
+  let sawButtons = false;    // the news has said "buttons mode" since then
+  let modeQueue = Promise.resolve(); // mode requests go one at a time, so a late heartbeat can't undo "Start the show"
+
+  const onScreen = () => document.visibilityState === 'visible';
+
+  function askMode(mode) {
+    const request = modeQueue.then(() => setMode(mode));
+    modeQueue = request.catch(() => { /* the caller deals with it */ });
+    return request;
+  }
+
+  // Start (or restart) the 30 s countdown to the next heartbeat; none while hidden or after "Start the show"
+  function scheduleHeartbeat() {
+    clearTimeout(heartbeatTimer);
+    heartbeatTimer = wantButtons && onScreen() ? setTimeout(heartbeat, HEARTBEAT_MS) : 0;
+  }
+
+  async function heartbeat() {
+    scheduleHeartbeat();
+    if (!wantButtons || !onScreen()) return;
+    try {
+      await modeQueue;
+      if (!wantButtons) return; // "Start the show" got in first
+      await askMode('buttons');
+      buttonsOkAt = Date.now();
+    } catch (e) { /* the next one may work; the status line says if the pumpkin's gone */ }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (onScreen()) {
+      heartbeat();
+    } else {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = 0;
+      sawButtons = false;
+    }
+  });
+  // Back to this page from the show creator (Safari may keep the old page and show it again)
+  window.addEventListener('pageshow', (event) => { if (event.persisted) heartbeat(); });
+
+  // Someone started the show (another phone, or "Save and play" on the show page) while this page was
+  // keeping the pumpkin in buttons mode: let it play, rather than stopping it at the next heartbeat. (A
+  // show that comes back because this phone went quiet for 2 minutes doesn't count.)
+  function noticeMode(player) {
+    if (player.mode === 'buttons') {
+      sawButtons = wantButtons && buttonsOkAt > 0;
+      return;
+    }
+    if (wantButtons && sawButtons && onScreen() && Date.now() - buttonsOkAt < 2 * HEARTBEAT_MS) {
+      wantButtons = false;
+      scheduleHeartbeat();
+    }
+    sawButtons = false;
+  }
+
   // ---- Buttons, built from the firmware's list of effects ----
 
   async function loadEffects() {
     const box = $('effects');
     try {
       const data = await get('/api/effects');
-      const groups = new Map(); // section name -> buttons, in the order the firmware lists them
-      for (const fx of data.effects) {
-        effects.set(fx.id, fx);
-        if (!groups.has(fx.group)) groups.set(fx.group, []);
-        groups.get(fx.group).push(fx);
-      }
-      box.textContent = '';
-      for (const [group, list] of groups) {
-        const heading = document.createElement('h2');
-        heading.textContent = group;
-        const grid = document.createElement('div');
-        grid.className = 'grid g-' + group.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        for (const fx of list) {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.className = 'tile';
-          button.dataset.id = fx.id;
-          const emoji = document.createElement('span');
-          emoji.className = 'e';
-          emoji.setAttribute('aria-hidden', 'true');
-          emoji.textContent = fx.emoji;
-          button.append(emoji, fx.label);
-          grid.appendChild(button);
-        }
-        box.append(heading, grid);
-      }
+      for (const fx of data.effects) effects.set(fx.id, fx);
+      effectAccordion(box, data.effects, { storeKey: 'section' });
     } catch (e) {
-      box.textContent = '';
-      const p = document.createElement('p');
-      p.className = 'center error';
-      p.textContent = "Couldn't get the buttons. " + e.message + ' ';
-      const retry = document.createElement('button');
-      retry.className = 'btn small secondary';
-      retry.type = 'button';
-      retry.textContent = 'Try again';
-      retry.addEventListener('click', loadEffects);
-      p.appendChild(retry);
-      box.appendChild(p);
+      loadFailed(box, 'the buttons', e, loadEffects);
     }
   }
 
@@ -116,10 +155,14 @@
     const mine = ++seq;
     err.textContent = '';
     outline(button);
-    pending = { id: button.dataset.id || button.id, at: Date.now() };
+    expect((player) => player.mode === 'buttons' && player.effectId === button.dataset.id);
     setStatus('Playing: ' + label + ' …', true);
+    // A press means buttons mode (and counts as "still here")
+    wantButtons = true;
+    scheduleHeartbeat();
     try {
       await send();
+      buttonsOkAt = Date.now();
     } catch (e) {
       if (mine !== seq) return; // a newer press took over
       pending = null;
@@ -133,7 +176,7 @@
     const button = event.target.closest('button[data-id]');
     if (!button) return;
     const fx = effects.get(button.dataset.id);
-    press(button, fx.emoji + ' ' + fx.label, () => post('/api/play', { id: fx.id }));
+    press(button, effectName(fx), () => post('/api/play', { id: fx.id }));
   });
 
   $('own').addEventListener('submit', (event) => {
@@ -148,32 +191,42 @@
   });
   words.addEventListener('input', () => { err.textContent = ''; });
 
-  $('show').addEventListener('click', (event) => {
-    press(event.currentTarget, 'Back to the normal show', () => post('/api/show'));
+  startShow.addEventListener('click', async () => {
+    const mine = ++seq;
+    err.textContent = '';
+    wantButtons = false;
+    scheduleHeartbeat(); // stops it
+    outline(startShow);
+    expect((player) => player.mode === 'show');
+    setStatus('🎃 Starting the show…');
+    try {
+      await askMode('show');
+    } catch (e) {
+      if (mine !== seq) return;
+      pending = null;
+      outline(null);
+      wantButtons = true;
+      scheduleHeartbeat();
+      setStatus('Oops, that didn’t work.');
+      err.textContent = e.message;
+    }
   });
 
   // What the pumpkin is doing, from server-sent events (or polling)
   function showPlayer(player) {
     if (!player) return;
-    // Just after a press, ignore older news until the pumpkin confirms it (or 2 s pass)
-    if (pending && Date.now() - pending.at < 2000) {
-      const confirmed = pending.id === 'show' ? player.inShow : player.effectId === pending.id;
-      if (!confirmed) return;
-    }
+    if (pending && Date.now() - pending.at < 2000 && !pending.test(player)) return;
     pending = null;
-    if (player.inShow) {
-      outline(null);
-      setStatus('🎃 The normal show is on. Press a button!');
-    } else if (player.effectId === 'words') {
-      outline(buttonFor('words'));
-      setStatus('Scrolling: “' + player.label + '”', true);
+    noticeMode(player);
+    if (player.mode === 'show') {
+      outline(startShow);
+      setStatus(playerText(player, effects));
     } else if (player.effectId) {
-      const fx = effects.get(player.effectId);
       outline(buttonFor(player.effectId));
-      setStatus('Playing: ' + (fx ? fx.emoji + ' ' : '') + (player.label || (fx && fx.label) || player.effectId) + ' …', true);
+      setStatus(playerText(player, effects), true);
     } else {
       outline(null);
-      setStatus('Done! Press another one.');
+      setStatus(playerText(player, effects));
     }
   }
 
@@ -259,6 +312,7 @@
   async function showWifiNotice() {
     try {
       const status = await loadStatus();
+      if (status.buttonsHeartbeatMs) HEARTBEAT_MS = status.buttonsHeartbeatMs;
       const notice = $('wifi-notice');
       if (status.mode === 'setup') {
         notice.textContent = '';
@@ -281,6 +335,9 @@
   // How much the "your own words" box takes, from the firmware's limits
   get('/api/settings').then((s) => { words.maxLength = s.limits.maxWordsLength; }).catch(() => { /* the pumpkin checks anyway */ });
 
+  // Opening the page pauses the show (buttons mode), once it's on screen
+  if (onScreen()) expect((player) => player.mode === 'buttons');
+  heartbeat();
   loadEffects().then(showWifiNotice);
   listen({ status: showPlayer, say: speak });
 })();

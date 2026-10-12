@@ -34,7 +34,7 @@ CONTENT_TYPES = {
 }
 
 # The pages web_server.cpp serves by name: without them the pumpkin would be useless
-REQUIRED_FILES = ("index.html", "setup.html", "settings.html")
+REQUIRED_FILES = ("index.html", "setup.html", "settings.html", "show.html")
 
 # Editor backups and swap files: never shipped
 JUNK_SUFFIXES = ("~", ".bak", ".swp", ".swo", ".tmp", ".orig")

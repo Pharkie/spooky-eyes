@@ -16,11 +16,12 @@ namespace web
 {
     namespace
     {
-        // Collect a request body that may arrive in several pieces. Bodies over the limit are
+        // Collect a request body that may arrive in several pieces. Bodies over maxBytes are
         // dropped here and rejected when the request completes.
-        void collectBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        void collectBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total,
+                         size_t maxBytes)
         {
-            if (total > kMaxJsonBodyBytes || index + len > total)
+            if (total > maxBytes || index + len > total)
             {
                 return;
             }
@@ -57,18 +58,23 @@ namespace web
         return request->hasHeader(kCsrfHeader) && request->header(kCsrfHeader) == kCsrfValue;
     }
 
-    void onJsonPost(AsyncWebServer &server, const char *path, JsonPostHandler handler)
+    void onJsonPost(AsyncWebServer &server, const char *path, JsonPostHandler handler, size_t maxBodyBytes)
     {
         server.on(
             path, HTTP_POST,
-            [handler](AsyncWebServerRequest *request)
+            [path, handler, maxBodyBytes](AsyncWebServerRequest *request)
             {
+                if (request->url() != path)
+                {
+                    sendError(request, 404, "There's no POST " + request->url());
+                    return;
+                }
                 if (!hasCsrfHeader(request))
                 {
                     sendError(request, 403, "Missing X-Pumpkin header");
                     return;
                 }
-                if (request->contentLength() > kMaxJsonBodyBytes)
+                if (request->contentLength() > maxBodyBytes)
                 {
                     sendError(request, 413, "That's too much to send");
                     return;
@@ -84,6 +90,9 @@ namespace web
                         return;
                     }
                     DeserializationError parseError = deserializeJson(body, text);
+                    // The document has its own copy now: free the body (up to 16 KB) before the handler runs
+                    free(request->_tempObject);
+                    request->_tempObject = nullptr;
                     if (parseError || !body.is<JsonObject>())
                     {
                         sendError(request, 400, "That request didn't make sense (bad JSON)");
@@ -92,7 +101,9 @@ namespace web
                 }
                 handler(request, body);
             },
-            nullptr, collectBody);
+            nullptr,
+            [maxBodyBytes](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+            { collectBody(request, data, len, index, total, maxBodyBytes); });
     }
 
     void sendJson(AsyncWebServerRequest *request, int code, const JsonDocument &doc)

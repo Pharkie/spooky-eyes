@@ -1,6 +1,7 @@
 #pragma once
 // The JSON API behind the pages. Handlers run on the async web server's task and only call player::,
-// settings::, network:: and boot_button::unlocked() (all thread-safe). They never touch the eyes.
+// settings::, network::, show_store:: and boot_button::unlocked() (all thread-safe). They never touch
+// the eyes.
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -9,8 +10,11 @@
 
 namespace web
 {
-    // effects, play, words, show, status, settings, hostname, restart (api_handlers.cpp)
+    // effects, play, words, mode, status, settings, hostname, restart (api_handlers.cpp)
     void registerApiRoutes(AsyncWebServer &server);
+
+    // show (GET and POST), show/reset: the show creator (show_handlers.cpp)
+    void registerShowRoutes(AsyncWebServer &server);
 
     // wifi/scan, wifi/forget, wifi (wifi_handlers.cpp)
     void registerWifiRoutes(AsyncWebServer &server);
@@ -18,7 +22,8 @@ namespace web
     // update: firmware upload (update_handler.cpp)
     void registerUpdateRoute(AsyncWebServer &server);
 
-    // {"inShow":..,"effectId":..,"label":..}, used by /api/status and the "status" server-sent event
+    // {"mode":"show"|"buttons","effectId":..,"label":..,"block":n}, used by /api/status and the
+    // "status" server-sent event. block is the show block playing (0-based), -1 in Buttons mode.
     void addPlayerStatus(JsonObject target);
 
     // Copy an optional "name" from a request body into updated.pumpkinName (/api/settings and /api/wifi).

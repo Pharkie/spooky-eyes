@@ -17,12 +17,16 @@ namespace web
 
     // Largest JSON body we accept (words are capped at kMaxWordsLength characters, so this is generous)
     constexpr size_t kMaxJsonBodyBytes = 1024;
+    // ...except for saving a show: kMaxShowBlocks blocks of kMaxWordsLength letters is about 13 KB
+    constexpr size_t kMaxShowBodyBytes = 16 * 1024;
 
     using JsonPostHandler = void (*)(AsyncWebServerRequest *request, JsonDocument &body);
 
-    // Register a POST route that checks the CSRF header, collects and parses a JSON body (an empty
-    // body gives an empty document), then calls handler. Bad requests get a JSON error reply.
-    void onJsonPost(AsyncWebServer &server, const char *path, JsonPostHandler handler);
+    // Register a POST route that checks the CSRF header, collects and parses a JSON body of up to
+    // maxBodyBytes (an empty body gives an empty document), then calls handler. Only the exact path
+    // counts (the library would also send "/api/show/anything" here). Bad requests get a JSON error.
+    void onJsonPost(AsyncWebServer &server, const char *path, JsonPostHandler handler,
+                    size_t maxBodyBytes = kMaxJsonBodyBytes);
 
     bool hasCsrfHeader(AsyncWebServerRequest *request);
 

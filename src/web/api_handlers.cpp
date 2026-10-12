@@ -1,6 +1,7 @@
-// JSON API: effects and buttons, status, settings and restart. WiFi and firmware updates are in
-// wifi_handlers.cpp and update_handler.cpp. Requests are checked for shape here (Scribe Evolution's
-// validation.cpp); settings::save() decides whether the values themselves will do.
+// JSON API: effects and buttons, the player's mode, status, settings and restart. The show creator is
+// in show_handlers.cpp, WiFi and firmware updates in wifi_handlers.cpp and update_handler.cpp. Requests
+// are checked for shape here (Scribe Evolution's validation.cpp); settings::save() decides whether the
+// values themselves will do.
 
 #include "web/api_handlers.h"
 
@@ -9,6 +10,7 @@
 #include "core/network.h"
 #include "core/settings.h"
 #include "effects/registry.h"
+#include "effects/show.h"
 #include "player/player.h"
 #include "web/web_utils.h"
 
@@ -58,6 +60,7 @@ namespace web
                 item["label"] = effects[i].label;
                 item["emoji"] = effects[i].emoji;
                 item["group"] = groupName(effects[i].group);
+                item["inShow"] = canBeInShow(effects[i]); // whether the show creator offers it
             }
             sendJson(request, 200, doc);
         }
@@ -108,11 +111,28 @@ namespace web
             sendOk(request);
         }
 
-        // POST /api/show: back to the normal show
-        void handleShow(AsyncWebServerRequest *request, JsonDocument &)
+        // POST /api/mode {"mode":"show"} or {"mode":"buttons"}. The button page sends "buttons" when it
+        // opens and every kButtonsHeartbeatMs while it's on screen, so this is quiet when it works.
+        void handleMode(AsyncWebServerRequest *request, JsonDocument &body)
         {
-            player::backToShow();
-            sendOk(request);
+            const char *mode = body["mode"] | "";
+            if (strcmp(mode, "show") == 0)
+            {
+                player::startShow();
+            }
+            else if (strcmp(mode, "buttons") == 0)
+            {
+                player::enterButtons();
+            }
+            else
+            {
+                sendError(request, 400, "The mode should be \"show\" or \"buttons\"");
+                return;
+            }
+            JsonDocument doc;
+            doc["ok"] = true;
+            doc["mode"] = mode;
+            sendJson(request, 200, doc);
         }
 
         // GET /api/status
@@ -122,6 +142,7 @@ namespace web
             JsonDocument doc;
             doc["name"] = current.pumpkinName;
             doc["defaultName"] = kDefaultPumpkinName; // a pumpkin still called this hasn't been named yet
+            doc["buttonsHeartbeatMs"] = kButtonsHeartbeatMs; // how often an open button page says it's there
             doc["version"] = FIRMWARE_VERSION;
             doc["uptime"] = millis() / 1000;
             doc["freeHeap"] = ESP.getFreeHeap();
@@ -252,9 +273,11 @@ namespace web
     void addPlayerStatus(JsonObject target)
     {
         const player::Status status = player::status();
-        target["inShow"] = status.inShow;
+        const bool buttons = status.mode == player::Mode::Buttons;
+        target["mode"] = buttons ? "buttons" : "show";
         target["effectId"] = status.effectId;
         target["label"] = status.label;
+        target["block"] = buttons ? -1 : status.block;
     }
 
     bool readNewName(JsonDocument &body, Settings &updated, String &error)
@@ -271,7 +294,7 @@ namespace web
         server.on("/api/hostname", HTTP_GET, handleHostname);
         onJsonPost(server, "/api/play", handlePlay);
         onJsonPost(server, "/api/words", handleWords);
-        onJsonPost(server, "/api/show", handleShow);
+        onJsonPost(server, "/api/mode", handleMode);
         onJsonPost(server, "/api/settings", handlePostSettings);
         onJsonPost(server, "/api/restart", handleRestart);
     }

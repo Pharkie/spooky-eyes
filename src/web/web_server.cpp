@@ -316,6 +316,7 @@ namespace web
                       });
             server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request) { sendPage(request, "/setup.html"); });
             server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) { sendPage(request, "/settings.html"); });
+            server.on("/show", HTTP_GET, [](AsyncWebServerRequest *request) { sendPage(request, "/show.html"); });
 
             // Every file in web/ at its own path: /style.css, /common.js, /index.html...
             for (size_t i = 0; i < web_assets::kAssetCount; i++)
@@ -331,6 +332,7 @@ namespace web
         server.addHandler(new CaptivePortalHandler()); // first, so it sees every request
         addPageRoutes();
         registerApiRoutes(server);
+        registerShowRoutes(server);
         registerWifiRoutes(server);
         registerUpdateRoute(server);
 

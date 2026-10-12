@@ -13,6 +13,11 @@
 Flip the mode while it runs by adding ?mode=home, ?mode=setup, ?mode=lost or ?mode=wrong to any address,
 e.g. http://localhost:8080/settings?mode=lost or curl 'http://localhost:8080/api/status?mode=setup'.
 
+The player has two modes, as on the board: show (the saved show, round and round: what it does at
+switch-on) and buttons (the button page is open: the show pauses and each press plays one effect). Buttons
+mode ends kButtonsIdleTimeoutMs after the last press or heartbeat (MOCK_IDLE_SECONDS=20 to wait less). The
+saved show lives in memory and starts as the default show from src/effects/show.cpp.
+
 The BOOT button: firmware updates always need a short BOOT press first, and so do WiFi and name changes
 in lost/wrong mode (strangers may be on the setup WiFi). Press it with ?boot=1 on any address, or
 curl -X POST http://localhost:8080/mock/boot. It counts for kBootUnlockMs, as on the board; ?boot=0
@@ -21,8 +26,8 @@ lets go of it.
 Serves web/ straight from disk (edit a page, reload the browser) and fakes every API endpoint the
 firmware has (src/web/*.cpp): buttons from src/effects/registry.cpp, limits, timings and the setup
 WiFi password from src/core/constants.h, server-sent events ("say" with each effect's phrase, "status"
-as it plays), a WiFi scan, settings, restarts and firmware uploads. Like the firmware, every POST needs
-the "X-Pumpkin: 1" header. Python standard library only.
+as it plays), the show creator's show, a WiFi scan, settings, restarts and firmware uploads. Like the
+firmware, every POST needs the "X-Pumpkin: 1" header. Python standard library only.
 """
 
 import argparse
@@ -43,13 +48,14 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 REGISTRY = ROOT / "src" / "effects" / "registry.cpp"
+SHOW_SOURCE = ROOT / "src" / "effects" / "show.cpp"
 CONSTANTS = ROOT / "src" / "core" / "constants.h"
 
 MAX_JSON_BODY = 1024          # web_utils.h kMaxJsonBodyBytes
+MAX_SHOW_BODY = 16 * 1024     # web_utils.h kMaxShowBodyBytes (POST /api/show)
 MAX_UPLOAD = 2 * 1024 * 1024  # bigger than an app slot
 EFFECT_SECONDS = 4
 BOOT_SECONDS = 5              # how long a pretend restart keeps the pumpkin away
-IDLE_SECONDS = int(os.environ.get("MOCK_IDLE_SECONDS", "120"))  # back to the show after this long
 BOOT_PRESS_MESSAGE = "Press the small BOOT button on the pumpkin's board, then try again"  # web_utils.h
 
 CONTENT_TYPES = {
@@ -122,13 +128,25 @@ DEFAULT_NAME = constant("kDefaultPumpkinName")
 BOOT_UNLOCK_SECONDS = constant("kBootUnlockMs") / 1000
 RESTART_DELAY_SECONDS = constant("kRestartDelayMs") / 1000
 WIFI_SAVED_RESTART_DELAY_SECONDS = constant("kWifiSavedRestartDelayMs") / 1000
+MAX_SHOW_BLOCKS = constant("kMaxShowBlocks")
+# Buttons mode goes back to the show after this long without a press or heartbeat
+BUTTONS_IDLE_SECONDS = float(os.environ.get("MOCK_IDLE_SECONDS") or constant("kButtonsIdleTimeoutMs") / 1000)
+BUTTONS_HEARTBEAT_SECONDS = constant("kButtonsHeartbeatMs") / 1000  # how often an open button page says so
+
+# If show.cpp can't be read: a short show
+FALLBACK_SHOW = [
+    {"type": "effect", "id": "minecraft"}, {"type": "effect", "id": "pumpkin"}, {"type": "effect", "id": "witch"},
+    {"type": "effect", "id": "blink"}, {"type": "words", "text": "Happy Halloween!"},
+]
 
 C_STRING = r'(?:u8)?"((?:[^"\\]|\\.)*)"'
 # id, label, emoji, group, phrase, function, inSurprise
 EFFECT_ENTRY = re.compile(
     r"\{\s*" + C_STRING + r"\s*,\s*" + C_STRING + r"\s*,\s*" + C_STRING +
-    r"\s*,\s*EffectGroup::(\w+)\s*,\s*(nullptr|" + C_STRING + r")\s*,\s*\w+\s*,\s*(true|false)\s*\}"
+    r"\s*,\s*EffectGroup::(\w+)\s*,\s*(nullptr|" + C_STRING + r")\s*,\s*(\w+)\s*,\s*(true|false)\s*\}"
 )
+# A block of the default show in show.cpp: {ShowBlock::Kind::Effect, "creeper"} or {ShowBlock::Kind::Words, "..."}
+SHOW_ENTRY = re.compile(r"\{\s*(?:ShowBlock::)?Kind::(Effect|Words)\s*,\s*" + C_STRING + r"\s*\}")
 GROUP_NAME = re.compile(r'case\s+EffectGroup::(\w+)\s*:\s*return\s+"([^"]*)"')
 
 
@@ -145,7 +163,7 @@ def load_effects():
     names = dict(GROUP_NAME.findall(source))
     effects = []
     for match in EFFECT_ENTRY.finditer(source):
-        effect_id, label, emoji, group, phrase_raw, phrase, in_surprise = match.groups()
+        effect_id, label, emoji, group, phrase_raw, phrase, function, in_surprise = match.groups()
         effects.append({
             "id": c_unescape(effect_id),
             "label": c_unescape(label),
@@ -153,10 +171,33 @@ def load_effects():
             "group": names.get(group, group),
             "phrase": None if phrase_raw == "nullptr" else c_unescape(phrase),
             "inSurprise": in_surprise == "true",
+            # canBeInShow(): everything but effects that never end (the surprise show)
+            "inShow": function != "surpriseShow",
         })
     if not effects:
         sys.exit(f"Couldn't read the effects table in {REGISTRY.relative_to(ROOT)} (has its layout changed?)")
     return effects
+
+
+def load_default_show(by_id):
+    """defaultShow() from show.cpp, or a short show if it isn't there (yet)."""
+    try:
+        source = SHOW_SOURCE.read_text(encoding="utf-8")
+    except OSError:
+        print(f"  ({SHOW_SOURCE.relative_to(ROOT)} isn't there: using a short default show)")
+        return [dict(b) for b in FALLBACK_SHOW]
+    blocks = []
+    for kind, value in SHOW_ENTRY.findall(source):
+        value = c_unescape(value)
+        if kind == "Words":
+            blocks.append({"type": "words", "text": value})
+        elif value in by_id:
+            blocks.append({"type": "effect", "id": value})
+        else:
+            print(f"  (the default show in {SHOW_SOURCE.relative_to(ROOT)} has an unknown effect: {value})")
+    if not blocks:
+        sys.exit(f"Couldn't read the default show in {SHOW_SOURCE.relative_to(ROOT)} (has its layout changed?)")
+    return blocks
 
 
 # --- The firmware's text rules (src/core/text.h), roughly ---
@@ -263,7 +304,12 @@ class Pumpkin:
         self.wifi_password = ""
         self.mode = "home"
         self.set_mode(mode)
-        self.player = {"inShow": True, "effectId": "", "label": ""}
+        self.default_show = load_default_show(self.by_id)  # defaultShow()
+        self.show = [dict(b) for b in self.default_show]   # the saved show (in memory)
+        self.show_is_default = True
+        self.player_mode = "show"     # player::Mode: "show" or "buttons"
+        self.buttons_at = 0.0         # the last press or heartbeat in buttons mode
+        self.player = {"mode": "show", "effectId": "", "label": "", "block": -1}
         self.generation = 0           # bumped by every request, so old playback threads stop
         self.scan_started = None      # when the fake scan began
         self.restart_at = None        # a restart is due then
@@ -271,6 +317,9 @@ class Pumpkin:
         self.boot_pressed_at = None   # the last short BOOT press
         self.update_finished = False  # a firmware upload worked: refuse more until the restart
         self.clients = []             # one queue per server-sent events connection
+        with self.lock:
+            self.start_show()
+        threading.Thread(target=self.watch_buttons_mode, daemon=True).start()
 
     # --- Modes: home (on home WiFi), setup (never set up), lost (out of reach), wrong (turned away) ---
 
@@ -329,6 +378,7 @@ class Pumpkin:
             return {
                 "name": self.name,
                 "defaultName": DEFAULT_NAME,
+                "buttonsHeartbeatMs": int(BUTTONS_HEARTBEAT_SECONDS * 1000),
                 "version": self.version,
                 "uptime": int(time.time() - self.started),
                 "freeHeap": 180000 + random.randint(-4000, 4000),
@@ -361,9 +411,13 @@ class Pumpkin:
             for client in list(self.clients):
                 client.put((event, data))
 
-    def set_player(self, in_show, effect_id="", label=""):
+    def set_player(self, mode, effect_id="", label="", block=-1, generation=None):
+        """What the player is doing (player::Status). A playback thread passes its generation, so one that
+        has just been replaced can't overwrite the new one's news."""
         with self.lock:
-            self.player = {"inShow": in_show, "effectId": effect_id, "label": label}
+            if generation is not None and generation != self.generation:
+                return
+            self.player = {"mode": mode, "effectId": effect_id, "label": label, "block": block}
             self.broadcast("status", json.dumps(self.player))
 
     def say(self, words):
@@ -390,17 +444,67 @@ class Pumpkin:
             time.sleep(0.1)
         return self.current(generation)
 
-    def finish(self, generation):
-        """After a button: wait quietly, then go back to the normal show."""
-        if not self.current(generation):
-            return
-        self.set_player(False)
-        if self.sleep(IDLE_SECONDS, generation):
-            self.set_player(True)
+    def block_info(self, block):
+        """(effectId, label, seconds) for a show block"""
+        if block["type"] == "words":
+            return "words", block["text"], 1 + 0.12 * len(block["text"])
+        effect = self.by_id[block["id"]]
+        return effect["id"], effect["label"], EFFECT_SECONDS
+
+    def start_show(self):
+        """player::startShow() (and showChanged()): the saved show from the top, round and round. Quietly:
+        the show doesn't talk. Call with the lock held."""
+        if self.player_mode != "show":
+            print("  (show mode)")
+        self.player_mode = "show"
+
+        def run(generation):
+            while True:
+                with self.lock:
+                    blocks = list(self.show)
+                for index, block in enumerate(blocks):
+                    effect_id, label, seconds = self.block_info(block)
+                    self.set_player("show", effect_id, label, index, generation)
+                    if not self.sleep(seconds, generation):
+                        return
+        self.start(run)
+
+    def pressed(self):
+        """A press or heartbeat: buttons mode, and its idle timer starts again. True if it was in buttons
+        mode already. Call with the lock held."""
+        already = self.player_mode == "buttons"
+        if not already:
+            print(f"  (buttons mode: back to the show after {BUTTONS_IDLE_SECONDS:g} s without a press or heartbeat)")
+        self.player_mode = "buttons"
+        self.buttons_at = time.time()
+        return already
+
+    def enter_buttons(self):
+        """player::enterButtons(): pause the show (eyes idle), or "still here" if already in buttons mode."""
+        with self.lock:
+            quiet = time.time() - self.buttons_at
+            if self.player_mode == "buttons" and quiet > BUTTONS_HEARTBEAT_SECONDS + 5:
+                print(f"  (buttons heartbeat {quiet:.0f} s after the last press or heartbeat: pages send one "
+                      f"every {BUTTONS_HEARTBEAT_SECONDS:g} s while they're on screen)")
+            if self.pressed():
+                return  # carry on with whatever's playing
+        self.start(lambda generation: self.set_player("buttons", generation=generation))
+
+    def watch_buttons_mode(self):
+        """Buttons mode times out back to the show (the phone went to sleep, or was put away)"""
+        while True:
+            time.sleep(0.5)
+            with self.lock:
+                if self.player_mode == "buttons" and time.time() - self.buttons_at > BUTTONS_IDLE_SECONDS:
+                    print(f"  (no press or heartbeat for {BUTTONS_IDLE_SECONDS:g} s: back to the show)")
+                    self.start_show()
 
     def play(self, effect):
+        with self.lock:
+            self.pressed()
+
         def run(generation):
-            self.set_player(False, effect["id"], effect["label"])
+            self.set_player("buttons", effect["id"], effect["label"], generation=generation)
             self.say(effect["phrase"])
             if effect["id"] == "surprise":
                 # Picks effects until another button is pressed (inSurprise, from the registry)
@@ -410,21 +514,27 @@ class Pumpkin:
                     self.say(pick["phrase"])
                 return
             if self.sleep(EFFECT_SECONDS, generation):
-                self.finish(generation)
+                self.set_player("buttons", generation=generation)  # done: idle eyes
         self.start(run)
 
     def scroll_words(self, words):
+        with self.lock:
+            self.pressed()
+
         def run(generation):
-            self.set_player(False, "words", words)
+            self.set_player("buttons", "words", words, generation=generation)
             self.say(words)
             if self.sleep(1 + 0.12 * len(words), generation):
-                self.finish(generation)
+                self.set_player("buttons", generation=generation)
         self.start(run)
 
-    def back_to_show(self):
-        def run(generation):
-            self.set_player(True)
-        self.start(run)
+    def save_show(self, blocks, is_default):
+        """show_store::save() / reset(), then player::showChanged()"""
+        with self.lock:
+            self.show = blocks
+            self.show_is_default = is_default
+            if self.player_mode == "show":
+                self.start_show()  # from the top
 
     def restart_soon(self, delay, new_mode=None):
         """web::restartSoon(): after `delay` seconds the pumpkin goes away for BOOT_SECONDS (the API
@@ -444,13 +554,14 @@ class Pumpkin:
             self.restart_at = None
             self.down_until = time.time() + BOOT_SECONDS
             self.started = self.down_until
-            self.player = {"inShow": True, "effectId": "", "label": ""}
+            self.player_mode = "buttons"  # so start_show() below says "show mode"
             self.running_name = self.name
             self.boot_pressed_at = None
             self.update_finished = False
             if new_mode:
                 self.mode = new_mode
             self.broadcast(None, None)  # tells each event stream to hang up
+            self.start_show()  # what it does at switch-on
         print(f"  (pretending to restart for {BOOT_SECONDS} s)")
 
     def restarting(self):
@@ -499,8 +610,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(413, "That's too much to send")
         return self.rfile.read(length) if length else b""
 
-    def json_body(self):
-        raw = self.read_body(MAX_JSON_BODY)
+    def json_body(self, limit=MAX_JSON_BODY):
+        raw = self.read_body(limit)
         if not raw:
             return {}
         try:
@@ -575,7 +686,7 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def serve_page(self, path, query):
-        pages = {"/": "index.html", "/setup": "setup.html", "/settings": "settings.html"}
+        pages = {"/": "index.html", "/setup": "setup.html", "/settings": "settings.html", "/show": "show.html"}
         if path == "/" and self.pumpkin.needs_setup() and "play" not in query:
             self.redirect("/setup")
             return
@@ -596,7 +707,7 @@ class Handler(BaseHTTPRequestHandler):
     # --- API (same paths, bodies and replies as src/web/*.cpp) ---
 
     def api_effects(self, query):
-        effects = [{k: e[k] for k in ("id", "label", "emoji", "group")} for e in self.pumpkin.effects]
+        effects = [{k: e[k] for k in ("id", "label", "emoji", "group", "inShow")} for e in self.pumpkin.effects]
         self.send_json(200, {"effects": effects})
 
     def api_status(self, query):
@@ -624,10 +735,73 @@ class Handler(BaseHTTPRequestHandler):
         self.pumpkin.scroll_words(words)
         self.send_json(200, {"ok": True})
 
-    def api_show(self, query):
+    def api_mode(self, query):
+        mode = self.json_body().get("mode")
+        if mode not in ("show", "buttons"):
+            raise ApiError(400, 'The mode should be "show" or "buttons"')
+        pumpkin = self.pumpkin
+        if mode == "buttons":
+            pumpkin.enter_buttons()
+        else:
+            with pumpkin.lock:
+                if pumpkin.player_mode != "show":
+                    pumpkin.start_show()  # does nothing if the show is playing already
+        self.send_json(200, {"ok": True, "mode": mode})
+
+    # --- The show creator ---
+
+    def api_get_show(self, query):
+        pumpkin = self.pumpkin
+        with pumpkin.lock:
+            reply = {"blocks": [dict(b) for b in pumpkin.show], "isDefault": pumpkin.show_is_default}
+        reply["limits"] = {"maxBlocks": MAX_SHOW_BLOCKS, "maxWordsLength": MAX_WORDS}
+        self.send_json(200, reply)
+
+    def check_block(self, block, number):
+        """show_handlers.cpp readBlocks() then checkBlock() (same messages): the block tidied, or an
+        ApiError naming it (1-based)"""
+        def fail(reason):
+            return ApiError(400, f"Block {number}: {reason}")
+        kind = block.get("type") if isinstance(block, dict) else None
+        if kind == "effect":
+            effect_id = block.get("id")
+            if not isinstance(effect_id, str) or not effect_id:
+                raise fail("which effect?")
+            effect = self.pumpkin.by_id.get(effect_id)
+            if effect is None:
+                raise fail(f'no effect called "{effect_id[:24]}"')
+            if not effect["inShow"]:
+                raise fail(effect["label"] + " never ends, so it can't go in a show")
+            return {"type": "effect", "id": effect_id}
+        if kind == "words":
+            text = block.get("text")
+            if not isinstance(text, str):
+                raise fail("the words should be text")
+            text = plain(text)[:MAX_WORDS].strip()
+            if not text:
+                raise fail("no words to scroll (the eyes can't show emoji)")
+            return {"type": "words", "text": text}
+        raise fail("should be an effect or some words")
+
+    def api_post_show(self, query):
+        blocks = self.json_body(MAX_SHOW_BODY).get("blocks")
+        if not isinstance(blocks, list):
+            raise ApiError(400, "The show should be a list of blocks")
+        if not blocks:
+            raise ApiError(400, "The show needs at least one block")
+        if len(blocks) > MAX_SHOW_BLOCKS:
+            raise ApiError(400, f"That show is too long (up to {MAX_SHOW_BLOCKS} blocks)")
+        tidied = [self.check_block(block, number) for number, block in enumerate(blocks, 1)]
+        self.pumpkin.save_show(tidied, False)
+        print(f"  (show saved: {len(tidied)} blocks)")
+        self.send_json(200, {"ok": True, "blocks": tidied})
+
+    def api_reset_show(self, query):
         self.json_body()
-        self.pumpkin.back_to_show()
-        self.send_json(200, {"ok": True})
+        blocks = [dict(b) for b in self.pumpkin.default_show]
+        self.pumpkin.save_show(blocks, True)
+        print("  (back to the original show)")
+        self.send_json(200, {"ok": True, "blocks": [dict(b) for b in blocks]})
 
     def api_get_settings(self, query):
         reply = self.pumpkin.settings()
@@ -853,7 +1027,10 @@ API = {
     ("GET", "/events"): Handler.api_events,
     ("POST", "/api/play"): Handler.api_play,
     ("POST", "/api/words"): Handler.api_words,
-    ("POST", "/api/show"): Handler.api_show,
+    ("GET", "/api/show"): Handler.api_get_show,
+    ("POST", "/api/show"): Handler.api_post_show,
+    ("POST", "/api/show/reset"): Handler.api_reset_show,
+    ("POST", "/api/mode"): Handler.api_mode,
     ("POST", "/api/settings"): Handler.api_post_settings,
     ("POST", "/api/restart"): Handler.api_restart,
     ("POST", "/api/wifi"): Handler.api_wifi,

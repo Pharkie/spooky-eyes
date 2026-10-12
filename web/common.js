@@ -139,6 +139,114 @@ const Pumpkin = (() => {
     return minutes + (minutes === 1 ? ' minute' : ' minutes');
   }
 
+  // ---- Effects and the player (the button page and the show creator) ----
+
+  // Show mode (the saved show, round and round) or buttons mode (the show pauses, each press plays one)
+  const setMode = (mode) => post('/api/mode', { mode });
+
+  // "💥 Creeper" for an effect from /api/effects
+  const effectName = (fx) => fx.emoji + ' ' + fx.label;
+
+  // Effect tiles in sections (Pictures, Minecraft...), in the order the firmware lists them, as an
+  // accordion: one section open at a time, the last one opened remembered under storeKey (the first
+  // section to begin with). Each header shows the section's first emoji, its name and how many effects
+  // it has; each section has its colour (the g-minecraft etc. classes in style.css). Each tile is a
+  // <button data-id="creeper">: clicks are up to the page.
+  function effectAccordion(box, effects, { headingTag = 'h2', storeKey = 'section' } = {}) {
+    const groups = new Map(); // section name -> effects
+    for (const fx of effects) {
+      if (!groups.has(fx.group)) groups.set(fx.group, []);
+      groups.get(fx.group).push(fx);
+    }
+    box.textContent = '';
+    const sections = [];
+    for (const [group, list] of groups) {
+      const id = box.id + '-' + groupClass(group);
+      const section = document.createElement('section');
+      section.className = 'acc ' + groupClass(group);
+      const heading = document.createElement(headingTag);
+      heading.className = 'acc-h';
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'acc-btn';
+      header.id = id + '-h';
+      header.setAttribute('aria-controls', id);
+      header.innerHTML = '<span class="e" aria-hidden="true"></span><span class="acc-name"></span> ' +
+        '<span class="acc-count"></span><span class="chev" aria-hidden="true">▾</span>';
+      header.querySelector('.e').textContent = list[0].emoji;
+      header.querySelector('.acc-name').textContent = group;
+      header.querySelector('.acc-count').innerHTML = list.length + '<span class="sr-only"> effects</span>';
+      heading.appendChild(header);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.id = id;
+      grid.setAttribute('role', 'region');
+      grid.setAttribute('aria-labelledby', header.id);
+      for (const fx of list) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tile';
+        button.dataset.id = fx.id;
+        const emoji = document.createElement('span');
+        emoji.className = 'e';
+        emoji.setAttribute('aria-hidden', 'true');
+        emoji.textContent = fx.emoji;
+        button.append(emoji, fx.label);
+        grid.appendChild(button);
+      }
+      section.append(heading, grid);
+      box.appendChild(section);
+      sections.push({ group, header, grid });
+    }
+    const open = (wanted) => {
+      for (const s of sections) {
+        s.header.setAttribute('aria-expanded', String(s.group === wanted));
+        s.grid.hidden = s.group !== wanted;
+      }
+    };
+    const remembered = store.get(storeKey);
+    open(sections.some((s) => s.group === remembered) ? remembered : sections.length ? sections[0].group : null);
+    for (const s of sections) {
+      s.header.addEventListener('click', () => {
+        const opening = s.grid.hidden;
+        open(opening ? s.group : null); // tapping the open one closes it
+        if (!opening) return;
+        store.set(storeKey, s.group);
+        s.header.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
+      });
+    }
+  }
+  const groupClass = (group) => 'g-' + String(group).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const reducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  // "Couldn't get the buttons. <why> [Try again]" in place of something that didn't load
+  function loadFailed(box, what, error, retry) {
+    box.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'center error';
+    p.textContent = 'Couldn’t get ' + what + '. ' + error.message + ' ';
+    const button = document.createElement('button');
+    button.className = 'btn small secondary';
+    button.type = 'button';
+    button.textContent = 'Try again';
+    button.addEventListener('click', retry);
+    p.appendChild(button);
+    box.appendChild(p);
+  }
+
+  // The status line: what the pumpkin is doing. player = {mode, effectId, label, block} from
+  // /api/status or the "status" event; effects = Map of id -> effect.
+  function playerText(player, effects) {
+    const fx = effects.get(player.effectId);
+    const label = player.label || '';
+    const now = player.effectId === 'words' ? '“' + (label.length > 50 ? label.slice(0, 49) + '…' : label) + '”'
+      : fx ? effectName(fx) : label || player.effectId || '';
+    if (player.mode === 'show') return '🎃 The show is playing' + (now ? ': ' + now : '');
+    if (player.effectId === 'words') return 'Scrolling: ' + now;
+    if (now) return 'Playing: ' + now + ' …';
+    return '⏸️ Buttons mode: the show is paused';
+  }
+
   // iPhones type curly quotes; the pumpkin's font has straight ones
   const straightQuotes = (text) => text.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
 
@@ -161,5 +269,9 @@ const Pumpkin = (() => {
     showMessage(el, error.message, error.needsBoot ? 'boot' : 'error');
   }
 
-  return { $, get, post, replyError, loadStatus, setupReason, showName, listen, waitForRestart, signalWords, signalBars, formatUptime, straightQuotes, store, showMessage, showError };
+  return {
+    $, get, post, replyError, loadStatus, setupReason, showName, listen, waitForRestart, signalWords, signalBars,
+    formatUptime, setMode, effectName, effectAccordion, groupClass, reducedMotion, loadFailed, playerText, straightQuotes, store,
+    showMessage, showError,
+  };
 })();
