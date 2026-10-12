@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1324">
+<title>Pumpkin WiFi setup</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body data-title=": WiFi setup">
+<main class="narrow">
+<header class="top">
+  <a class="icon-link" id="back" href="/?play=1" aria-label="Back to the buttons">←</a>
+  <h1>🎃 <span data-name>Spooky Pumpkin</span></h1>
+  <span class="icon-link" aria-hidden="true"></span>
+</header>
+
+<section id="form-view">
+  <!-- Lost its home WiFi (e.g. on the doorstep): playing comes first, changing the WiFi second -->
+  <div class="card" id="away" hidden>
+    <h2>🎃 Away from home? You can still play</h2>
+    <p id="away-reason"></p>
+    <a href="/?play=1" class="btn wide">▶️ Play with the pumpkin</a>
+    <p class="hint">Back home, the pumpkin joins your WiFi again by itself.</p>
+    <button type="button" id="show-form" class="btn secondary wide" style="margin-top:16px">Put it on a different WiFi</button>
+  </div>
+
+  <p class="lead" id="intro">Let’s put the pumpkin on your home WiFi, so everyone in the house can use its buttons.</p>
+  <p class="notice" id="current" hidden></p>
+  <div class="notice problem" id="reason" role="alert" hidden>
+    <b></b><br>Check the WiFi name and password below, then save again.
+  </div>
+  <p class="notice" id="no-internet" hidden>If your phone says this WiFi has no internet, choose “Use without internet” or “Stay connected”.</p>
+  <form id="setup" novalidate>
+    <div class="card">
+      <h2><label for="name">1. Name your pumpkin</label></h2>
+      <input id="name" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Jack's Pumpkin">
+      <p class="hint">It scrolls across the eyes and makes the web address: <b id="address">http://spooky-pumpkin.local</b></p>
+    </div>
+
+    <div class="card">
+      <h2>2. Choose your home WiFi</h2>
+      <p class="hint" style="margin:0 0 10px">The pumpkin only sees 2.4 GHz WiFi. If your router has two names, choose the one without “5G”.</p>
+      <div class="row">
+        <span id="scan-state" class="muted" style="flex:1" role="status"></span>
+        <button type="button" id="rescan" class="btn small secondary">↻ Look again</button>
+      </div>
+      <ul id="networks" class="networks" aria-label="WiFi networks"></ul>
+      <button type="button" id="manual-toggle" class="linkish">Not in the list? Type its name</button>
+      <div id="manual" hidden>
+        <label class="label" for="ssid">WiFi name</label>
+        <input id="ssid" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><label for="password">3. WiFi password</label></h2>
+      <div class="password">
+        <input id="password" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+        <button type="button" id="show-password" class="btn small secondary" aria-pressed="false">Show</button>
+      </div>
+      <p id="password-hint" class="hint">It’s often on a sticker on the WiFi router.</p>
+    </div>
+
+    <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
+    <p id="error" class="error" role="alert"></p>
+    <button type="submit" id="save" class="btn wide">Save and restart</button>
+  </form>
+  <p class="center" id="play-link" style="margin-top:28px">
+    <a href="/?play=1" class="btn secondary">🎃 No home WiFi? Just play with the pumpkin</a>
+  </p>
+</section>
+
+<section id="done-view" hidden>
+  <div class="card">
+    <h2>✅ Saved!</h2>
+    <ol class="steps">
+      <li>The pumpkin is restarting and joining <b class="home-ssid"></b>.</li>
+      <li id="phone-step">Your phone goes back to your home WiFi by itself.</li>
+      <li>Type the address with http:// in front (e.g. <a class="big" id="done-address" href="/"></a>), or the numbers the eyes scroll.
+        Press the small BOOT button on the pumpkin’s board to see them again.</li>
+    </ol>
+    <p class="hint">Some Android phones can’t open “.local” addresses: type the numbers instead, like http://192.168.1.23</p>
+    <p class="hint">If the pumpkin can’t join <b class="home-ssid"></b>, it makes its own WiFi called <b id="setup-ssid"></b> again. Join that and try once more (check the password).</p>
+  </div>
+</section>
+</main>
+<script src="/common.js"></script>
+<script>
+'use strict';
+(() => {
+  const { $, get, post, loadStatus, setupReason, signalBars, signalWords, straightQuotes, showMessage, showError } = Pumpkin;
+  const nameInput = $('name');
+  const ssidInput = $('ssid');
+  const password = $('password');
+  const list = $('networks');
+  const errorEl = $('error');
+  let networks = [];
+  let selected = null;     // network chosen from the list ({ssid, rssi, secure}), or null for typed
+  let savedSsid = '';      // the home WiFi it has now, picked if it shows up
+  let nameTouched = false;
+  let warnedNoPassword = false;
+  let limits = {};         // from the firmware (GET /api/settings)
+  let onSetupWifi = false; // this phone is on the pumpkin's own WiFi
+
+  // ---- Name and web address ----
+
+  let currentName = ''; // what it's called now: a blank box keeps it
+  function chosenName() {
+    return straightQuotes(nameInput.value).trim() || currentName;
+  }
+
+  let hostnameTimer = 0;
+  function updateAddress() {
+    clearTimeout(hostnameTimer);
+    hostnameTimer = setTimeout(async () => {
+      try {
+        const name = chosenName();
+        const data = await get('/api/hostname?name=' + encodeURIComponent(name));
+        $('address').textContent = 'http://' + (data.hostname || '…') + '.local';
+      } catch (e) { /* keep the old hint */ }
+    }, 300);
+  }
+  nameInput.addEventListener('input', () => { nameTouched = true; updateAddress(); });
+
+  // ---- WiFi list (Scribe Evolution's setup page, without Alpine) ----
+
+  // Same name seen more than once (mesh, 2.4/5 GHz): keep the strongest. Strongest first.
+  function tidyNetworks(raw) {
+    const best = new Map();
+    for (const net of raw) {
+      const ssid = (net.ssid || '').trim();
+      if (!ssid) continue;
+      if (!best.has(ssid) || net.rssi > best.get(ssid).rssi) best.set(ssid, Object.assign({}, net, { ssid }));
+    }
+    return [...best.values()].sort((a, b) => (b.rssi - a.rssi) || a.ssid.localeCompare(b.ssid));
+  }
+
+  function renderNetworks() {
+    list.textContent = '';
+    for (const net of networks) {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('aria-pressed', selected && selected.ssid === net.ssid ? 'true' : 'false');
+      const name = document.createElement('span');
+      name.className = 'net-name';
+      name.textContent = net.ssid;
+      button.append(name);
+      if (net.secure) {
+        const lock = document.createElement('span');
+        lock.className = 'net-lock';
+        lock.textContent = '🔒';
+        lock.setAttribute('aria-label', 'needs a password');
+        button.append(lock);
+      }
+      button.append(signalBars(net.rssi));
+      button.title = signalWords(net.rssi) + ' signal (' + net.rssi + ' dBm)';
+      button.addEventListener('click', () => choose(net));
+      li.appendChild(button);
+      list.appendChild(li);
+    }
+  }
+
+  function choose(net) {
+    selected = net;
+    $('manual').hidden = true;
+    $('manual-toggle').hidden = false;
+    renderNetworks();
+    showMessage(errorEl, '');
+    $('password-hint').textContent = net.secure ? 'It’s often on a sticker on the WiFi router.' : 'This WiFi has no password: leave it empty.';
+    if (net.secure) password.focus();
+  }
+
+  let scanning = false;
+  async function scan() {
+    if (scanning) return;
+    scanning = true;
+    $('rescan').disabled = true;
+    const state = $('scan-state');
+    state.innerHTML = '<span class="spinner"></span>Looking for WiFi…';
+    try {
+      for (let tries = 0; tries < 20; tries++) {
+        const data = await get('/api/wifi/scan');
+        if (data.networks) {
+          networks = tidyNetworks(data.networks);
+          if (!selected && savedSsid) selected = networks.find((n) => n.ssid === savedSsid) || null;
+          renderNetworks();
+          state.textContent = networks.length ? 'Tap your WiFi:' : 'No WiFi found. Move the pumpkin closer to the router and look again.';
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      state.textContent = 'That took too long. Look again?';
+    } catch (e) {
+      state.textContent = e.message;
+    } finally {
+      scanning = false;
+      $('rescan').disabled = false;
+    }
+  }
+  $('rescan').addEventListener('click', scan);
+
+  $('manual-toggle').addEventListener('click', () => {
+    selected = null;
+    renderNetworks();
+    $('manual').hidden = false;
+    $('manual-toggle').hidden = true;
+    $('password-hint').textContent = 'Leave it empty if the WiFi has no password.';
+    ssidInput.focus();
+  });
+
+  $('show-password').addEventListener('click', (event) => {
+    const show = password.type === 'password';
+    password.type = show ? 'text' : 'password';
+    event.currentTarget.textContent = show ? 'Hide' : 'Show';
+    event.currentTarget.setAttribute('aria-pressed', show ? 'true' : 'false');
+  });
+
+  // ---- Save ----
+
+  $('setup').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = chosenName();
+    const ssid = selected ? selected.ssid : ssidInput.value.trim();
+    const pass = password.value;
+    if (!ssid) { showMessage(errorEl, 'Please choose your home WiFi (or type its name).', 'error'); return; }
+    if (pass && pass.length < (limits.minWifiPassword || 0)) {
+      showMessage(errorEl, 'WiFi passwords have at least ' + limits.minWifiPassword + ' characters.', 'error');
+      password.focus();
+      return;
+    }
+    // No confirm() here: captive-portal browsers don't always show pop-ups
+    if (!pass && (!selected || selected.secure) && !warnedNoPassword) {
+      warnedNoPassword = true;
+      showMessage(errorEl, 'No password? Most home WiFi needs one. Press Save again to carry on without.', 'error');
+      password.focus();
+      return;
+    }
+    const save = $('save');
+    save.disabled = true;
+    save.textContent = 'Saving…';
+    showMessage(errorEl, '');
+    try {
+      const reply = await post('/api/wifi', { ssid, password: pass, name });
+      document.querySelectorAll('.home-ssid').forEach((el) => { el.textContent = reply.ssid; });
+      $('done-address').textContent = reply.address;
+      $('done-address').href = reply.address;
+      $('setup-ssid').textContent = reply.setupSsid;
+      if (!onSetupWifi) {
+        // Changed from the home WiFi: the phone stays where it is
+        $('phone-step').textContent = 'If this phone isn’t on ' + reply.ssid + ', join it.';
+      }
+      $('form-view').hidden = true;
+      $('done-view').hidden = false;
+      window.scrollTo(0, 0);
+    } catch (e) {
+      showError(errorEl, e);
+      save.disabled = false;
+      save.textContent = 'Save and restart';
+    }
+  });
+
+  // ---- Start ----
+
+  // Limits for the boxes, from the firmware
+  async function loadLimits() {
+    try {
+      limits = (await get('/api/settings')).limits;
+      nameInput.maxLength = limits.maxNameLength;
+      ssidInput.maxLength = limits.maxSsidBytes;
+      password.maxLength = limits.maxWifiPassword;
+    } catch (e) { /* the pumpkin checks anyway */ }
+  }
+
+  $('show-form').addEventListener('click', () => {
+    $('setup').hidden = false;
+    $('show-form').hidden = true;
+    scan();
+    nameInput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  (async () => {
+    let away = false;
+    try {
+      const [status] = await Promise.all([loadStatus(), loadLimits()]);
+      currentName = status.name;
+      // A brand-new pumpkin: leave the box empty so the placeholder invites a name
+      if (!nameTouched) nameInput.value = status.name === status.defaultName ? '' : status.name;
+      updateAddress();
+      savedSsid = status.homeSsid || '';
+      onSetupWifi = status.mode === 'setup';
+      $('no-internet').hidden = !onSetupWifi;
+      $('boot-hint').hidden = !status.wifiNeedsBoot;
+      if (status.mode === 'connected') {
+        const current = $('current');
+        current.textContent = 'The pumpkin is on ' + status.homeSsid + ' now. Choosing another WiFi restarts it.';
+        current.hidden = false;
+        $('intro').hidden = true;
+        $('back').href = '/settings';
+      } else if (status.homeWifiOutOfReach) {
+        // Lost its home WiFi (on the doorstep?): lead with playing, keep the form for later
+        away = true;
+        $('away-reason').textContent = setupReason(status) + ' So the pumpkin made its own WiFi, and this phone is on it.';
+        $('away').hidden = false;
+        $('intro').hidden = true;
+        $('play-link').hidden = true;
+        $('setup').hidden = true;
+      } else if (status.mode === 'setup' && status.hasSavedWifi) {
+        // e.g. Couldn't join "Home" (wrong password?): say why, so it can be put right
+        const reason = $('reason');
+        reason.querySelector('b').textContent = setupReason(status);
+        reason.hidden = false;
+        $('intro').hidden = true;
+      }
+      updateAddress();
+    } catch (e) {
+      showError(errorEl, e);
+    }
+    // Looking for WiFi takes the radio away from the pumpkin's own WiFi for a moment: only when wanted
+    if (!away) scan();
+  })();
+})();
+</script>
+</body>
+</html>

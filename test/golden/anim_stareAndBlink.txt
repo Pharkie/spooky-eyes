@@ -1,0 +1,34 @@
+# anim_stareAndBlink: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'stareAndBlink', E)
+# c++:    runAnimation(engine, Animations::stareAndBlink)
+# 30 events. Do not edit: re-run the capture script instead.
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 1000
+M
+F 007effe7e7ff7e00 007effe7e7ff7e00
+W 20
+M
+F 0000ffe7e7ff0000 0000ffe7e7ff0000
+W 20
+M
+F 000000e7e7000000 000000e7e7000000
+W 20
+M
+F 0000000000000000 0000000000000000
+W 20
+M
+F 0000ffe7e7ff0000 0000ffe7e7ff0000
+W 20
+M
+F 007effe7e7ff7e00 007effe7e7ff7e00
+W 20
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 20
+M
+B 0
+W 500
+M
+B 2
+W 500

@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Spooky Pumpkin Eyes: WiFi Brain Transplant</title>
+<!--
+  One-page A4 sheet for swapping a 2024 pumpkin's Raspberry Pi Pico for the ESP32-C3 SuperMini.
+  Render it with tools/make_instructions.sh (add a pumpkin name to personalise it).
+
+  The wiring lives in ONE place: the WIRES list in the script at the bottom. The table and the diagram are both
+  drawn from it, and it must match src/hardware/board.h.
+
+  Personalise by opening this file with ?name=Jack's%20Pumpkin (and optionally &host=jacks-pumpkin).
+  The artwork in assets/ comes from the 2024 sheet (assets/extract-2024-artwork.sh).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Mouse+Memoirs&family=Rye&display=block" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+
+  /* Offline fallbacks: fonts every Mac has, scaled to the width of the Google fonts so the lines break in the
+     same places (measured with headless Chrome). */
+  @font-face { font-family: "Body Fallback"; src: local("Baskerville"); size-adjust: 94.8%; }
+  @font-face { font-family: "Body Fallback"; src: local("Baskerville Bold"), local("Baskerville-Bold"); font-weight: 700; size-adjust: 94.8%; }
+  @font-face { font-family: "Hand Fallback"; src: local("DIN Condensed Bold"), local("DINCondensed-Bold"); size-adjust: 88%; }
+
+  :root {
+    --ink: #1d1714;
+    --soft-ink: #4a3f38;
+    --paper: #efe5de;
+    --board: #22304a;
+    /* Fonts: Google Fonts when online, then the fallbacks above */
+    --display: "Rye", "Rockwell", "Superclarendon", Georgia, serif;
+    --hand: "Mouse Memoirs", "Hand Fallback", "Arial Narrow", sans-serif;
+    --body: "EB Garamond", "Body Fallback", Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #8a7d75;
+    color: var(--ink);
+    font-family: var(--body);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @media print { body { background: none; } }
+  @media screen { .page { margin: 10mm auto; box-shadow: 0 2mm 8mm rgba(0,0,0,.4); } }
+
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden;
+    background: var(--paper);
+  }
+  .frame { position: absolute; inset: 0; width: 210mm; height: 297mm; }
+  .abs { position: absolute; }
+
+  /* ---------- Header: the 2024 title artwork, then this year's subtitle ---------- */
+  .header-art { position: absolute; left: 53.6mm; top: 39.8mm; width: 102mm; }
+  .subtitle {
+    position: absolute; left: 30mm; width: 151mm; top: 74.0mm;
+    text-align: center;
+    font-family: var(--display);
+    font-size: 13.5pt;
+    letter-spacing: .02em;
+    line-height: 1;
+  }
+  .subtitle small { font-size: 9.5pt; }
+
+  /* ---------- Steps ---------- */
+  .steps { font-size: 9.5pt; line-height: 1.17; }
+  .step { position: relative; padding-left: 7.2mm; margin: 0 0 1.1mm; }
+  .step .n {
+    position: absolute; left: 0; top: -.6mm;
+    font-family: var(--display); font-size: 14pt; line-height: 1;
+  }
+  .lead {
+    font-family: var(--hand);
+    font-size: 12.5pt;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  b, strong { font-weight: 700; }
+  .addr { font-weight: 700; white-space: nowrap; }
+  .nowrap { white-space: nowrap; }
+
+  .top { left: 35mm; top: 80.0mm; width: 146mm; }
+  /* Bottom: text runs beside the 2024 raven (part of the frame artwork) and the sign-off above its head */
+  .bottom { left: 27mm; top: 165.6mm; width: 160mm; } /* below the left branch's brushes */
+  .keep-clear-head { float: right; width: 29mm; height: 20.4mm; } /* space above the raven's head, 186 mm down */
+  .keep-clear-raven { float: right; clear: right; width: 48.6mm; height: 76mm; }
+
+  #diagram { display: block; width: 146mm; height: 62mm; margin-top: .6mm; overflow: visible; }
+
+  /* ---------- Tips box, like 2024's ---------- */
+  .tips {
+    display: flow-root; /* sits beside the raven instead of under it */
+    margin-top: 1.8mm;
+    border: .7mm solid var(--ink);
+    border-radius: 9mm;
+    padding: 1.5mm 5mm 1.7mm 12mm;
+    position: relative;
+    font-size: 9pt;
+    line-height: 1.15;
+  }
+  .tips .bulb { position: absolute; left: 3.5mm; top: 50%; width: 6.5mm; transform: translateY(-50%); }
+  .tips p { margin: 0 0 .6mm; }
+  .tips p:last-child { margin-bottom: 0; }
+  .tips .lead { font-size: 11pt; }
+
+
+  /* generic sheet vs one personalised for a named pumpkin */
+  .named .generic-only, html:not(.named) .named-only { display: none; }
+  .layout-problem { position: absolute; left: 30mm; right: 30mm; top: 20mm; padding: 3mm; background: #c00; color: #fff;
+                    font: bold 14pt sans-serif; z-index: 9; }
+</style>
+</head>
+<body>
+<div class="page">
+  <img class="frame" src="assets/2024-frame.jpg" alt="">
+  <img class="header-art" src="assets/2024-header.png" alt="Knowles &amp; Skrodermoose: The All Hallows Spooky Pumpkin Eyes™">
+  <div class="subtitle">The WiFi Brain Transplant</div>
+
+  <section class="abs top steps" id="top">
+    <div class="step"><span class="n">1</span><span class="lead">Switch off.</span>
+      Switch the battery pack off (the switch is on its back).</div>
+    <div class="step"><span class="n">2</span><span class="lead">Move the wires.</span>
+      Move the 9 wires to the new board <b>one at a time</b>: pull a wire off the Pico, check which pin it
+      was on, push it onto the matching new pin. Colours vary, so go by the pins (the eye board has its pin
+      names printed on it; the mouth LED’s long leg is +). Keep the Pico: it still works.</div>
+    <svg id="diagram" viewBox="0 0 146 62" xmlns="http://www.w3.org/2000/svg"
+         role="img" aria-label="Wiring diagram: the 9 wires move from the old Pico to the new SuperMini"></svg>
+  </section>
+
+  <section class="abs bottom steps" id="bottom">
+    <div class="keep-clear-head"></div>
+    <div class="keep-clear-raven"></div>
+    <div class="step"><span class="n">3</span><span class="lead">Switch on.</span>
+      The eyes may stare for up to 30 seconds while it looks for WiFi, then (the first time) scroll the
+      WiFi name, password and address for step 4. It’s alive!</div>
+    <div class="step"><span class="n">4</span><span class="lead">Introduce it to your WiFi</span> (first time only).
+      On a phone, join the WiFi
+      <span class="generic-only">called <b class="nowrap">Spooky Pumpkin</b></span><span class="named-only">called
+        <b class="nowrap" data-fill="name">Jack's Pumpkin</b></span>,
+      password <b>spookyeyes</b>. If the phone says “no internet”, choose <i>Use without internet</i> or
+      <i>Stay connected</i>. A page pops up (if not within 20 seconds, open <span class="addr">192.168.4.1</span>):
+      <span class="generic-only">give your pumpkin a name (e.g. <i>Jack's Pumpkin</i>), </span>pick your home
+      WiFi, enter its password and tap <b>Save</b>. It only sees 2.4 GHz WiFi: pick your
+      main network, not a guest one (if there are two, the one ending <i>2.4G</i>).</div>
+    <div class="step"><span class="n">5</span><span class="lead">Play.</span>
+      It restarts, joins your home WiFi and scrolls its address,
+      <span class="generic-only">made from its name, e.g. </span><span class="addr">http://<span data-fill="host">jacks-pumpkin.local</span></span>
+      or numbers like <span class="addr">192.168.1.23</span>. Open it on a phone or computer on your WiFi
+      for the button page: dozens of effects, a talking pumpkin (your phone speaks), your own words on the
+      eyes, and Settings for brightness and name. If the name won’t open (common on Android), use the
+      numbers. Eyes say <i>Join WiFi</i> again? Probably a wrong password: join the pumpkin’s WiFi and try
+      again (the page says what went wrong).</div>
+
+    <div class="tips">
+      <img class="bulb" src="assets/2024-bulb.png" alt="">
+      <p><span class="lead">On the doorstep?</span> If it loses your home WiFi for 3 minutes, it makes its
+        own: join it and open <span class="addr">192.168.4.1</span>. It goes back to your WiFi by itself.</p>
+      <p><span class="lead">BOOT button:</span> a quick press repeats the address, or the setup message
+        (which stops after 15 minutes). Hold it for 5 seconds to forget your home WiFi.</p>
+      <p><span class="lead">Hungry brain:</span> fit fresh AA batteries, or plug a USB power bank into the
+        USB-C socket (battery pack off).</p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ===================== The wiring: must match src/hardware/board.h =====================
+// pico: the old Raspberry Pi Pico pin number(s), 1-40. sm: the new ESP32-C3 SuperMini pin, as printed on it.
+const WIRES = [
+  { label: "Eyes DIN",    colour: "#6b3fa0", was: "GP3 · pin 5",        pico: [5],      sm: "7"   },
+  { label: "Eyes CLK",    colour: "#00838f", was: "GP2 · pin 4",        pico: [4],      sm: "6"   },
+  { label: "Eyes CS",     colour: "#8d5a2b", was: "GP1 · pin 2",        pico: [2],      sm: "5"   },
+  { label: "+ Power",     colour: "#e8650a", was: "VBUS 40 or VSYS 39", pico: [40, 39], sm: "5V"  },
+  { label: "− Ground",    colour: "#1d1714", was: "GND · e.g. pin 38",  pico: [38],     sm: "G"   },
+  { label: "Mouth long leg", colour: "#c2185b", was: "3V3 · pin 36",       pico: [36],     sm: "3.3" },
+  { label: "Mouth red",   colour: "#d32f2f", was: "GP14 · pin 19",      pico: [19],     sm: "4"   },
+  { label: "Mouth green", colour: "#2e7d32", was: "GP15 · pin 20",      pico: [20],     sm: "3"   },
+  { label: "Mouth blue",  colour: "#1565c0", was: "GP16 · pin 21",      pico: [21],     sm: "1"   },
+];
+// SuperMini pins, top view, USB-C socket at the top (as in board.h)
+const SM_LEFT  = ["5V", "G", "3.3", "4", "3", "2", "1", "0"];
+const SM_RIGHT = ["5", "6", "7", "8", "9", "10", "20", "21"];
+
+// ===================== Personalisation (?name=...&host=...) =====================
+function hostnameFor(name) { // same rule as settings::hostnameFor() in the firmware
+  let host = "", gap = false;
+  for (const ch of name.replace(/['‘’]/g, "").toLowerCase()) {
+    if (/[a-z0-9]/.test(ch)) {
+      if (gap && host) { if (host.length + 2 > 32) break; host += "-"; }
+      else if (host.length + 1 > 32) break;
+      host += ch; gap = false;
+    } else gap = true;
+  }
+  return host || "pumpkin";
+}
+const params = new URLSearchParams(location.search);
+const pumpkinName = params.get("name");
+if (pumpkinName) {
+  const host = (params.get("host") || hostnameFor(pumpkinName)) + ".local";
+  document.documentElement.classList.add("named");
+  document.querySelectorAll('[data-fill="name"]').forEach(el => el.textContent = pumpkinName);
+  document.querySelectorAll('[data-fill="host"]').forEach(el => el.textContent = host);
+  document.title = pumpkinName + ": WiFi Brain Transplant";
+}
+
+// ===================== Diagram (units: mm) =====================
+(function drawDiagram() {
+  const svg = document.getElementById("diagram");
+  const NS = "http://www.w3.org/2000/svg";
+  const PAPER = "#efe5de";
+  const el = (tag, attrs, parent = svg, text) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    if (text !== undefined) e.textContent = text;
+    parent.appendChild(e);
+    return e;
+  };
+  const pt = p => p * 25.4 / 72; // points to mm
+  const HAND = '"Mouse Memoirs", "Hand Fallback", "Arial Narrow", sans-serif'; // same stacks as the CSS
+  const BODY = '"EB Garamond", "Body Fallback", Georgia, serif';
+  const SILK = '"Helvetica Neue", Helvetica, Arial, sans-serif';             // like a board's printed labels
+  const g = (attrs = {}) => el("g", attrs);
+
+  // ---- layout ----
+  const P = { x: 5, y: 12, s: 0.9 };              // old Pico: top-left corner and scale
+  P.w = 21 * P.s; P.h = 51 * P.s;
+  const S = { x: 106, y: 18.8, s: 1.75 };           // new SuperMini
+  S.w = 18 * S.s; S.h = 22.52 * S.s;
+  // table: rows at the SuperMini's pin pitch, with "+ Power" (row 3) level with its 5V pin
+  const T = { x0: 34, x1: 98, pitch: 2.54 * S.s };
+  T.row1 = S.y + 2.37 * S.s - 3 * T.pitch;
+  const rowY = i => T.row1 + i * T.pitch;          // i = 0..8 (WIRES order)
+
+  // Pico pad centre for pin n (1-20 down the left, 21-40 up the right, USB at the top)
+  const picoPad = n => {
+    const left = n <= 20, r = left ? n - 1 : 40 - n;
+    return { x: left ? P.x + 1.61 * P.s : P.x + P.w - 1.61 * P.s, y: P.y + 1.37 * P.s + r * 2.54 * P.s, left };
+  };
+  // SuperMini pad centre for a printed pin name
+  const smPad = name => {
+    let r = SM_LEFT.indexOf(name), left = true;
+    if (r < 0) { r = SM_RIGHT.indexOf(name); left = false; }
+    if (r < 0) throw new Error("No SuperMini pin " + name);
+    return { x: left ? S.x + 1.38 * S.s : S.x + S.w - 1.38 * S.s, y: S.y + 2.37 * S.s + r * 2.54 * S.s, left };
+  };
+
+  // Orthogonal path through points, with rounded corners
+  function wirePath(pts, r = 0.9) {
+    let d = `M${pts[0].x},${pts[0].y}`;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+      const l1 = Math.hypot(b.x - a.x, b.y - a.y), l2 = Math.hypot(c.x - b.x, c.y - b.y);
+      const rr = Math.min(r, l1 / 2, l2 / 2);
+      const p1 = { x: b.x + (a.x - b.x) * rr / l1, y: b.y + (a.y - b.y) * rr / l1 };
+      const p2 = { x: b.x + (c.x - b.x) * rr / l2, y: b.y + (c.y - b.y) * rr / l2 };
+      d += ` L${p1.x},${p1.y} Q${b.x},${b.y} ${p2.x},${p2.y}`;
+    }
+    const z = pts[pts.length - 1];
+    return d + ` L${z.x},${z.y}`;
+  }
+  // Route helper: start at a point, then alternate x / y moves
+  const route = (start, ...moves) => {
+    const pts = [start];
+    let cur = { ...start };
+    moves.forEach(m => { cur = { ...cur, ...m }; pts.push(cur); });
+    return pts;
+  };
+
+  // ---- Old Pico (faded) ----
+  const pico = g({ opacity: 0.55 });
+  el("rect", { x: P.x + P.w / 2 - 3.4, y: P.y - 1.3, width: 6.8, height: 4.2, rx: 0.5, fill: "#b9bcbf", stroke: "#6d7175", "stroke-width": 0.2 }, pico);
+  el("rect", { x: P.x, y: P.y, width: P.w, height: P.h, rx: 1, fill: "#9cc59a", stroke: "#4f7a4d", "stroke-width": 0.3 }, pico);
+  el("rect", { x: P.x + P.w / 2 - 3.2, y: P.y + 20, width: 6.4, height: 6.4, fill: "#3a3a3a" }, pico);   // RP2040
+  el("circle", { cx: P.x + P.w / 2 - 3, cy: P.y + 8.5, r: 1.1, fill: "#f4f4f4", stroke: "#888", "stroke-width": 0.2 }, pico); // BOOTSEL
+  for (let n = 1; n <= 40; n++) {
+    const p = picoPad(n);
+    if (n === 1) el("rect", { x: p.x - 0.7, y: p.y - 0.7, width: 1.4, height: 1.4, fill: "#d8b25a", stroke: "#8a6d2a", "stroke-width": 0.15 }, pico);
+    else el("circle", { cx: p.x, cy: p.y, r: 0.7, fill: "#d8b25a", stroke: "#8a6d2a", "stroke-width": 0.15 }, pico);
+  }
+  el("text", { x: P.x + P.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#5d544e", "letter-spacing": 0.2 }, svg, "OLD PICO");
+
+  // ---- New SuperMini ----
+  const sm = g({});
+  el("rect", { x: S.x + S.w / 2 - 7, y: S.y - 1.9, width: 14, height: 9.5, rx: 1.6, fill: "#c9ccd0", stroke: "#6d7175", "stroke-width": 0.3 }, sm); // USB-C
+  el("rect", { x: S.x, y: S.y, width: S.w, height: S.h, rx: 1.4, fill: "#22304a", stroke: "#0f1626", "stroke-width": 0.35 }, sm);
+  el("rect", { x: S.x + S.w / 2 - 7, y: S.y - 1.9, width: 14, height: 9.5, rx: 1.6, fill: "#c9ccd0", stroke: "#6d7175", "stroke-width": 0.3 }, sm);
+  el("rect", { x: S.x + S.w / 2 - 5, y: S.y + 0.6, width: 10, height: 3, rx: 1.2, fill: "#8e9297" }, sm);
+  el("text", { x: S.x + S.w / 2, y: S.y + 6.3, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "#3b3f44" }, sm, "USB-C");
+  // BOOT and RST buttons, chip, blue LED, antenna
+  [["BOOT", -2.2], ["RST", 4.6]].forEach(([name, dx]) => {
+    const cx = S.x + S.w / 2 + dx, cy = S.y + 12.6;
+    el("rect", { x: cx - 1.8, y: cy - 1.4, width: 3.6, height: 2.8, rx: 0.4, fill: "#d9d9d9", stroke: "#777", "stroke-width": 0.2 }, sm);
+    el("circle", { cx, cy, r: 0.8, fill: "#555" }, sm);
+    el("text", { x: cx, y: cy - 2.1, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "#fff" }, sm, name);
+  });
+  el("rect", { x: S.x + S.w / 2 - 4.3, y: S.y + 18.5, width: 8.6, height: 8.6, rx: 0.4, fill: "#111", stroke: "#444", "stroke-width": 0.2 }, sm);
+  el("rect", { x: S.x + S.w / 2 + 5, y: S.y + 23.6, width: 1.6, height: 1, fill: "#4aa3ff" }, sm);
+  el("rect", { x: S.x + S.w / 2 - 6, y: S.y + S.h - 6, width: 12, height: 3.4, rx: 0.4, fill: "#e8e2d6", stroke: "#999", "stroke-width": 0.2 }, sm);
+  // pads and printed pin names
+  const used = new Map(WIRES.map(w => [w.sm, w]));
+  [...SM_LEFT, ...SM_RIGHT].forEach(name => {
+    const p = smPad(name), w = used.get(name);
+    el("circle", { cx: p.x, cy: p.y, r: 1.25, fill: w ? "#e3b95c" : "#a08a5a", stroke: "#6b5320", "stroke-width": 0.2 }, sm);
+    el("circle", { cx: p.x, cy: p.y, r: 0.55, fill: "#111" }, sm);
+    el("text", {
+      x: p.left ? p.x + 2.2 : p.x - 2.2, y: p.y + 1.05, "text-anchor": p.left ? "start" : "end",
+      "font-family": SILK, "font-size": pt(w ? 9 : 8), "font-weight": 700,
+      fill: w ? "#fff" : "rgba(255,255,255,.45)"
+    }, sm, name);
+  });
+  el("text", { x: S.x + S.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#1d1714", "letter-spacing": 0.2 }, svg, "NEW BOARD (ESP32-C3 SUPERMINI)");
+
+  // ---- Table ----
+  const tbl = g({});
+  const colWire = T.x0 + 3.6, colWas = T.x0 + 24.6, colNew = T.x1 - 5.6;
+  [["WIRE", colWire, "start"], ["WAS ON THE PICO", colWas, "start"], ["NEW PIN", colNew, "middle"]].forEach(([t, x, a]) =>
+    el("text", { x, y: T.row1 - 3.2, "text-anchor": a, "font-family": HAND, "font-size": pt(9.5), fill: "#5d544e", "letter-spacing": 0.15 }, tbl, t));
+  WIRES.forEach((w, i) => {
+    const y = rowY(i);
+    el("rect", { x: T.x0, y: y - T.pitch / 2 + 0.25, width: T.x1 - T.x0, height: T.pitch - 0.5, rx: 1.1,
+                 fill: i % 2 ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.55)", stroke: "rgba(29,23,20,.25)", "stroke-width": 0.15 }, tbl);
+    el("rect", { x: T.x0 + 0.9, y: y - 1.5, width: 1.6, height: 3, rx: 0.5, fill: w.colour }, tbl);
+    el("text", { x: colWire, y: y + 1.25, "font-family": HAND, "font-size": pt(11), fill: "#1d1714" }, tbl, w.label);
+    el("text", { x: colWas, y: y + 1.25, "font-family": HAND, "font-size": pt(11), fill: "#1d1714" }, tbl, w.was);
+    el("rect", { x: colNew - 4, y: y - 1.75, width: 8, height: 3.5, rx: 1.75, fill: "#22304a" }, tbl);
+    el("text", { x: colNew, y: y + 1.15, "text-anchor": "middle", "font-family": SILK,
+                 "font-size": pt(9), "font-weight": 700, fill: "#fff" }, tbl, w.sm);
+  });
+
+  // ---- Wires ----
+  // Pico side: hand-routed lanes so nothing tangles more than it must (red, green and blue swap order, so they cross)
+  const L = i => ({ x: T.x0, y: rowY(i) });       // table row, left end
+  const R = i => ({ x: T.x1, y: rowY(i) });       // table row, right end
+  const pp = n => { const p = picoPad(n); return { x: p.x, y: p.y }; };
+  const sp = name => { const p = smPad(name); return { x: p.x, y: p.y }; };
+  const pTop = P.y - 1.3; // top of the Pico's USB socket
+  const pBot = P.y + P.h;
+  const picoRoutes = {
+    "Eyes DIN":    route(pp(5),  { x: P.x - 4 },   { y: pTop - 5.4 }, { x: T.x0 - 1.6 }, { y: rowY(0) }, { x: T.x0 }),
+    "Eyes CLK":    route(pp(4),  { x: P.x - 2.6 }, { y: pTop - 3.8 }, { x: T.x0 - 3.1 }, { y: rowY(1) }, { x: T.x0 }),
+    "Eyes CS":     route(pp(2),  { x: P.x - 1.2 }, { y: pTop - 2.2 }, { x: T.x0 - 4.6 }, { y: rowY(2) }, { x: T.x0 }),
+    "+ Power":     route(pp(40), { x: P.x + P.w + 3.7 }, { y: rowY(3) }, { x: T.x0 }),
+    "− Ground":    route(pp(38), { x: P.x + P.w + 2.4 }, { y: rowY(4) }, { x: T.x0 }),
+    "Mouth long leg": route(pp(36), { x: P.x + P.w + 1.1 }, { y: rowY(5) }, { x: T.x0 }),
+    "Mouth blue":  route(pp(21), { x: P.x + P.w + 1.1 }, { y: rowY(8) }, { x: T.x0 }),
+    "Mouth green": route(pp(20), { x: P.x - 1.2 }, { y: pBot + 1.6 }, { x: P.x + P.w + 3.1 }, { y: rowY(7) }, { x: T.x0 }),
+    "Mouth red":   route(pp(19), { x: P.x - 2.6 }, { y: pBot + 3.2 }, { x: P.x + P.w + 4.6 }, { y: rowY(6) }, { x: T.x0 }),
+  };
+  // New board side
+  const overTop = S.y - 1.9; // top of the USB-C socket
+  const smRoutes = {
+    "Eyes DIN":    route(R(0), { x: T.x1 + 2 },   { y: overTop - 5.1 }, { x: S.x + S.w + 5.4 }, { y: sp("7").y }, { x: sp("7").x }),
+    "Eyes CLK":    route(R(1), { x: S.x + S.w + 3.6 }, { y: sp("6").y }, { x: sp("6").x }),   // its row is level with its lane
+    "Eyes CS":     route(R(2), { x: T.x1 + 5 },   { y: overTop - 1.2 }, { x: S.x + S.w + 1.8 }, { y: sp("5").y }, { x: sp("5").x }),
+    "+ Power":     route(R(3), { x: sp("5V").x }),
+    "− Ground":    route(R(4), { x: sp("G").x }),
+    "Mouth long leg": route(R(5), { x: sp("3.3").x }),
+    "Mouth red":   route(R(6), { x: sp("4").x }),
+    "Mouth green": route(R(7), { x: sp("3").x }),
+    "Mouth blue":  route(R(8), { x: T.x1 + 3 }, { y: sp("1").y }, { x: sp("1").x }),
+  };
+  // Check every route really ends on the pin the table names
+  WIRES.forEach((w, i) => {
+    const a = picoRoutes[w.label], b = smRoutes[w.label];
+    const start = pp(w.pico[0]), end = sp(w.sm);
+    const near = (p, q) => Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) < 0.01;
+    if (!near(a[0], start) || !near(a[a.length - 1], L(i)) || !near(b[0], R(i)) || !near(b[b.length - 1], end))
+      throw new Error("Route for " + w.label + " doesn't match the WIRES table");
+  });
+
+  const wires = g({ fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" });
+  const drawWire = (pts, colour, width, dash) => {
+    const d = wirePath(pts);
+    el("path", { d, stroke: PAPER, "stroke-width": width + 0.9 }, wires);
+    el("path", Object.assign({ d, stroke: colour, "stroke-width": width }, dash ? { "stroke-dasharray": dash } : {}), wires);
+  };
+  WIRES.forEach(w => drawWire(picoRoutes[w.label], w.colour, 0.55, "1.3 0.7"));
+  WIRES.forEach(w => drawWire(smRoutes[w.label], w.colour, 0.75));
+  // VSYS (pin 39) works as well as VBUS (pin 40): join it to the + wire
+  const p39 = pp(39), p40 = pp(40);
+  drawWire([p39, { x: P.x + P.w + 1.1, y: p39.y }, { x: P.x + P.w + 1.1, y: p40.y }], WIRES[3].colour, 0.55, "1.3 0.7");
+
+  // pin markers on top of the wires
+  WIRES.forEach((w, i) => {
+    w.pico.forEach(n => { const p = pp(n); el("circle", { cx: p.x, cy: p.y, r: 0.85, fill: w.colour, stroke: PAPER, "stroke-width": 0.25 }); });
+    const s = sp(w.sm);
+    el("circle", { cx: s.x, cy: s.y, r: 1.25, fill: "none", stroke: w.colour, "stroke-width": 0.7 });
+    el("circle", { cx: T.x0, cy: rowY(i), r: 0.7, fill: w.colour });
+    el("circle", { cx: T.x1, cy: rowY(i), r: 0.7, fill: w.colour });
+  });
+  // Pico pin numbers beside the used pins
+  [...new Set(WIRES.flatMap(w => w.pico))].forEach(n => {
+    const p = picoPad(n);
+    el("text", { x: p.left ? p.x + 1.3 : p.x - 1.3, y: p.y + 0.85, "text-anchor": p.left ? "start" : "end",
+                 "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "#1f3a1e" }, svg, n);
+  });
+
+  // ---- Notes under the table ----
+  const note = el("text", { "font-family": BODY, "font-size": pt(9), fill: "#1d1714" });
+  [
+    ["+ Power", " is the battery pack’s + and the eyes’ VCC;"],
+    ["− Ground", " is the battery pack’s − and the eyes’ GND."],
+    ["", "Two separate + (or −) wires? Twist both onto the pin."],
+    ["Match the pin names printed on the new board.", ""],
+  ].forEach(([b, t], k) => {
+    const line = el("tspan", { x: T.x0 + 0.6, y: rowY(8) + 5.4 + k * 3.4 }, note);
+    if (b) el("tspan", { "font-weight": 700 }, line, b);
+    el("tspan", {}, line, t);
+  });
+})();
+
+// ===================== Layout check =====================
+// The two text blocks are placed by hand around the 2024 artwork. If text grows (a long pumpkin name, new words)
+// and they collide, say so loudly on the page: tools/make_instructions.sh looks for this and fails.
+function checkLayout() {
+  const page = document.querySelector(".page").getBoundingClientRect();
+  const mmDown = el => (el.getBoundingClientRect().bottom - page.top) * 25.4 / 96; // bottom edge, mm from page top
+  const mmTop = el => (el.getBoundingClientRect().top - page.top) * 25.4 / 96;
+  const problems = [];
+  const topEnd = mmDown(document.getElementById("diagram")), bottomStart = mmTop(document.getElementById("bottom"));
+  const bottomEnd = mmDown(document.querySelector("#bottom > :last-child"));
+  document.documentElement.dataset.layout = // for debugging: mm from the top of the page
+    `diagram ends ${topEnd.toFixed(1)}, step 3 starts ${bottomStart.toFixed(1)}, tips end ${bottomEnd.toFixed(1)}`;
+  if (topEnd > bottomStart + 0.3) problems.push(`the diagram runs ${(topEnd - bottomStart - 0.3).toFixed(1)} mm into step 3`);
+  if (bottomEnd > 260) problems.push(`the tips run ${(bottomEnd - 260).toFixed(1)} mm too close to the frame`);
+  if (problems.length) {
+    const div = document.createElement("div");
+    div.className = "layout-problem";
+    div.textContent = "LAYOUT PROBLEM: " + problems.join("; ");
+    document.querySelector(".page").appendChild(div);
+  }
+}
+document.fonts.ready.then(checkLayout); // measure with the real fonts
+</script>
+</body>
+</html>

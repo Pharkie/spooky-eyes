@@ -1,0 +1,6 @@
+# prim_slide_still: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.slide((S['dirt'],), 5, 5, right_bg=S['heart1'])
+# c++:    slide(engine, {Shapes::dirt}, 5, 5, kBlank, Shapes::heart1)
+# 2 events. Do not edit: re-run the capture script instead.
+F 0000000000000000 0066998142241800
+W 30

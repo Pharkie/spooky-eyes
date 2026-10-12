@@ -1,0 +1,19 @@
+# invaders: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['invader1'], S['invader2'], 8, 0.3)
+# 16 events. Do not edit: re-run the capture script instead.
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300
+F 183c7edbff245a42 183c7edbff245aa5
+W 300
+F 183c7edbff245aa5 183c7edbff245a42
+W 300

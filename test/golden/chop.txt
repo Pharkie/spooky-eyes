@@ -1,0 +1,58 @@
+# chop: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.chop_tree()
+# 55 events. Do not edit: re-run the capture script instead.
+F 0000000000140808 0000000000000000
+W 600
+F 0000001c3e1c0808 0000000000000000
+W 600
+F 003c7e7e3c181818 0000000000000000
+W 600
+F 7effffff7e181818 0000000000000000
+W 800
+F 7effffff7e181818 3c7cfc7c0c0c0c0c
+W 800
+S Chop!
+F 7effffff7e181818 78f8f8f818181818
+W 150
+F 3f7f7f7f3f0c0c0c 3c7cfc7c0c0c0c0c
+W 250
+F 7effffff7e181818 3c7cfc7c0c0c0c0c
+W 300
+S Chop!
+F 7effffff7e181818 78f8f8f818181818
+W 150
+F 3f7f7f7f3f0c0c0c 3c7cfc7c0c0c0c0c
+W 250
+F 7effffff7e181818 3c7cfc7c0c0c0c0c
+W 300
+S Chop!
+F 7effffff7e181818 78f8f8f818181818
+W 150
+F 3f7f7f7f3f0c0c0c 3c7cfc7c0c0c0c0c
+W 250
+F 7effffff7e181818 3c7cfc7c0c0c0c0c
+W 300
+S Timber!
+F fcffffff7e181818 3c7cfc7c0c0c0c0c
+W 120
+F f8fefefe7e181818 3c7cfc7c0c0c0c0c
+W 120
+F e0f8fcfcfc301818 3c7cfc7c0c0c0c0c
+W 120
+F 00c0e0f0f0603018 3c7cfc7c0c0c0c0c
+W 120
+F 0000000000e0ffe0 3c7cfc7c0c0c0c0c
+W 300
+F 2042180c02500240 3c7cfc7c0c0c0c0c
+W 60
+F 0100410000001080 3c7cfc7c0c0c0c0c
+W 60
+F 000000808d220480 3c7cfc7c0c0c0c0c
+W 60
+F 00000e0000040082 3c7cfc7c0c0c0c0c
+W 60
+F 8207821400400805 3c7cfc7c0c0c0c0c
+W 60
+S You got some wood!
+F ff81bda5a5bd81ff 3c7cfc7c0c0c0c0c
+W 2000

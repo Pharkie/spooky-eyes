@@ -1,0 +1,13 @@
+# anim_growEyes: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'growEyes', E)
+# c++:    runAnimation(engine, Animations::growEyes)
+# 9 events. Do not edit: re-run the capture script instead.
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 600
+M
+F 3c7ee7c3c3e77e3c 3c7ee7c3c3e77e3c
+W 1000
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 1000

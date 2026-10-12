@@ -1,0 +1,10 @@
+# prim_sparkles_keep: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.sparkles(3, 1, left=S['heart1'], right=True, delay=0.01)
+# c++:    sparkles(engine, 3, 1, EyeSetting::keep(Shapes::heart1), EyeSetting::sparkle(), 10)
+# 6 events. Do not edit: re-run the capture script instead.
+F 0066998142241800 7aafa0ead3629838
+W 10
+F 0066998142241800 784cbedf42670bfc
+W 10
+F 0066998142241800 5d724a82ef41cc6d
+W 10

@@ -1,0 +1,12 @@
+# lookdown: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'downLeftABit', E)
+# 9 events. Do not edit: re-run the capture script instead.
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 200
+M
+F 3c7effffcfcf7e3c 3c7effffcfcf7e3c
+W 2000
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 200

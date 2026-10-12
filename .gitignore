@@ -1,3 +1,27 @@
-.micropico
-.vscode
-/archive
+# PlatformIO
+.pio/
+.vscode/
+!legacy/pico-micropython/.vscode/
+
+# Generated at build time from web/ by scripts/embed_web.py
+src/generated/
+
+# Claude Code worktrees and local settings
+.claude/worktrees/
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Release builds (attach to GitHub releases instead)
+release/
+
+# Personalised instruction sheets: make them with tools/make_instructions.sh "Name's Pumpkin"
+docs/instructions/2026-wifi-upgrade-*.pdf
+
+# Personal files kept out of the repo (e.g. the 2024 instructions sheet, which has a sign-off)
+local/

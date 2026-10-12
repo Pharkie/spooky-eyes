@@ -1,0 +1,19 @@
+# sleepy: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.sleepy_eyes()
+# 16 events. Do not edit: re-run the capture script instead.
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 800
+F 007effe7e7ff7e3c 007effe7e7ff7e3c
+W 500
+F 0000ffe7e7ff7e3c 0000ffe7e7ff7e3c
+W 800
+F 000000e7e7ff7e3c 000000e7e7ff7e3c
+W 1000
+F 0000ffe7e7ff7e3c 0000ffe7e7ff7e3c
+W 300
+F 000000e7e7ff7e3c 000000e7e7ff7e3c
+W 800
+F 00000000817e0000 00000000817e0000
+W 2500
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 800

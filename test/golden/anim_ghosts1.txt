@@ -1,0 +1,22 @@
+# anim_ghosts1: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'ghosts1', E)
+# c++:    runAnimation(engine, Animations::ghosts1)
+# 18 events. Do not edit: re-run the capture script instead.
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 20
+M
+F 3c5693dbffffdd89 387c9292fefefeaa
+W 2000
+M
+F 387c9292fefefeaa 3c5693dbffffdd89
+W 2000
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 20
+M
+B 1
+W 1000
+M
+B 2
+W 2000

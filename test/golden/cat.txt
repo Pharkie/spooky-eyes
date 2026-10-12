@@ -1,0 +1,17 @@
+# cat: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.cat_blink()
+# 14 events. Do not edit: re-run the capture script instead.
+F 81c3ffbdffe77e3c 81c3ffbdffe77e3c
+W 1200
+F 81c3ffffffe77e3c 81c3ffffffe77e3c
+W 150
+F 81c3ffbdffe77e3c 81c3ffbdffe77e3c
+W 800
+F 81c3ffffffe77e3c 81c3ffffffe77e3c
+W 150
+F 81c3ffbdffe77e3c 81c3ffbdffe77e3c
+W 150
+F 81c3ffffffe77e3c 81c3ffffffe77e3c
+W 150
+F 81c3ffbdffe77e3c 81c3ffbdffe77e3c
+W 1000

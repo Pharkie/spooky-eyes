@@ -1,0 +1,19 @@
+# diamond: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.flip(S['diamond1'], S['diamond2'], 8, 0.3)
+# 16 events. Do not edit: re-run the capture script instead.
+F 817effdb7e3c1881 007edbff7e3c1800
+W 300
+F 007edbff7e3c1800 817effdb7e3c1881
+W 300
+F 817effdb7e3c1881 007edbff7e3c1800
+W 300
+F 007edbff7e3c1800 817effdb7e3c1881
+W 300
+F 817effdb7e3c1881 007edbff7e3c1800
+W 300
+F 007edbff7e3c1800 817effdb7e3c1881
+W 300
+F 817effdb7e3c1881 007edbff7e3c1800
+W 300
+F 007edbff7e3c1800 817effdb7e3c1881
+W 300

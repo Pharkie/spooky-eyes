@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1324">
+<title>Spooky Pumpkin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%83%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<header class="top">
+  <span class="icon-link" aria-hidden="true"></span>
+  <h1>🎃 <span data-name>Spooky Pumpkin</span></h1>
+  <a class="icon-link" href="/settings" aria-label="Settings" title="Settings">⚙️</a>
+</header>
+<div id="status" class="status" role="status" aria-live="polite">Waking up the pumpkin…</div>
+<p id="wifi-notice" class="notice" hidden></p>
+<div class="talk">
+  <label class="switch-label"><input type="checkbox" id="talk" class="switch" checked> 🗣️ Talking pumpkin</label>
+  <select id="voice" aria-label="Voice" hidden></select>
+</div>
+<p id="no-speech" class="hint center" hidden>This browser can't talk. Try Safari or Chrome.</p>
+
+<div id="effects"><p class="center muted"><span class="spinner"></span>Getting the buttons…</p></div>
+
+<h2>Your own words</h2>
+<form id="own" class="own" autocomplete="off">
+  <input id="words" placeholder="Type anything…" enterkeyhint="send" aria-label="Your own words">
+  <button id="say" class="say-btn" type="submit" data-id="words">✨ Scroll it!</button>
+</form>
+<div id="err" class="error" role="alert"></div>
+
+<button id="show" class="show-btn" type="button">▶️ Back to the normal show</button>
+<p class="links"><a href="/settings">⚙️ Settings</a></p>
+</main>
+<script src="/common.js"></script>
+<script>
+'use strict';
+(() => {
+  const { $, get, post, listen, loadStatus, setupReason, store, straightQuotes } = Pumpkin;
+  const statusEl = $('status');
+  const err = $('err');
+  const words = $('words');
+  const talk = $('talk');
+  const voicePicker = $('voice');
+  const effects = new Map(); // id -> {id, label, emoji, group}
+  let seq = 0;               // each press gets a number; only the newest press shows its error
+  let pending = null;        // what this phone just pressed, until the pumpkin confirms it
+
+  function setStatus(text, playing) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle('playing', !!playing);
+  }
+
+  function outline(button) {
+    document.querySelectorAll('.now').forEach((b) => b.classList.remove('now'));
+    if (button) button.classList.add('now');
+  }
+
+  function buttonFor(id) {
+    return [...document.querySelectorAll('[data-id]')].find((b) => b.dataset.id === id) || null;
+  }
+
+  // ---- Buttons, built from the firmware's list of effects ----
+
+  async function loadEffects() {
+    const box = $('effects');
+    try {
+      const data = await get('/api/effects');
+      const groups = new Map(); // section name -> buttons, in the order the firmware lists them
+      for (const fx of data.effects) {
+        effects.set(fx.id, fx);
+        if (!groups.has(fx.group)) groups.set(fx.group, []);
+        groups.get(fx.group).push(fx);
+      }
+      box.textContent = '';
+      for (const [group, list] of groups) {
+        const heading = document.createElement('h2');
+        heading.textContent = group;
+        const grid = document.createElement('div');
+        grid.className = 'grid g-' + group.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        for (const fx of list) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'tile';
+          button.dataset.id = fx.id;
+          const emoji = document.createElement('span');
+          emoji.className = 'e';
+          emoji.setAttribute('aria-hidden', 'true');
+          emoji.textContent = fx.emoji;
+          button.append(emoji, fx.label);
+          grid.appendChild(button);
+        }
+        box.append(heading, grid);
+      }
+    } catch (e) {
+      box.textContent = '';
+      const p = document.createElement('p');
+      p.className = 'center error';
+      p.textContent = "Couldn't get the buttons. " + e.message + ' ';
+      const retry = document.createElement('button');
+      retry.className = 'btn small secondary';
+      retry.type = 'button';
+      retry.textContent = 'Try again';
+      retry.addEventListener('click', loadEffects);
+      p.appendChild(retry);
+      box.appendChild(p);
+    }
+  }
+
+  // ---- Pressing things ----
+
+  async function press(button, label, send) {
+    const mine = ++seq;
+    err.textContent = '';
+    outline(button);
+    pending = { id: button.dataset.id || button.id, at: Date.now() };
+    setStatus('Playing: ' + label + ' …', true);
+    try {
+      await send();
+    } catch (e) {
+      if (mine !== seq) return; // a newer press took over
+      pending = null;
+      outline(null);
+      setStatus('Oops, that didn’t work.');
+      err.textContent = e.message;
+    }
+  }
+
+  $('effects').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-id]');
+    if (!button) return;
+    const fx = effects.get(button.dataset.id);
+    press(button, fx.emoji + ' ' + fx.label, () => post('/api/play', { id: fx.id }));
+  });
+
+  $('own').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = straightQuotes(words.value).trim();
+    if (!text) {
+      err.textContent = 'Type some words first';
+      words.focus();
+      return;
+    }
+    press($('say'), '“' + text + '”', () => post('/api/words', { words: text }));
+  });
+  words.addEventListener('input', () => { err.textContent = ''; });
+
+  $('show').addEventListener('click', (event) => {
+    press(event.currentTarget, 'Back to the normal show', () => post('/api/show'));
+  });
+
+  // What the pumpkin is doing, from server-sent events (or polling)
+  function showPlayer(player) {
+    if (!player) return;
+    // Just after a press, ignore older news until the pumpkin confirms it (or 2 s pass)
+    if (pending && Date.now() - pending.at < 2000) {
+      const confirmed = pending.id === 'show' ? player.inShow : player.effectId === pending.id;
+      if (!confirmed) return;
+    }
+    pending = null;
+    if (player.inShow) {
+      outline(null);
+      setStatus('🎃 The normal show is on. Press a button!');
+    } else if (player.effectId === 'words') {
+      outline(buttonFor('words'));
+      setStatus('Scrolling: “' + player.label + '”', true);
+    } else if (player.effectId) {
+      const fx = effects.get(player.effectId);
+      outline(buttonFor(player.effectId));
+      setStatus('Playing: ' + (fx ? fx.emoji + ' ' : '') + (player.label || (fx && fx.label) || player.effectId) + ' …', true);
+    } else {
+      outline(null);
+      setStatus('Done! Press another one.');
+    }
+  }
+
+  // ---- Talking pumpkin: the phone speaks what the pumpkin says ----
+
+  const speech = window.speechSynthesis && window.SpeechSynthesisUtterance ? window.speechSynthesis : null;
+  let voices = [];
+  let unlocked = false;
+
+  function isEnglish(voice) { return /^en([-_]|$)/i.test(voice.lang); }
+
+  function loadVoices() {
+    const list = speech.getVoices();
+    if (!list.length) return;
+    voices = list.slice().sort((a, b) => (isEnglish(b) - isEnglish(a)) || a.name.localeCompare(b.name));
+    const saved = store.get('voice');
+    // The old Mac page used Zarvox; some phones have it too
+    const zarvox = voices.find((v) => v.name === 'Zarvox');
+    const wanted = saved !== null ? saved : (zarvox ? zarvox.voiceURI : '');
+    voicePicker.textContent = '';
+    voicePicker.appendChild(new Option('Usual voice', ''));
+    const english = document.createElement('optgroup');
+    english.label = 'English';
+    const others = document.createElement('optgroup');
+    others.label = 'Other languages';
+    for (const voice of voices) {
+      (isEnglish(voice) ? english : others).appendChild(new Option(voice.name + ' (' + voice.lang + ')', voice.voiceURI));
+    }
+    if (english.children.length) voicePicker.appendChild(english);
+    if (others.children.length) voicePicker.appendChild(others);
+    voicePicker.value = voices.some((v) => v.voiceURI === wanted) ? wanted : '';
+    voicePicker.hidden = false;
+  }
+
+  function speak(text) {
+    if (!speech || !talk.checked || !text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voice = voices.find((v) => v.voiceURI === voicePicker.value);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
+    if (speech.speaking || speech.pending) {
+      speech.cancel(); // newest words win
+      setTimeout(() => speech.speak(utterance), 60); // Safari can drop words spoken straight after cancel
+    } else {
+      speech.speak(utterance);
+    }
+  }
+
+  // iPhones only let a page talk after a tap, so say nothing (silently) on the first one
+  function unlockSpeech() {
+    if (unlocked) return;
+    unlocked = true;
+    const hush = new SpeechSynthesisUtterance(' ');
+    hush.volume = 0;
+    speech.speak(hush);
+    ['touchend', 'click', 'keydown'].forEach((type) => document.removeEventListener(type, unlockSpeech, true));
+  }
+
+  if (speech) {
+    talk.checked = store.get('talk') !== 'off';
+    loadVoices();
+    speech.addEventListener ? speech.addEventListener('voiceschanged', loadVoices) : (speech.onvoiceschanged = loadVoices);
+    setTimeout(loadVoices, 700); // Safari doesn't always say when its voices are ready
+    ['touchend', 'click', 'keydown'].forEach((type) => document.addEventListener(type, unlockSpeech, true));
+    talk.addEventListener('change', () => {
+      store.set('talk', talk.checked ? 'on' : 'off');
+      if (!talk.checked) speech.cancel();
+    });
+    voicePicker.addEventListener('change', () => {
+      store.set('voice', voicePicker.value);
+      speak('Hello! This is my new voice.');
+    });
+  } else {
+    talk.checked = false;
+    talk.disabled = true;
+    $('no-speech').hidden = false;
+  }
+
+  // ---- Start ----
+
+  async function showWifiNotice() {
+    try {
+      const status = await loadStatus();
+      const notice = $('wifi-notice');
+      if (status.mode === 'setup') {
+        notice.textContent = '';
+        notice.append(status.hasSavedWifi
+          ? setupReason(status) + ' It’s using its own WiFi for now. '
+          : 'The pumpkin isn’t on your home WiFi yet. ');
+        const link = document.createElement('a');
+        link.href = '/setup';
+        link.textContent = 'Set up WiFi';
+        notice.appendChild(link);
+        notice.hidden = false;
+      }
+      showPlayer(status.player);
+    } catch (e) {
+      setStatus('Oops, can’t reach the pumpkin.');
+      err.textContent = e.message;
+    }
+  }
+
+  // How much the "your own words" box takes, from the firmware's limits
+  get('/api/settings').then((s) => { words.maxLength = s.limits.maxWordsLength; }).catch(() => { /* the pumpkin checks anyway */ });
+
+  loadEffects().then(showWifiNotice);
+  listen({ status: showPlayer, say: speak });
+})();
+</script>
+</body>
+</html>

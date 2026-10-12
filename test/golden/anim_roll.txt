@@ -1,0 +1,52 @@
+# anim_roll: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.anim_runner(a, 'roll', E)
+# c++:    runAnimation(engine, Animations::roll)
+# 48 events. Do not edit: re-run the capture script instead.
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 200
+M
+F 3c7effcfcfff7e3c 3c7effcfcfff7e3c
+W 100
+M
+F 3c7e9f9fffff7e3c 3c7e9f9fffff7e3c
+W 100
+M
+F 3c4ecfffffff7e3c 3c4ecfffffff7e3c
+W 100
+M
+F 3c66e7ffffff7e3c 3c66e7ffffff7e3c
+W 100
+M
+F 3c72f3ffffff7e3c 3c72f3ffffff7e3c
+W 100
+M
+F 3c7ef9f9ffff7e3c 3c7ef9f9ffff7e3c
+W 100
+M
+F 3c7efffcfcff7e3c 3c7efffcfcff7e3c
+W 100
+M
+F 3c7efffff9f97e3c 3c7efffff9f97e3c
+W 100
+M
+F 3c7efffffff3723c 3c7efffffff3723c
+W 100
+M
+F 3c7effffffe7663c 3c7effffffe7663c
+W 100
+M
+F 3c7effffffcf4e3c 3c7effffffcf4e3c
+W 100
+M
+F 3c7effff9f9f7e3c 3c7effff9f9f7e3c
+W 100
+M
+F 3c7eff9f9fff7e3c 3c7eff9f9fff7e3c
+W 100
+M
+F 3c7effcfcfff7e3c 3c7effcfcfff7e3c
+W 100
+M
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 200

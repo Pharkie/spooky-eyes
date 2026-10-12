@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b1324">
+<title>Pumpkin settings</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body data-title=": settings">
+<main class="narrow">
+<header class="top">
+  <a class="icon-link" href="/?play=1" aria-label="Back to the buttons">←</a>
+  <h1>⚙️ Settings</h1>
+  <span class="icon-link" aria-hidden="true"></span>
+</header>
+<p class="center muted">🎃 <span data-name>Spooky Pumpkin</span></p>
+
+<div class="card">
+  <h2>🎃 Pumpkin</h2>
+  <form id="name-form" class="field">
+    <label class="label" for="name">Name</label>
+    <div class="row">
+      <input id="name" autocomplete="off" autocapitalize="words" spellcheck="false">
+      <button class="btn" type="submit">Save</button>
+    </div>
+    <p id="name-msg" class="hint" role="status">It scrolls in the show, and names the pumpkin’s WiFi and web address.</p>
+    <button id="name-restart" class="btn small secondary" type="button" hidden>Restart now</button>
+  </form>
+  <div class="field">
+    <label class="label" for="brightness">Eye brightness <output id="brightness-value"></output></label>
+    <input id="brightness" type="range" min="0" max="11" step="1" value="2">
+  </div>
+  <div class="field">
+    <label class="label" for="eyeGap">Gap between the eyes <output id="eyeGap-value"></output></label>
+    <input id="eyeGap" type="range" min="0" max="16" step="1" value="8">
+    <p class="hint">Dots of space between the two eyes, so words scroll across smoothly.</p>
+  </div>
+  <div class="field">
+    <label class="switch-label"><input type="checkbox" id="mouthLed" class="switch"> Mouth light</label>
+  </div>
+  <p id="settings-msg" class="hint" role="status"></p>
+</div>
+
+<div class="card">
+  <h2>📶 WiFi</h2>
+  <p id="wifi-status">…</p>
+  <p id="wifi-address" class="hint"></p>
+  <div class="buttons">
+    <a id="change-wifi" class="btn secondary" href="/setup">Change WiFi</a>
+    <button id="forget" class="btn danger" type="button" hidden>Forget WiFi</button>
+  </div>
+  <p id="wifi-msg" class="hint" role="status"></p>
+</div>
+
+<div class="card">
+  <h2>🧩 Firmware</h2>
+  <p>Version <b id="version">…</b></p>
+  <p class="hint">Running for <span id="uptime">…</span>, <span id="heap">…</span> of memory free.</p>
+  <form id="update-form" class="field">
+    <label class="label" for="firmware">Update the firmware</label>
+    <input id="firmware" type="file" accept=".bin,application/octet-stream">
+    <p class="hint">Choose the file ending <b>-ota.bin</b>. First press the small BOOT button on the pumpkin’s board (it proves you’re holding the pumpkin). The pumpkin restarts when it’s done.</p>
+    <div id="progress" class="progress" hidden><div></div></div>
+    <button id="upload" class="btn" type="submit" disabled>Update</button>
+    <p id="update-msg" class="hint" role="status"></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>🔁 Restart</h2>
+  <button id="restart" class="btn secondary" type="button">Restart the pumpkin</button>
+  <p id="restart-msg" class="hint" role="status"></p>
+</div>
+</main>
+<script src="/common.js"></script>
+<script>
+'use strict';
+(() => {
+  const { $, get, post, replyError, loadStatus, setupReason, showName, waitForRestart, signalWords, formatUptime, straightQuotes, showMessage, showError } = Pumpkin;
+  let lastStatus = null; // the newest /api/status
+  let renamed = null;    // a rename waiting for a restart: {address, setupSsid}
+
+  // ---- Pumpkin settings ----
+
+  function fillSettings(s) {
+    $('name').value = s.name;
+    for (const key of ['brightness', 'eyeGap']) {
+      $(key).value = s[key];
+      $(key + '-value').textContent = s[key];
+    }
+    $('mouthLed').checked = s.mouthLed;
+  }
+
+  async function saveSettings(changes, messageEl) {
+    showMessage(messageEl, 'Saving…');
+    try {
+      const reply = await post('/api/settings', changes);
+      fillSettings(reply.settings);
+      showName(reply.settings.name);
+      if (reply.restartNeeded) renamed = { address: reply.address, setupSsid: reply.setupSsid };
+      showMessage(messageEl, reply.restartNeeded ? reply.message : 'Saved ✓', 'ok');
+      return reply;
+    } catch (e) {
+      showError(messageEl, e);
+      return null;
+    }
+  }
+
+  // Sliders save when you let go; the number updates as you slide
+  for (const key of ['brightness', 'eyeGap']) {
+    const slider = $(key);
+    slider.addEventListener('input', () => { $(key + '-value').textContent = slider.value; });
+    slider.addEventListener('change', () => saveSettings({ [key]: Number(slider.value) }, $('settings-msg')));
+  }
+  $('mouthLed').addEventListener('change', (e) => saveSettings({ mouthLed: e.target.checked }, $('settings-msg')));
+
+  $('name-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = straightQuotes($('name').value).trim();
+    if (!name) { showMessage($('name-msg'), 'Please give the pumpkin a name.', 'error'); return; }
+    const reply = await saveSettings({ name }, $('name-msg'));
+    $('name-restart').hidden = !(reply && reply.restartNeeded);
+  });
+
+  // ---- WiFi ----
+
+  function showWifi(status) {
+    const wifi = $('wifi-status');
+    const address = $('wifi-address');
+    address.textContent = '';
+    $('forget').hidden = !status.hasSavedWifi;
+    $('change-wifi').textContent = status.hasSavedWifi ? 'Change WiFi' : 'Set up WiFi';
+    if (status.mode === 'connected') {
+      wifi.textContent = 'On ' + status.homeSsid + ', ' + signalWords(status.rssi).toLowerCase() + ' signal (' + status.rssi + ' dBm).';
+      address.textContent = 'Address: ' + (status.hostname ? 'http://' + status.hostname + '.local or ' : '') + 'http://' + status.ip;
+    } else if (status.mode === 'setup') {
+      wifi.textContent = (status.hasSavedWifi
+        ? setupReason(status) + ' So the pumpkin is making its own WiFi called “'
+        : 'Not on a home WiFi yet. The pumpkin is making its own WiFi called “') + status.setupSsid + '”.';
+      address.textContent = 'Address: http://' + status.ip;
+    } else if (status.mode === 'connecting') {
+      wifi.textContent = 'Joining ' + status.homeSsid + '…';
+    } else {
+      wifi.textContent = 'Lost ' + status.homeSsid + '. Trying again…';
+    }
+  }
+
+  function showStatus(status) {
+    lastStatus = status;
+    $('version').textContent = status.version;
+    $('uptime').textContent = formatUptime(status.uptime);
+    $('heap').textContent = Math.round(status.freeHeap / 1024) + ' KB';
+    showWifi(status);
+  }
+
+  $('forget').addEventListener('click', async () => {
+    if (!confirm('Forget the home WiFi? The pumpkin will restart and make its own WiFi again, ready to be set up.')) return;
+    try {
+      const reply = await post('/api/wifi/forget');
+      showMessage($('wifi-msg'), reply.message, 'ok');
+      $('forget').disabled = true;
+    } catch (e) {
+      showError($('wifi-msg'), e);
+    }
+  });
+
+  // ---- Restarting ----
+
+  function restarted(messageEl, status, extra) {
+    if (status) {
+      showStatus(status);
+      showMessage(messageEl, 'The pumpkin is back' + (extra ? extra(status) : '') + '.', 'ok');
+    } else {
+      showMessage(messageEl, 'The pumpkin hasn’t come back yet. If it has joined a different WiFi, join that and reload this page.', 'error');
+    }
+  }
+
+  // "http://new-name.local (or http://192.168.1.23)" as a link, after some words
+  function showNewAddress(messageEl, before, status) {
+    showMessage(messageEl, before, 'ok');
+    const link = document.createElement('a');
+    link.href = renamed.address;
+    link.textContent = renamed.address;
+    const ip = status && status.mode === 'connected' && status.ip ? ' (or http://' + status.ip + ')' : '';
+    messageEl.append(link, ip + '.');
+  }
+
+  // After a rename the old web address and setup WiFi name stop working, so say what to use instead
+  function restartAfterRename(messageEl, reply) {
+    const before = lastStatus || {};
+    if (before.mode === 'setup') {
+      // This phone is on the setup WiFi, which comes back with the new name
+      showMessage(messageEl, 'The pumpkin is restarting. Its own WiFi will be called “' + renamed.setupSsid +
+        '”: join that, then open http://' + before.ip, 'ok');
+      return;
+    }
+    if (/\.local$/i.test(location.hostname) && location.hostname.toLowerCase() !== new URL(renamed.address).hostname) {
+      // This page came from the old name, which won't answer after the restart
+      showNewAddress(messageEl, 'The pumpkin is restarting with its new name. In about 20 seconds, open ', before);
+      return;
+    }
+    showMessage(messageEl, reply.message);
+    waitForRestart((status) => {
+      if (!status) { restarted(messageEl, null); return; }
+      showStatus(status);
+      showNewAddress(messageEl, 'The pumpkin is back. Its new address is ', status);
+      renamed = null; // done: the new name is in use
+    });
+  }
+
+  async function restart(messageEl) {
+    try {
+      const reply = await post('/api/restart');
+      if (renamed) {
+        restartAfterRename(messageEl, reply);
+        return;
+      }
+      showMessage(messageEl, reply.message);
+      waitForRestart((status) => restarted(messageEl, status));
+    } catch (e) {
+      showError(messageEl, e);
+    }
+  }
+  $('restart').addEventListener('click', () => {
+    if (confirm('Restart the pumpkin?')) restart($('restart-msg'));
+  });
+  $('name-restart').addEventListener('click', () => restart($('name-msg')));
+
+  // ---- Firmware update (XMLHttpRequest, because fetch can't report upload progress) ----
+
+  const fileInput = $('firmware');
+  fileInput.addEventListener('change', () => {
+    $('upload').disabled = !fileInput.files.length;
+    showMessage($('update-msg'), '');
+  });
+
+  $('update-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const file = fileInput.files[0];
+    const message = $('update-msg');
+    if (!file) return;
+    if (!/\.bin$/i.test(file.name)) { showMessage(message, 'Choose the file ending -ota.bin.', 'error'); return; }
+    const oldVersion = $('version').textContent;
+    const progress = $('progress');
+    const bar = progress.firstElementChild;
+    const form = new FormData();
+    form.append('firmware', file, file.name);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/update');
+    xhr.setRequestHeader('X-Pumpkin', '1');
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+    });
+    const finish = (ok, text) => {
+      progress.hidden = !ok;
+      $('upload').disabled = ok;
+      fileInput.disabled = ok;
+      showMessage(message, text, ok ? 'ok' : 'error');
+    };
+    xhr.addEventListener('load', () => {
+      let reply = {};
+      try { reply = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
+      if (xhr.status !== 200) {
+        finish(false, '');
+        showError(message, replyError(xhr.status, reply));
+        return;
+      }
+      bar.style.width = '100%';
+      finish(true, reply.message + ' Waiting for it to come back…');
+      waitForRestart((status) => {
+        progress.hidden = true;
+        fileInput.disabled = false;
+        fileInput.value = '';
+        restarted(message, status, (s) => s.version === oldVersion ? ', still on version ' + s.version : ', now on version ' + s.version);
+      }, { firstWait: 8000 });
+    });
+    xhr.addEventListener('error', () => finish(false, 'The upload stopped. Is this phone still on the same WiFi as the pumpkin?'));
+    bar.style.width = '0';
+    progress.hidden = false;
+    $('upload').disabled = true;
+    showMessage(message, 'Uploading… keep this page open.');
+    xhr.send(form);
+  });
+
+  // ---- Start ----
+
+  (async () => {
+    try {
+      const [settings, status] = await Promise.all([get('/api/settings'), loadStatus()]);
+      $('brightness').max = settings.limits.maxBrightness;
+      $('eyeGap').max = settings.limits.maxEyeGap;
+      $('name').maxLength = settings.limits.maxNameLength;
+      fillSettings(settings);
+      showStatus(status);
+    } catch (e) {
+      showError($('settings-msg'), e);
+    }
+  })();
+})();
+</script>
+</body>
+</html>

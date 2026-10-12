@@ -1,0 +1,27 @@
+# angry: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.angry_eyes()
+# 24 events. Do not edit: re-run the capture script instead.
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 500
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 1000
+F 000040f0e4e7ff7e 0000020f27e7ff7e
+W 70
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 70
+F 000040f0e4e7ff7e 0000020f27e7ff7e
+W 70
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 70
+F 000040f0e4e7ff7e 0000020f27e7ff7e
+W 70
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 70
+F 000040f0e4e7ff7e 0000020f27e7ff7e
+W 70
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 70
+F 0040f0e4e7ff7e3c 00020f27e7ff7e3c
+W 1500
+F 3c7effe7e7ff7e3c 3c7effe7e7ff7e3c
+W 300

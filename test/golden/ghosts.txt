@@ -1,0 +1,6 @@
+# ghosts: recorded from legacy/pico-micropython/main.py by tools/capture_python_frames.py
+# python: m.show_char(E['ghost1'], E['ghost2'])
+#         time.sleep(1)
+# 2 events. Do not edit: re-run the capture script instead.
+F 387c9292fefefeaa 3c5693dbffffdd89
+W 1000
