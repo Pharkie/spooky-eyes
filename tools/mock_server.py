@@ -74,9 +74,9 @@ PROBE_PATHS = {
 }
 
 FAKE_NETWORKS = [
-    {"ssid": "Ghost Road", "rssi": -48, "secure": True, "channel": 6},
-    {"ssid": "Ghost Road", "rssi": -71, "secure": True, "channel": 36},
-    {"ssid": "Witchway", "rssi": -63, "secure": True, "channel": 1},
+    {"ssid": "Haunted House 2.4G", "rssi": -48, "secure": True, "channel": 6},
+    {"ssid": "Haunted House 2.4G", "rssi": -71, "secure": True, "channel": 36},
+    {"ssid": "BatCave-5G", "rssi": -63, "secure": True, "channel": 1},
     {"ssid": "PumpkinPatch", "rssi": -77, "secure": True, "channel": 11},
     {"ssid": "Garden Café 🌻", "rssi": -82, "secure": False, "channel": 6},
     {"ssid": "BT-Hub-X7Q2", "rssi": -88, "secure": True, "channel": 1},
@@ -333,7 +333,7 @@ class Pumpkin:
                 self.wifi_ssid, self.wifi_password = "", ""
                 self.name = self.running_name = DEFAULT_NAME
             elif not self.wifi_ssid:
-                self.wifi_ssid, self.wifi_password = "Ghost Road", ""
+                self.wifi_ssid, self.wifi_password = "Haunted House 2.4G", ""
 
     def network_mode(self):
         return "connected" if self.mode == "home" else "setup"
