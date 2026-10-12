@@ -43,6 +43,10 @@ a { color: var(--yellow); }
 .error { color: var(--red); min-height: 22px; font-size: 16px; margin: 6px 0; }
 .ok { color: var(--teal); }
 .bad { color: var(--red); }
+/* The setup page's WiFi check, under the password */
+.check { font-size: 16px; color: var(--muted); margin: 10px 0 0; overflow-wrap: anywhere; }
+.check.ok { color: var(--teal); }
+.check.bad { color: var(--red); font-weight: 600; }
 /* "Press the BOOT button" replies: the one thing to do next, so it stands out */
 .boot {
   display: block; color: var(--text); background: var(--card); border: 2px solid var(--yellow);

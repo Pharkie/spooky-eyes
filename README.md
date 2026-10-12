@@ -17,7 +17,8 @@ Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
 1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network, named after the pumpkin
    (a new one is called "Spooky Pumpkin"), and its eyes scroll how to join it. The password is `spookyeyes`.
 2. Join it on a phone. A setup page pops up (or open http://192.168.4.1): give the pumpkin a name (e.g.
-   "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, Save.
+   "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Check and save.
+   The pumpkin tries the password first (about 10 seconds) and only saves one that works.
 3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes, e.g.
    `http://jacks-pumpkin.local  or  192.168.1.23`. Open that on any phone or computer on the same WiFi
    (Android phones often need the numbers).

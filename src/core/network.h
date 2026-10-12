@@ -5,6 +5,7 @@
 //   captive-portal DNS server, so a phone that joins gets the setup page
 // - a background task keeps the DNS server answering, reconnects after dropouts, blinks the
 //   status LED, and watches the BOOT button (hold 5 s = forget WiFi)
+// - in setup mode, that task can check a home WiFi's password before the page saves it (startWifiTest())
 //
 // Threads: begin() runs on the Arduino loop task and returns within about a second, so the show starts at
 // switch-on. Everything slow happens on the network task (priority 2): first the joining (a ~3 s scan, up
@@ -74,4 +75,41 @@ namespace network
 
     // Start a scan if none is running (safe to call from the web server task; never blocks)
     ScanStatus scan(std::vector<FoundNetwork> &found);
+
+    // --- Checking a home WiFi before it's saved (the setup page's "Check and save") ---
+    //
+    // From Scribe Evolution's handleTestWiFi(), but run on the network task so the web server never waits.
+
+    enum class WifiTestStatus : uint8_t
+    {
+        Idle,    // no check lately
+        Running, // asked for or under way: ask again in a moment
+        Passed,  // joined it: rssi says how strong
+        Failed,  // couldn't: reason says why, in words for the family
+    };
+
+    struct WifiTest
+    {
+        WifiTestStatus status;
+        String ssid;   // the WiFi checked (never the password)
+        int32_t rssi;  // signal in dBm when Passed, otherwise 0
+        String reason; // when Failed, e.g. "That password didn't work"
+    };
+
+    enum class WifiTestStart : uint8_t
+    {
+        Started,
+        Busy,       // a check is already running
+        NotInSetup, // not running the setup WiFi (on home WiFi, say): a check would drop the connection
+    };
+
+    // Setup mode only: ask the network task to join this WiFi on the station side while the setup WiFi
+    // stays up, then leave it again. It takes up to about 12 s; ask wifiTest() how it went. Nothing is
+    // saved, and the password is wiped from memory once the check starts. Safe from any task; never
+    // waits for the check.
+    WifiTestStart startWifiTest(const String &ssid, const String &password);
+
+    // The latest check. A finished one is kept for a minute (a phone that dropped off the setup WiFi
+    // while the radio changed channel can still ask), then it's Idle again.
+    WifiTest wifiTest();
 }

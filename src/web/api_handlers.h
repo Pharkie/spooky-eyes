@@ -16,7 +16,7 @@ namespace web
     // show (GET and POST), show/reset: the show creator (show_handlers.cpp)
     void registerShowRoutes(AsyncWebServer &server);
 
-    // wifi/scan, wifi/forget, wifi (wifi_handlers.cpp)
+    // wifi/scan, wifi/test, wifi/forget, wifi (wifi_handlers.cpp)
     void registerWifiRoutes(AsyncWebServer &server);
 
     // update: firmware upload (update_handler.cpp)

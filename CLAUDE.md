@@ -66,7 +66,9 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
   name (`Jack's Pumpkin` -> `jacks-pumpkin.local`), reconnects, status LED. SuperMini boards need reduced
   WiFi transmit power to connect reliably. Our own captive-portal DNS (`captive_dns.cpp`) replaces
   Arduino's, which ignores queries with EDNS records. Losing home WiFi for 3 minutes (carried out to the
-  doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range.
+  doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range. Before saving, the setup
+  page has the network task try the WiFi on the station side (`network::startWifiTest()`, `/api/wifi/test`)
+  and only saves one that joined; skipped on home WiFi, where a check would drop the connection.
 - **Web pages** are plain HTML/CSS/JS in `web/`, gzipped into the firmware at build time by
   `scripts/embed_web.py`. No filesystem upload step, and OTA updates update the pages too.
 

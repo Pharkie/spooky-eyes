@@ -60,11 +60,14 @@
         <button type="button" id="show-password" class="btn small secondary" aria-pressed="false">Show</button>
       </div>
       <p id="password-hint" class="hint">It’s often on a sticker on the WiFi router.</p>
+      <!-- How the check went: "Checking…", "✓ Joined …" or why it didn't work -->
+      <p id="check" class="check" role="status" hidden></p>
     </div>
 
     <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
     <p id="error" class="error" role="alert"></p>
-    <button type="submit" id="save" class="btn wide">Save and restart</button>
+    <button type="submit" id="save" class="btn wide">Check and save</button>
+    <p class="hint center" id="check-hint" hidden>The pumpkin tries your WiFi first (about 10 seconds), then restarts to join it.</p>
   </form>
   <p class="center" id="play-link" style="margin-top:28px">
     <a href="/?play=1" class="btn secondary">🎃 No home WiFi? Just play with the pumpkin</a>
@@ -102,6 +105,9 @@
   let warnedNoPassword = false;
   let limits = {};         // from the firmware (GET /api/settings)
   let onSetupWifi = false; // this phone is on the pumpkin's own WiFi
+  let setupSsid = '';      // the pumpkin's own WiFi's name
+  let passed = null;       // {ssid, password} that the pumpkin joined, so saving needs no second check
+  let busy = false;        // checking or saving
 
   // ---- Name and web address ----
 
@@ -164,6 +170,7 @@
 
   function choose(net) {
     selected = net;
+    wifiChanged();
     $('manual').hidden = true;
     $('manual-toggle').hidden = false;
     renderNetworks();
@@ -174,7 +181,7 @@
 
   let scanning = false;
   async function scan() {
-    if (scanning) return;
+    if (scanning || busy) return;
     scanning = true;
     $('rescan').disabled = true;
     const state = $('scan-state');
@@ -184,7 +191,10 @@
         const data = await get('/api/wifi/scan');
         if (data.networks) {
           networks = tidyNetworks(data.networks);
-          if (!selected && savedSsid) selected = networks.find((n) => n.ssid === savedSsid) || null;
+          if (!selected && savedSsid) {
+            selected = networks.find((n) => n.ssid === savedSsid) || null;
+            if (selected) wifiChanged();
+          }
           renderNetworks();
           state.textContent = networks.length ? 'Tap your WiFi:' : 'No WiFi found. Move the pumpkin closer to the router and look again.';
           return;
@@ -196,13 +206,14 @@
       state.textContent = e.message;
     } finally {
       scanning = false;
-      $('rescan').disabled = false;
+      $('rescan').disabled = busy;
     }
   }
   $('rescan').addEventListener('click', scan);
 
   $('manual-toggle').addEventListener('click', () => {
     selected = null;
+    wifiChanged();
     renderNetworks();
     $('manual').hidden = false;
     $('manual-toggle').hidden = true;
@@ -217,30 +228,123 @@
     event.currentTarget.setAttribute('aria-pressed', show ? 'true' : 'false');
   });
 
-  // ---- Save ----
+  // ---- Check, then save (Scribe Evolution's "Test WiFi" gating) ----
+  //
+  // On the pumpkin's own WiFi it first tries to join the chosen WiFi, and only a WiFi that worked is
+  // saved: a typo in the password would otherwise leave it restarting into a WiFi it can't join. Any
+  // change to the WiFi name or password after that undoes the pass. On the home WiFi the pumpkin can't
+  // check (it would drop its connection), so it saves straight away, as before.
 
-  $('setup').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const name = chosenName();
-    const ssid = selected ? selected.ssid : ssidInput.value.trim();
-    const pass = password.value;
-    if (!ssid) { showMessage(errorEl, 'Please choose your home WiFi (or type its name).', 'error'); return; }
-    if (pass && pass.length < (limits.minWifiPassword || 0)) {
-      showMessage(errorEl, 'WiFi passwords have at least ' + limits.minWifiPassword + ' characters.', 'error');
-      password.focus();
-      return;
+  const checkEl = $('check');
+  const saveButton = $('save');
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const chosenSsid = () => (selected ? selected.ssid : ssidInput.value.trim());
+  const hasPassed = (ssid, pass) => !!passed && passed.ssid === ssid && passed.password === pass;
+
+  // On the home WiFi there's no check (the pumpkin answers "skipped"), so it just saves
+  function updateSaveButton() {
+    const checked = !onSetupWifi || hasPassed(chosenSsid(), password.value);
+    saveButton.textContent = checked ? 'Save and restart' : 'Check and save';
+  }
+
+  // The line under the password: kind 'ok', 'error', or none; spinning adds a spinner
+  function showCheck(text, kind, spinning) {
+    checkEl.textContent = text || '';
+    if (spinning) {
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      checkEl.prepend(spinner);
     }
-    // No confirm() here: captive-portal browsers don't always show pop-ups
-    if (!pass && (!selected || selected.secure) && !warnedNoPassword) {
-      warnedNoPassword = true;
-      showMessage(errorEl, 'No password? Most home WiFi needs one. Press Save again to carry on without.', 'error');
-      password.focus();
-      return;
+    checkEl.classList.toggle('ok', kind === 'ok');
+    checkEl.classList.toggle('bad', kind === 'error');
+    checkEl.hidden = !text;
+  }
+
+  // The WiFi name or password changed: an earlier pass (or failure) no longer applies
+  function wifiChanged() {
+    if (busy) return; // the check compares what it checked with the boxes when it's done
+    passed = null;
+    showCheck('');
+    updateSaveButton();
+  }
+  ssidInput.addEventListener('input', wifiChanged);
+  password.addEventListener('input', wifiChanged);
+
+  function setBusy(label) {
+    busy = !!label;
+    saveButton.disabled = busy;
+    $('rescan').disabled = busy || scanning;
+    if (label) saveButton.textContent = label;
+    else updateSaveButton();
+  }
+
+  // Ask how the check is going until it's done: {status:'passed'|'failed', rssi, reason}, or
+  // {status:'lost', reason} if the pumpkin stopped answering. Joining the home WiFi can move the
+  // pumpkin's radio to the router's channel, and phones may drop off its WiFi for a moment, so failed
+  // requests are put up with for a while.
+  async function waitForCheck(ssid) {
+    const start = Date.now();
+    let failingSince = 0;
+    let failures = 0;
+    for (;;) {
+      await sleep(700);
+      try {
+        const data = await get('/api/wifi/test', { timeout: 3000 });
+        failures = 0;
+        failingSince = 0;
+        if (data.status === 'running') {
+          showCheck('Checking ' + ssid + '…', '', true);
+        } else if ((data.status === 'passed' || data.status === 'failed') && data.ssid === ssid) {
+          return data;
+        } else {
+          return { status: 'lost', reason: 'The check didn’t finish. Please try again.' };
+        }
+      } catch (e) {
+        failures++;
+        if (!failingSince) failingSince = Date.now();
+        if (failures >= 3) {
+          showCheck('Still checking ' + ssid + '… If your phone left the pumpkin’s WiFi, rejoin ' +
+            (setupSsid || 'it') + '.', '', true);
+        }
+        if (Date.now() - failingSince > 30000) {
+          return { status: 'lost', reason: 'Lost touch with the pumpkin. Join ' + (setupSsid || 'its WiFi') +
+            ' again, then try once more.' };
+        }
+      }
+      if (Date.now() - start > 60000) return { status: 'lost', reason: 'The check took too long. Please try again.' };
     }
-    const save = $('save');
-    save.disabled = true;
-    save.textContent = 'Saving…';
-    showMessage(errorEl, '');
+  }
+
+  async function check(ssid, pass) {
+    showCheck(''); // last time's answer no longer applies
+    let reply;
+    try {
+      reply = await post('/api/wifi/test', { ssid, password: pass });
+    } catch (e) {
+      showError(errorEl, e); // e.g. press BOOT first, or a password that's too short
+      return false;
+    }
+    if (reply.skipped) return true; // on the home WiFi: no check
+    saveButton.textContent = 'Checking…';
+    showCheck('Checking ' + ssid + '… (about 10 seconds)', '', true);
+    const result = await waitForCheck(ssid);
+    if (result.status !== 'passed') {
+      showCheck(result.reason, 'error');
+      if (result.status === 'failed') password.focus(); // everything typed stays, to put right
+      return false;
+    }
+    passed = { ssid, password: pass };
+    showCheck('✓ Joined ' + ssid + ' (' + signalWords(result.rssi).toLowerCase() + ' signal)', 'ok');
+    if (!hasPassed(chosenSsid(), password.value)) {
+      // Changed while it was checking: check what's there now
+      showMessage(errorEl, 'The WiFi details changed while the pumpkin was checking. Tap Check and save again.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  async function save(ssid, pass, name) {
     try {
       const reply = await post('/api/wifi', { ssid, password: pass, name });
       document.querySelectorAll('.home-ssid').forEach((el) => { el.textContent = reply.ssid; });
@@ -254,11 +358,41 @@
       $('form-view').hidden = true;
       $('done-view').hidden = false;
       window.scrollTo(0, 0);
+      return true;
     } catch (e) {
+      // A pass still counts (e.g. after "press BOOT"), so the next tap saves without checking again
       showError(errorEl, e);
-      save.disabled = false;
-      save.textContent = 'Save and restart';
+      return false;
     }
+  }
+
+  $('setup').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    const name = chosenName();
+    const ssid = chosenSsid();
+    const pass = password.value;
+    if (!ssid) { showMessage(errorEl, 'Please choose your home WiFi (or type its name).', 'error'); return; }
+    if (pass && pass.length < (limits.minWifiPassword || 0)) {
+      showMessage(errorEl, 'WiFi passwords have at least ' + limits.minWifiPassword + ' characters.', 'error');
+      password.focus();
+      return;
+    }
+    // No confirm() here: captive-portal browsers don't always show pop-ups
+    if (!pass && (!selected || selected.secure) && !warnedNoPassword) {
+      warnedNoPassword = true;
+      showMessage(errorEl, 'No password? Most home WiFi needs one. Tap the button again to carry on without.', 'error');
+      password.focus();
+      return;
+    }
+    showMessage(errorEl, '');
+    if (!hasPassed(ssid, pass)) {
+      setBusy(onSetupWifi ? 'Checking…' : 'Saving…');
+      const ok = await check(ssid, pass);
+      if (!ok) { setBusy(''); return; }
+    }
+    setBusy('Saving…');
+    if (!(await save(ssid, pass, name))) setBusy('');
   });
 
   // ---- Start ----
@@ -290,7 +424,10 @@
       updateAddress();
       savedSsid = status.homeSsid || '';
       onSetupWifi = status.mode === 'setup';
+      setupSsid = status.setupSsid || '';
       $('no-internet').hidden = !onSetupWifi;
+      $('check-hint').hidden = !onSetupWifi;
+      updateSaveButton();
       $('boot-hint').hidden = !status.wifiNeedsBoot;
       if (status.mode === 'connected') {
         const current = $('current');

@@ -18,15 +18,21 @@ switch-on) and buttons (the button page is open: the show pauses and each press 
 mode ends kButtonsIdleTimeoutMs after the last press or heartbeat (MOCK_IDLE_SECONDS=20 to wait less). The
 saved show lives in memory and starts as the default show from src/effects/show.cpp.
 
-The BOOT button: firmware updates always need a short BOOT press first, and so do WiFi and name changes
-in lost/wrong mode (strangers may be on the setup WiFi). Press it with ?boot=1 on any address, or
+The setup page's WiFi check (POST then GET /api/wifi/test) takes WIFI_TEST_SECONDS, then: "That password
+didn't work" if the password is empty (for a WiFi that needs one) or has "wrong" in it, "Can't find ..." if
+the WiFi isn't in the fake scan list, otherwise it passes. On home WiFi it's skipped, as on the board.
+MOCK_WIFI_DROP_SECONDS=8 pretends the phone drops off the setup WiFi for that long when a check starts
+(the radio changing channel): API requests get no answer meanwhile.
+
+The BOOT button: firmware updates always need a short BOOT press first, and so do WiFi checks, WiFi and name
+changes in lost/wrong mode (strangers may be on the setup WiFi). Press it with ?boot=1 on any address, or
 curl -X POST http://localhost:8080/mock/boot. It counts for kBootUnlockMs, as on the board; ?boot=0
 lets go of it.
 
 Serves web/ straight from disk (edit a page, reload the browser) and fakes every API endpoint the
 firmware has (src/web/*.cpp): buttons from src/effects/registry.cpp, limits, timings and the setup
 WiFi password from src/core/constants.h, server-sent events ("say" with each effect's phrase, "status"
-as it plays), the show creator's show, a WiFi scan, settings, restarts and firmware uploads. Like the
+as it plays), the show creator's show, a WiFi scan and check, settings, restarts and firmware uploads. Like the
 firmware, every POST needs the "X-Pumpkin: 1" header. Python standard library only.
 """
 
@@ -57,6 +63,10 @@ MAX_UPLOAD = 2 * 1024 * 1024  # bigger than an app slot
 EFFECT_SECONDS = 4
 BOOT_SECONDS = 5              # how long a pretend restart keeps the pumpkin away
 BOOT_PRESS_MESSAGE = "Press the small BOOT button on the pumpkin's board, then try again"  # web_utils.h
+WIFI_TEST_SECONDS = 3         # a pretend WiFi check takes this long (up to about 12 s on the board)
+WIFI_TEST_KEEP_SECONDS = 60   # network.cpp kWifiTestKeepMs: a finished check is kept this long
+# Pretend the phone drops off the setup WiFi for this long when a check starts (0 = it doesn't)
+WIFI_DROP_SECONDS = float(os.environ.get("MOCK_WIFI_DROP_SECONDS") or 0)
 
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -312,6 +322,7 @@ class Pumpkin:
         self.player = {"mode": "show", "effectId": "", "label": "", "block": -1}
         self.generation = 0           # bumped by every request, so old playback threads stop
         self.scan_started = None      # when the fake scan began
+        self.wifi_test = None         # the last WiFi check: {ssid, started, status, rssi, reason} (no password)
         self.restart_at = None        # a restart is due then
         self.down_until = 0.0         # "restarting" until then
         self.boot_pressed_at = None   # the last short BOOT press
@@ -559,6 +570,7 @@ class Pumpkin:
             self.running_name = self.name
             self.boot_pressed_at = None
             self.update_finished = False
+            self.wifi_test = None
             if new_mode:
                 self.mode = new_mode
             self.broadcast(None, None)  # tells each event stream to hang up
@@ -568,6 +580,48 @@ class Pumpkin:
     def restarting(self):
         with self.lock:
             return time.time() < self.down_until
+
+    # --- The setup page's WiFi check (network::startWifiTest() and wifiTest()) ---
+
+    def start_wifi_test(self, ssid, password):
+        """Works out now how the check will end (the password isn't kept), and says so after
+        WIFI_TEST_SECONDS. False if one is running."""
+        with self.lock:
+            if self.wifi_test and self.wifi_test["status"] == "running" and not self.wifi_test_done():
+                return False
+            seen = [n for n in FAKE_NETWORKS if n["ssid"] == ssid]
+            if not seen:
+                outcome = ("failed", 0, f"Can't find {ssid}: is it a 2.4 GHz network, and in range?")
+            elif seen[0]["secure"] and (not password or "wrong" in password.lower()):
+                outcome = ("failed", 0, "That password didn't work")
+            else:
+                outcome = ("passed", max(n["rssi"] for n in seen) + random.randint(-3, 3), "")
+            self.wifi_test = {"ssid": ssid, "started": time.time(), "status": "running", "rssi": 0, "reason": "",
+                              "outcome": outcome}
+        print(f'  (checking "{ssid}": {outcome[0]} in {WIFI_TEST_SECONDS} s'
+              f'{", phone off the setup WiFi for " + format(WIFI_DROP_SECONDS, "g") + " s" if WIFI_DROP_SECONDS else ""})')
+        return True
+
+    def wifi_test_done(self):
+        return time.time() - self.wifi_test["started"] >= WIFI_TEST_SECONDS
+
+    def wifi_test_result(self):
+        with self.lock:
+            test = self.wifi_test
+            if test is None:
+                return {"status": "idle", "ssid": "", "rssi": 0, "reason": ""}
+            if test["status"] == "running" and self.wifi_test_done():
+                test["status"], test["rssi"], test["reason"] = test["outcome"]
+                test["finished"] = time.time()
+            if test["status"] != "running" and time.time() - test["finished"] >= WIFI_TEST_KEEP_SECONDS:
+                return {"status": "idle", "ssid": "", "rssi": 0, "reason": ""}
+            return {k: test[k] for k in ("status", "ssid", "rssi", "reason")}
+
+    def phone_off_setup_wifi(self):
+        """MOCK_WIFI_DROP_SECONDS: the phone is off the setup WiFi for a while after a check starts"""
+        with self.lock:
+            return (WIFI_DROP_SECONDS > 0 and self.wifi_test is not None and self.network_mode() == "setup"
+                    and time.time() - self.wifi_test["started"] < WIFI_DROP_SECONDS)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -664,6 +718,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"ok": True, "message": f"BOOT pressed: unlocked for {int(BOOT_UNLOCK_SECONDS)} s"})
                 return
             if path.startswith("/api/") or path == "/events":
+                if pumpkin.phone_off_setup_wifi():
+                    self.close_connection = True  # no answer, as if the phone had left the setup WiFi
+                    return
                 if pumpkin.restarting():
                     if path == "/events":
                         self.close_connection = True  # like a board that's off: the browser retries
@@ -907,27 +964,56 @@ class Handler(BaseHTTPRequestHandler):
                 best[net["ssid"]] = net
         self.send_json(200, {"networks": sorted(best.values(), key=lambda n: -n["rssi"])})
 
-    def api_wifi(self, query):
-        # Same order as the firmware: the request's shape, then the BOOT gate, then settings::save()
-        body = self.json_body()
-        ssid = self.check_text(body, "ssid", "WiFi name")
-        password = self.check_text(body, "password", "WiFi password") or ""
-        new_name = self.check_text(body, "name", "pumpkin's name")
+    @staticmethod
+    def check_wifi(body):
+        """The WiFi name and password from a request, checked as wifi_handlers.cpp and settings::checkWifi()
+        do (same messages)"""
+        ssid = Handler.check_text(body, "ssid", "WiFi name")
+        password = Handler.check_text(body, "password", "WiFi password") or ""
         if not ssid:
             raise ApiError(400, "Please fill in the WiFi name")
         if len(ssid.encode("utf-8")) > MAX_SSID_BYTES:
             raise ApiError(400, f"The WiFi name is too long (up to {MAX_SSID_BYTES} characters)")
         if len(password) > MAX_WIFI_PASSWORD:
             raise ApiError(400, f"The WiFi password is too long (up to {MAX_WIFI_PASSWORD} characters)")
+        return ssid, password
+
+    @staticmethod
+    def check_wifi_password(password):
+        if not valid_wifi_password(password):
+            raise ApiError(400, f"WiFi passwords have at least {MIN_WIFI_PASSWORD} characters (leave it empty if "
+                                "the WiFi has no password)" if len(password) < MIN_WIFI_PASSWORD else
+                                f"That WiFi password is too long ({MAX_WIFI_PASSWORD - 1} characters at most)")
+
+    def api_wifi_test_start(self, query):
+        # Same order as the firmware: the request, then home WiFi (skipped), the BOOT gate, a check running
+        ssid, password = self.check_wifi(self.json_body())
+        self.check_wifi_password(password)
+        pumpkin = self.pumpkin
+        if pumpkin.network_mode() != "setup":
+            self.send_json(200, {"skipped": True, "reason": "The pumpkin is on its home WiFi, and checking "
+                                 "another would cut it off. It saves without a check."})
+            return
+        if pumpkin.strangers_may_be_connected() and not pumpkin.boot_unlocked():
+            raise boot_needed()
+        if not pumpkin.start_wifi_test(ssid, password):
+            raise ApiError(409, "A check is already running")
+        self.send_json(202, {"testing": True})
+
+    def api_wifi_test_result(self, query):
+        self.send_json(200, self.pumpkin.wifi_test_result())
+
+    def api_wifi(self, query):
+        # Same order as the firmware: the request's shape, then the BOOT gate, then settings::save()
+        body = self.json_body()
+        ssid, password = self.check_wifi(body)
+        new_name = self.check_text(body, "name", "pumpkin's name")
         pumpkin = self.pumpkin
         with pumpkin.lock:
             if pumpkin.strangers_may_be_connected() and not pumpkin.boot_unlocked():
                 raise boot_needed()
             name = self.check_name(new_name) if new_name is not None else pumpkin.name
-            if not valid_wifi_password(password):
-                raise ApiError(400, f"WiFi passwords have at least {MIN_WIFI_PASSWORD} characters (leave it empty if "
-                                    "the WiFi has no password)" if len(password) < MIN_WIFI_PASSWORD else
-                                    f"That WiFi password is too long ({MAX_WIFI_PASSWORD - 1} characters at most)")
+            self.check_wifi_password(password)
             pumpkin.name = name
             pumpkin.wifi_ssid, pumpkin.wifi_password = ssid, password
         host = hostname_for(name)
@@ -1025,6 +1111,7 @@ API = {
     ("GET", "/api/settings"): Handler.api_get_settings,
     ("GET", "/api/hostname"): Handler.api_hostname,
     ("GET", "/api/wifi/scan"): Handler.api_wifi_scan,
+    ("GET", "/api/wifi/test"): Handler.api_wifi_test_result,
     ("GET", "/events"): Handler.api_events,
     ("POST", "/api/play"): Handler.api_play,
     ("POST", "/api/words"): Handler.api_words,
@@ -1034,6 +1121,7 @@ API = {
     ("POST", "/api/mode"): Handler.api_mode,
     ("POST", "/api/settings"): Handler.api_post_settings,
     ("POST", "/api/restart"): Handler.api_restart,
+    ("POST", "/api/wifi/test"): Handler.api_wifi_test_start,
     ("POST", "/api/wifi"): Handler.api_wifi,
     ("POST", "/api/wifi/forget"): Handler.api_wifi_forget,
     ("POST", "/api/update"): Handler.api_update,
