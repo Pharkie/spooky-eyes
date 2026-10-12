@@ -6,7 +6,10 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
 
 ## Golden rules
 
-- **Never upload firmware or open the serial monitor.** Adam does that. Build and test only.
+- **Only flash a board or read its serial port when Adam asks** (he plugs one in and says so). Then flash
+  the full image with an erase (`esptool --chip esp32c3 --port /dev/cu.usbmodem… write-flash -e 0x0
+  release/…-full.bin`, outside the sandbox), and read the log by opening the port with DTR and RTS low and
+  pulsing RTS to reset it (pyserial is in PlatformIO's Python, /Library/Frameworks/Python.framework/…/python3).
 - Pins live only in `src/hardware/board.h`, and the wiring guide (`docs/instructions/`) must match it.
 - Effects code (`src/display/`, `src/effects/`) is portable: no Arduino headers, so it runs in native tests.
 - The effects table in `src/effects/registry.cpp` is the single source of truth for buttons, phrases and the
