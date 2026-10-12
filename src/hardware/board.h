@@ -1,7 +1,8 @@
 #pragma once
 // Pin map for the ESP32-C3 SuperMini. The wiring guide (docs/instructions/) must match these.
 //
-// SuperMini pins, USB socket at the top:
+// SuperMini pins seen from underneath (the side the wires plug into, where the pin names are printed),
+// USB socket at the top:
 //   left side:  5V  G  3.3  4  3  2  1  0
 //   right side:  5  6  7  8  9  10  20  21
 //
