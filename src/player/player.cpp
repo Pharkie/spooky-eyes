@@ -338,8 +338,11 @@ namespace
             setStatus(Mode::Show, nullptr, block.value.c_str(), static_cast<int>(index));
         else
             setStatus(Mode::Show, findEffect(block.value.c_str()), nullptr, static_cast<int>(index));
-        // Cut short by an announcement, it carries on with the next block; by a new show, from the top
+        // Cut short by an announcement, it carries on with the next block. The show doesn't talk: only
+        // button presses do (phrases and the effects' own lines alike).
+        engine.setQuiet(true);
         runGuarded(CutBy::Announcement, [&] { playBlock(engine, block); });
+        engine.setQuiet(false);
     }
 
     // --- Buttons mode ---

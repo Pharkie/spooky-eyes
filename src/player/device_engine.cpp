@@ -50,7 +50,7 @@ void DeviceEngine::wait(uint32_t ms)
 
 void DeviceEngine::say(const char *words)
 {
-    if (!words || !*words)
+    if (quiet_ || !words || !*words)
         return;
     Serial.printf("SAY:%s\n", words); // for tools listening on the USB cable
     if (hooks_.said)

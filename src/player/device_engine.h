@@ -31,14 +31,18 @@ public:
     uint8_t eyeGap() const override { return eyeGap_; }
     const char *pumpkinName() const override { return name_; }
 
+    // Quiet: say() does nothing. The show is silent; only button presses talk.
+    void setQuiet(bool quiet) { quiet_ = quiet; }
+
     // Copy the current settings and switch the mouth LED on or off. The name is only copied when
     // includeName is true, so the player can leave it alone while an effect might be scrolling it.
     void refreshSettings(bool includeName);
 
 private:
-    static constexpr size_t kNameBufferSize = kMaxNameLength * 4 + 1; // room for accented letters
+    static constexpr size_t kNameBufferSize = kMaxNameLength + 1; // names are plain ASCII (text::plain)
 
     Hooks hooks_;
+    bool quiet_ = false;
     uint8_t maxBright_ = kDefaultBrightness;
     uint8_t eyeGap_ = kDefaultEyeGap;
     char name_[kNameBufferSize] = {};
