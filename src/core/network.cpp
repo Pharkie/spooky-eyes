@@ -24,6 +24,8 @@
 // - every WiFi scan, the setup page's included, goes through scanMutex
 // - Scribe's handleTestWiFi() (check the password before saving it) runs here on the network task,
 //   under scanMutex, while the web server only asks and polls (runWifiTest())
+// - nobody has used the pumpkin for kWifiIdleOffMs: switch the WiFi off to save batteries, until a
+//   restart (saveBatteries())
 // - left out: printAPDetailsOnStartup() (the eyes scroll the address instead), MQTT, NTP, LogManager and
 //   the custom PCB's RGB status LED
 
@@ -45,6 +47,7 @@
 #include "core/firmware.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "core/wifi_saver.h"
 #include "hardware/boot_button.h"
 #include "hardware/status_led.h"
 
@@ -104,6 +107,9 @@ namespace
     // A finished check is kept this long, for a phone that dropped off the setup WiFi meanwhile
     constexpr uint32_t kWifiTestKeepMs = PumpkinTime::Minutes(1);
 
+    // How often to ask whether it's time to switch the WiFi off (saveBatteries())
+    constexpr uint32_t kSaverCheckMs = PumpkinTime::Seconds(1);
+
     // What the network task looks after
     enum class Role : uint8_t
     {
@@ -111,6 +117,7 @@ namespace
         Home,     // joined the home WiFi at boot: keep it connected
         Setup,    // running the setup WiFi: answer DNS
         Broken,   // the setup WiFi wouldn't start
+        Off,      // WiFi switched off to save batteries, until a restart
     };
 
     // Why it's in setup mode with home WiFi saved
@@ -130,6 +137,7 @@ namespace
     std::atomic<bool> sawAuthFailure{false};      // ditto: sticky, cleared when a join starts
     std::atomic<uint8_t> refusalCount{0};         // ditto: goes up with each failed join (wraps round)
     std::atomic<network::ModeListener> modeListener{nullptr};
+    std::atomic<uint32_t> lastActivityMs{0};      // millis() when someone last used the pumpkin
 
     // Set by begin() before it starts the network task, then only read (from any task)
     String savedSsid;
@@ -173,6 +181,7 @@ namespace
     uint32_t connectedSinceMs = 0;
     uint32_t lastRecheckMs = 0;
     uint32_t brokenSinceMs = 0;
+    uint32_t lastSaverCheckMs = 0;
 
     // These survive a restart (not a power cut), to count restarts made to retry the WiFi
     RTC_NOINIT_ATTR uint32_t rtcRetryMagic;
@@ -307,6 +316,7 @@ namespace
         case Mode::SetupAP:
             return status_led::Pattern::SlowBlink;
         case Mode::Disconnected:
+        case Mode::Off:
             break;
         }
         return status_led::Pattern::Off;
@@ -783,6 +793,72 @@ namespace
         }
     }
 
+    // --- Saving batteries (kWifiIdleOffMs) ---
+
+    // A WiFi check or a scan for the setup page under way. Their requests came only seconds ago, so the
+    // idle time can't run out meanwhile: this is just in case.
+    bool radioBusy()
+    {
+        {
+            Lock lock(testMutex);
+            if (testRunning)
+                return true;
+        }
+        Lock lock(scanMutex);
+        collectPageScan(millis()); // a scan nobody came back for still finishes
+        return pageScanRunning;
+    }
+
+    // Off until a restart: the captive DNS, the web name and the radio. The web server stays, with nothing
+    // to hear. Nothing turns the WiFi on again meanwhile: keepConnected() and lookForHomeWifi() only run in
+    // the Home and Setup roles, and the driver's own reconnect is switched off first.
+    void switchWifiOff()
+    {
+        LOG("WIFI", "Nobody has used the pumpkin for %lu minutes: WiFi off to save batteries (BOOT brings it back)",
+            static_cast<unsigned long>(kWifiIdleOffMs / 60000));
+        role = Role::Off; // first, so the setup page's scans and checks are turned away from now on
+        captive_dns::stop();
+        MDNS.end();
+        setRegisteredMdnsName("");
+        WiFi.setAutoReconnect(false);
+        setWifiMode(WIFI_OFF);
+        currentMode = Mode::Off; // the status LED goes off at the next housekeeping()
+        tellListener(Mode::Off);
+    }
+
+    // Every kSaverCheckMs while the WiFi is on: switch it off if the setting's on and nobody has used the
+    // pumpkin for kWifiIdleOffMs. A phone on the setup WiFi counts as using it (it may be about to open a
+    // page); the web server notes requests and open event streams (network::noteActivity()). The
+    // pumpkin's own WiFi traffic (DNS answers, mDNS, reconnects, scans for the home WiFi) doesn't count.
+    void saveBatteries()
+    {
+        const uint32_t now = millis();
+        if (now - lastSaverCheckMs < kSaverCheckMs)
+            return;
+        lastSaverCheckMs = now;
+        if (role == Role::Setup && WiFi.softAPgetStationNum() > 0)
+            lastActivityMs = now;
+        // lastActivityMs is read after now, so a request noted meanwhile can't look 49 days old
+        if (wifi_saver::timeToSwitchOff(settings::get().wifiSaver, radioBusy(), now, lastActivityMs.load(),
+                                        kWifiIdleOffMs))
+            switchWifiOff();
+    }
+
+    // While it's off, every kSaverCheckMs: if the driver has started the radio again by itself (its one
+    // retry after a failed join could), switch it off again
+    void keepWifiOff()
+    {
+        const uint32_t now = millis();
+        if (now - lastSaverCheckMs < kSaverCheckMs)
+            return;
+        lastSaverCheckMs = now;
+        if (WiFi.getMode() == WIFI_OFF)
+            return;
+        LOG("WIFI", "The WiFi came back on by itself: switching it off again");
+        WiFi.setAutoReconnect(false);
+        setWifiMode(WIFI_OFF);
+    }
+
     // The first thing the network task does, while the show plays: join the home WiFi and register the
     // web name, or start the setup WiFi. Then it tells the mode listener how it went, so the eyes can say
     // how to reach the pumpkin. (Scribe did this in setup(), before anything else ran.)
@@ -843,15 +919,21 @@ namespace
                 break;
             case Role::Home:
                 keepConnected(now);
+                saveBatteries();
                 break;
             case Role::Setup:
                 captive_dns::serve();
                 runWifiTest();
                 lookForHomeWifi(now);
+                saveBatteries();
                 break;
             case Role::Broken:
                 if (retryRestartsSoFar < kMaxRetryRestarts && now - brokenSinceMs >= kBrokenRestartMs)
                     retryRestart("to try the WiFi again");
+                saveBatteries();
+                break;
+            case Role::Off:
+                keepWifiOff();
                 break;
             }
 
@@ -889,6 +971,7 @@ namespace network
         setupApName = apNameFor(s.pumpkinName);
         wantedHostname = settings::hostnameFor(s.pumpkinName);
         retryRestartsSoFar = takeRetryCount();
+        lastActivityMs = millis(); // switching on counts as using it: the idle time starts now
 
         currentMode = Mode::Connecting;
         status_led::begin();
@@ -998,6 +1081,11 @@ namespace network
     void onModeChange(ModeListener listener)
     {
         modeListener = listener;
+    }
+
+    void noteActivity()
+    {
+        lastActivityMs = millis();
     }
 
     ScanStatus scan(std::vector<FoundNetwork> &found)

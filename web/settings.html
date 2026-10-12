@@ -51,6 +51,11 @@
     <button id="forget" class="btn danger" type="button" hidden>Forget WiFi</button>
   </div>
   <p id="wifi-msg" class="hint" role="status"></p>
+  <div class="field">
+    <label class="switch-label"><input type="checkbox" id="wifiSaver" class="switch"> <span>🔋 Save batteries: switch WiFi off after <span id="idle-minutes">10</span> minutes when nobody’s using it</span></label>
+    <p class="hint">Switch the pumpkin off and on, or press its BOOT button, to get WiFi back.</p>
+    <p id="saver-msg" class="hint" role="status"></p>
+  </div>
 </div>
 
 <div class="card">
@@ -90,6 +95,7 @@
       $(key + '-value').textContent = s[key];
     }
     $('mouthLed').checked = s.mouthLed;
+    $('wifiSaver').checked = s.wifiSaver;
   }
 
   async function saveSettings(changes, messageEl) {
@@ -114,6 +120,7 @@
     slider.addEventListener('change', () => saveSettings({ [key]: Number(slider.value) }, $('settings-msg')));
   }
   $('mouthLed').addEventListener('change', (e) => saveSettings({ mouthLed: e.target.checked }, $('settings-msg')));
+  $('wifiSaver').addEventListener('change', (e) => saveSettings({ wifiSaver: e.target.checked }, $('saver-msg')));
 
   $('name-form').addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -141,6 +148,8 @@
       address.textContent = 'Address: http://' + status.ip;
     } else if (status.mode === 'connecting') {
       wifi.textContent = 'Joining ' + status.homeSsid + '…';
+    } else if (status.mode === 'off') {
+      wifi.textContent = 'WiFi is off to save batteries. Press the BOOT button on the pumpkin, or switch it off and on, to get it back.';
     } else {
       wifi.textContent = 'Lost ' + status.homeSsid + '. Trying again…';
     }
@@ -291,6 +300,7 @@
       $('brightness').max = settings.limits.maxBrightness;
       $('eyeGap').max = settings.limits.maxEyeGap;
       $('name').maxLength = settings.limits.maxNameLength;
+      if (settings.limits.wifiIdleOffMinutes) $('idle-minutes').textContent = settings.limits.wifiIdleOffMinutes;
       fillSettings(settings);
       showStatus(status);
     } catch (e) {

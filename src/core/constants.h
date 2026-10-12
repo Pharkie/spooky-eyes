@@ -32,8 +32,23 @@ constexpr uint32_t kForgetWifiHoldMs = PumpkinTime::Seconds(5);
 constexpr uint32_t kBootUnlockMs = PumpkinTime::Minutes(5);
 
 // The setup instructions scroll in every show pass for this long after switch-on, then stop (so they
-// don't scroll the password at trick-or-treaters all night). A short BOOT press shows them again.
+// don't scroll the password at trick-or-treaters all night), or sooner if the WiFi switches off to save
+// batteries. A short BOOT press shows them again.
 constexpr uint32_t kSetupMessageMs = PumpkinTime::Minutes(15);
+
+// Saving batteries. With the "save batteries" setting on (the default), the WiFi switches off after this
+// long with nobody using the pumpkin: no page or API request, no page open listening for news, and no
+// phone on the setup WiFi. The setup WiFi can't doze between messages as home WiFi does, so it draws
+// several times more. A short BOOT press, or switching off and on, brings the WiFi back.
+constexpr uint32_t kWifiIdleOffMs = PumpkinTime::Minutes(10);
+
+// Processor speed. 80 MHz is the slowest that keeps WiFi (and USB serial) working, and draws a few mA
+// less than the usual 160 MHz. The effects use a small fraction of it.
+constexpr uint32_t kCpuMhz = 80;
+
+// The mouth LED is lit for this much of the time (PWM), so it draws about a quarter of the current.
+// Its pins drive it with no resistor, which can pull 10-20 mA per colour when fully on.
+constexpr uint8_t kMouthDutyPercent = 25;
 
 // A new firmware that runs this long without crashing is kept; one that crashes sooner is rolled back
 constexpr uint32_t kFirmwareTrialMs = PumpkinTime::Seconds(30);
@@ -55,6 +70,7 @@ constexpr const char *kDefaultPumpkinName = "Spooky Pumpkin";
 constexpr uint8_t kDefaultBrightness = 2; // 0-15. Low is plenty in the dark, and kind to batteries.
 constexpr uint8_t kDefaultEyeGap = 8;     // as on the original pumpkin
 constexpr bool kDefaultMouthLed = true;
+constexpr bool kDefaultWifiSaver = true;  // switch the WiFi off when nobody's using it (kWifiIdleOffMs)
 
 // Limits (the web pages and tools/mock_server.py read these too)
 constexpr uint8_t kChipMaxBrightness = 15; // the MAX7219's top setting

@@ -1,7 +1,8 @@
 // Spooky Pumpkin Eyes: ESP32-C3 SuperMini firmware.
 // Boot order: settings -> saved show -> eyes -> WiFi (home, or the pumpkin's own setup network) -> web
 // server -> show. WiFi joins in the background, so the show starts at once; the eyes say how to reach the
-// pumpkin when it's done.
+// pumpkin when it's done. To save batteries, the WiFi switches off when nobody has used it for a while
+// (kWifiIdleOffMs); a short BOOT press brings it back.
 
 #include <Arduino.h>
 #include <atomic>
@@ -41,7 +42,14 @@ static String howToConnect()
 // `now` also scrolls the setup instructions straight away, rather than at the next show pass.
 static void tellHowToConnect(bool now)
 {
-    if (network::isSetupAP())
+    if (network::mode() == network::Mode::Off)
+    {
+        // Nobody was using it, so the WiFi is off to save batteries: say so once, and stop the setup
+        // instructions (there's no WiFi to join now)
+        player::setShowMessage("");
+        player::announce(" WiFi off to save batteries ");
+    }
+    else if (network::isSetupAP())
     {
         player::setShowMessage(howToConnect(), kSetupMessageMs);
         if (now)
@@ -63,8 +71,13 @@ static bool batteriesTooWeakForWifi()
 
 void setup()
 {
+    // Slower processor, longer batteries (kCpuMhz). The peripherals' clock (APB) stays at 80 MHz, so the
+    // eyes' SPI, the mouth LED's PWM and the serial port keep their speeds; effects time in milliseconds.
+    const bool slowed = setCpuFrequencyMhz(kCpuMhz);
     Serial.begin(115200);
     LOG("BOOT", "Spooky Pumpkin Eyes %s", FIRMWARE_VERSION);
+    if (!slowed)
+        LOG("BOOT", "Couldn't slow the processor to %lu MHz", static_cast<unsigned long>(kCpuMhz));
 
     settings::begin();
     show_store::begin(); // the saved show, which the player loads
@@ -85,8 +98,15 @@ void setup()
             wifiReady = true;
             tellHowToConnect(true);
         });
-    // A short press on the BOOT button shows how to reach it again
-    boot_button::onShortPress([] { tellHowToConnect(true); });
+    // A short press on the BOOT button shows how to reach it again, or brings the WiFi back if it was
+    // switched off to save batteries (a restart joins the home WiFi or starts the setup WiFi afresh)
+    boot_button::onShortPress(
+        []
+        {
+            if (network::mode() == network::Mode::Off)
+                firmware::restart("BOOT pressed: WiFi back on");
+            tellHowToConnect(true);
+        });
 
     network::begin(); // quick: WiFi joins in the background
     web::begin();     // after network::begin(), which starts the network stack the server needs

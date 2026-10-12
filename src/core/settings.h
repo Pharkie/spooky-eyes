@@ -14,6 +14,7 @@ struct Settings
     uint8_t brightness;  // normal eye brightness 0..kMaxBrightness
     uint8_t eyeGap;      // 0..kMaxEyeGap
     bool mouthLed;       // drive the RGB mouth LED
+    bool wifiSaver;      // switch the WiFi off when nobody's using it (kWifiIdleOffMs), to save batteries
 };
 
 namespace settings

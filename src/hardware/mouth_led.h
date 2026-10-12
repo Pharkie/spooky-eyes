@@ -1,6 +1,7 @@
 #pragma once
 // The mouth: a common-anode RGB LED (pins in board.h). A pin driven LOW lights that colour.
-// Only on/off per colour, as in main.py: red, green or magenta. Call only from the Arduino loop task.
+// On or off per colour, as in main.py: red, green or magenta. "On" is dimmed with PWM to save batteries
+// (kMouthDutyPercent). Call only from the Arduino loop task.
 
 #include <cstddef>
 #include <cstdint>

@@ -4,6 +4,9 @@
 // Route setup, the captive portal and onNotFound are ported from Scribe Evolution (src/web/web_server.cpp
 // there). Scribe picks its routes once at boot; here each request checks the network mode instead,
 // because the pumpkin can drop into setup mode later (home WiFi gone) and come back again.
+//
+// Every request, and every page listening for news, tells network::noteActivity() someone's using the
+// pumpkin, so the WiFi stays on (it switches off to save batteries when nobody is).
 
 #include "web/web_server.h"
 
@@ -149,6 +152,9 @@ namespace web
                     pingQueued = false;
                     if (events.count() > 0)
                     {
+                        // A page listening for news counts as using the pumpkin. Counted here because
+                        // only this task may walk the list of phones (see above).
+                        network::noteActivity();
                         events.send("", "ping");
                     }
                 }
@@ -267,6 +273,19 @@ namespace web
             return mdns.length() > 0 && host == mdns + ".local";
         }
 
+        // Checked first: notes that someone's using the pumpkin, then lets the other handlers have the
+        // request. The one place requests are counted, so the WiFi stays on while they come (a firmware
+        // upload, one long request, also notes each piece as it arrives).
+        class ActivityHandler : public AsyncWebHandler
+        {
+        public:
+            bool canHandle(AsyncWebServerRequest *) override
+            {
+                network::noteActivity();
+                return false;
+            }
+        };
+
         // Checked before every other route. In setup mode, anything for another website and the OS
         // internet checks go to portalUrl() (Scribe redirects these in its onNotFound).
         class CaptivePortalHandler : public AsyncWebHandler
@@ -329,7 +348,8 @@ namespace web
 
     void begin()
     {
-        server.addHandler(new CaptivePortalHandler()); // first, so it sees every request
+        server.addHandler(new ActivityHandler());      // first two, so they see every request
+        server.addHandler(new CaptivePortalHandler());
         addPageRoutes();
         registerApiRoutes(server);
         registerShowRoutes(server);

@@ -1,6 +1,7 @@
 #pragma once
 // The SuperMini's blue status LED (kStatusLedPin), with Scribe Evolution's WiFi patterns:
 //   fast blink = joining the home WiFi, heartbeat = on it, slow blink = setup WiFi on, off = no WiFi
+//   (or WiFi switched off to save batteries)
 // (Scribe's mini boards stayed solid on home WiFi; a short flash every 3 s saves battery.)
 // Only the network task drives it, so there's no locking.
 
