@@ -452,21 +452,23 @@ class Pumpkin:
         return effect["id"], effect["label"], EFFECT_SECONDS
 
     def start_show(self):
-        """player::startShow() (and showChanged()): the saved show from the top, round and round. Quietly:
-        the show doesn't talk. Call with the lock held."""
+        """player::startShow(): the saved show from the top, round and round. Quietly: the show doesn't
+        talk. A newly saved show takes over at the next block (by position). Call with the lock held."""
         if self.player_mode != "show":
             print("  (show mode)")
         self.player_mode = "show"
 
         def run(generation):
+            index = 0
             while True:
                 with self.lock:
-                    blocks = list(self.show)
-                for index, block in enumerate(blocks):
-                    effect_id, label, seconds = self.block_info(block)
-                    self.set_player("show", effect_id, label, index, generation)
-                    if not self.sleep(seconds, generation):
-                        return
+                    if index >= len(self.show):
+                        index = 0
+                    effect_id, label, seconds = self.block_info(self.show[index])
+                self.set_player("show", effect_id, label, index, generation)
+                if not self.sleep(seconds, generation):
+                    return
+                index += 1
         self.start(run)
 
     def pressed(self):
@@ -529,12 +531,11 @@ class Pumpkin:
         self.start(run)
 
     def save_show(self, blocks, is_default):
-        """show_store::save() / reset(), then player::showChanged()"""
+        """show_store::save() / reset(), then player::showChanged(): a playing show carries on from the next
+        block of the new list"""
         with self.lock:
             self.show = blocks
             self.show_is_default = is_default
-            if self.player_mode == "show":
-                self.start_show()  # from the top
 
     def restart_soon(self, delay, new_mode=None):
         """web::restartSoon(): after `delay` seconds the pumpkin goes away for BOOT_SECONDS (the API

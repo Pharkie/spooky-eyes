@@ -4,8 +4,8 @@ LED eyes for a Halloween pumpkin: two 8x8 LED matrices and a colour-changing mou
 SuperMini with WiFi. Out of the box it plays a show of eyes, pictures and messages. Open its web page on a
 phone and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
 Pac-Man, a Nether portal...), a talking pumpkin (the phone speaks along), and a box for scrolling your own
-words across the eyes. The show page builds your own show from effects and messages; once saved, it's what
-the pumpkin plays at switch-on.
+words across the eyes. The show page builds your own show from effects and messages (it saves as you go), and
+that's what the pumpkin plays at switch-on.
 
 Pictures, effects and ideas by a six-year-old Halloween fan.
 

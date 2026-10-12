@@ -17,7 +17,7 @@
 </header>
 <p class="center muted">🎃 <span data-name>Spooky Pumpkin</span></p>
 <div id="status" class="status">…</div>
-<p class="lead">The pumpkin plays these blocks in order, round and round. Save, and it plays them every time it’s switched on.</p>
+<p class="lead">The pumpkin plays these blocks in order, round and round, every time it’s switched on. Changes save themselves.</p>
 
 <div id="loading"><p class="center muted"><span class="spinner"></span>Getting the show…</p></div>
 
@@ -37,11 +37,8 @@
   </div>
 
   <div class="save-bar" id="save-bar">
-    <p id="msg" class="save-msg" role="status" aria-live="polite"></p>
-    <div class="save-buttons">
-      <button id="save" class="btn" type="button">💾 Save the show</button>
-      <button id="save-play" class="btn start-show" type="button">▶ Play the show</button>
-    </div>
+    <p class="save-msg" role="status" aria-live="polite"><span id="note"></span> <span id="save-state"></span></p>
+    <button id="play" class="btn start-show" type="button">▶ Play the show</button>
   </div>
 
   <div class="card">
@@ -57,26 +54,34 @@
 (() => {
   const { $, get, post, listen, loadStatus, setMode, effectName, effectAccordion, groupClass, reducedMotion, loadFailed, playerText, showMessage, showError } = Pumpkin;
   const list = $('blocks');
-  const msg = $('msg');
+  const note = $('note');
+  const saveState = $('save-state');
   const picker = $('picker');
   const addWords = $('add-words');
   const addEffect = $('add-effect');
-  const saveButton = $('save');
-  const savePlay = $('save-play');
+  const playButton = $('play');
   const resetButton = $('reset');
   const resetMsg = $('reset-msg');
   const smooth = reducedMotion() ? 'auto' : 'smooth';
+  const SAVE_DELAY = 800;    // ms after the last change before it saves
+  const TYPING_DELAY = 1000; // ms after typing stops (or straight away when the words box is left)
 
   const effects = new Map(); // id -> {id, label, emoji, group}, every effect (for names)
   let limits = { maxBlocks: 60, maxWordsLength: 200 }; // replaced by the pumpkin's
-  let blocks = [];           // the show being made: {type:"effect", id} or {type:"words", text}
-  let saved = '[]';          // the saved show, as JSON, to spot unsaved changes
-  let isDefault = false;     // the saved show is the original one
+  let blocks = [];           // the show on screen: {type:"effect", id} or {type:"words", text}
+  let saved = '[]';          // the show the pumpkin has, as JSON
+  let isDefault = false;     // the pumpkin's show is the original one
   let player = null;         // what the pumpkin is doing
   let deleted = null;        // the last deleted block, {block, index}, until the next change (for Undo)
   let drag = null;           // a block being dragged by its grip
+  let saveTimer = 0;         // a save waiting for changes to stop
+  let saving = null;         // the save on its way to the pumpkin (a promise)
+  let saveError = null;      // why the last save failed (until one works)
+  let savedOnce = false;     // this page has saved something (so "Saved ✓" means something)
+  let resetting = false;
 
   const dirty = () => JSON.stringify(blocks) !== saved;
+  const emptyWords = () => blocks.some((b) => b.type === 'words' && !b.text.trim());
   const copy = (list) => list.map((b) => (b.type === 'words' ? { type: 'words', text: b.text } : { type: 'effect', id: b.id }));
 
   function setSaved(list) {
@@ -91,7 +96,7 @@
       return fx ? effectName(fx) : block.id;
     }
     const text = block.text.trim();
-    if (!text) return 'empty words';
+    if (!text) return 'a words block';
     return '“' + (text.length > 24 ? text.slice(0, 23) + '…' : text) + '”';
   }
 
@@ -129,20 +134,28 @@
     const emoji = document.createElement('span');
     emoji.className = 'e';
     emoji.setAttribute('aria-hidden', 'true');
-    let input = null;
+    const extra = [];
     if (block.type === 'words') {
       li.classList.add(groupClass('Words'));
       what.classList.add('words-label');
       emoji.textContent = '💬';
       what.append(emoji, 'Words');
-      input = document.createElement('input');
+      const input = document.createElement('input');
       input.className = 'words-input';
+      input.id = 'words-' + number;
       input.value = block.text;
       input.maxLength = limits.maxWordsLength;
       input.placeholder = 'Type some words…';
       input.autocomplete = 'off';
       input.setAttribute('enterkeyhint', 'done');
       input.setAttribute('aria-label', 'Words for block ' + number);
+      const hint = document.createElement('p');
+      hint.className = 'words-hint';
+      hint.id = input.id + '-hint';
+      hint.textContent = 'Type the words and it saves itself';
+      hint.hidden = !!block.text.trim();
+      input.setAttribute('aria-describedby', hint.id);
+      extra.push(input, hint);
     } else {
       const fx = effects.get(block.id);
       if (fx) li.classList.add(groupClass(fx.group));
@@ -155,8 +168,7 @@
       tool('up', '↑', 'Move block ' + number + ' up', index === 0),
       tool('down', '↓', 'Move block ' + number + ' down', index === blocks.length - 1),
       tool('delete', '✕', 'Delete block ' + number, false));
-    li.append(grip, what, tools);
-    if (input) li.appendChild(input);
+    li.append(grip, what, tools, ...extra);
     return li;
   }
 
@@ -193,31 +205,24 @@
     setTimeout(() => li.classList.remove(cls), ms);
   }
 
-  // Unsaved changes, and what just happened, in the save bar. action: e.g. "Added 💥 Creeper." (optional)
-  function showSaveState(action, undo) {
-    const unsaved = dirty();
-    const text = action ? action + (unsaved ? ' Not saved yet.' : '') : unsaved ? '● Not saved yet' : '';
-    if (msg.textContent !== text || undo) {
-      showMessage(msg, text);
-      if (undo) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'linkish';
-        button.textContent = 'Undo';
-        button.addEventListener('click', undoDelete);
-        msg.append(' ', button);
-      }
-    }
-    msg.classList.toggle('unsaved', unsaved);
-    savePlay.textContent = unsaved ? '▶ Save and play' : '▶ Play the show';
-    $('which').textContent = isDefault && !unsaved ? 'The original show' : 'Your show';
-    window.onbeforeunload = unsaved ? (e) => { e.preventDefault(); e.returnValue = ''; return ''; } : null;
+  // What just happened (e.g. "Added 💥 Creeper as block 25."), with an Undo button after a delete
+  function showNote(text, undo) {
+    showMessage(note, text);
+    if (!undo) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'linkish';
+    button.textContent = 'Undo';
+    button.addEventListener('click', undoDelete);
+    note.append(' ', button);
   }
 
-  function changed(action, undo) {
+  // A change to the show: note it, and save it a moment later
+  function changed(action, undo, delay = SAVE_DELAY) {
     list.querySelectorAll('.bad').forEach((li) => li.classList.remove('bad'));
     if (!undo) deleted = null;
-    showSaveState(action, undo);
+    if (action !== undefined) showNote(action, undo);
+    scheduleSave(delay);
     markPlaying();
   }
 
@@ -236,7 +241,7 @@
 
   // Move block `from` to position `to` (0-based), then focus that block's `act` button
   function moveTo(from, to, act) {
-    if (to < 0 || to >= blocks.length || to === from) return;
+    if (to < 0 || to >= blocks.length || to === from) return null;
     const [block] = blocks.splice(from, 1);
     blocks.splice(to, 0, block);
     render();
@@ -276,11 +281,15 @@
     else remove(index);
   });
 
+  // Typing saves a second after it stops, or as soon as the words box is left
   list.addEventListener('input', (event) => {
     const li = event.target.closest('li');
     blocks[Number(li.dataset.index)].text = event.target.value;
-    li.classList.remove('bad');
-    changed();
+    li.querySelector('.words-hint').hidden = !!event.target.value.trim();
+    changed('', false, TYPING_DELAY);
+  });
+  list.addEventListener('focusout', (event) => {
+    if (event.target.matches('.words-input') && saveTimer) saveNow();
   });
   list.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target.matches('.words-input')) event.target.blur(); // done: hide the keyboard
@@ -392,56 +401,129 @@
     addEffect.focus({ preventScroll: true }); // ready to add another
   });
 
-  // ---- Saving ----
+  // ---- Saving by itself ----
+  // A change saves SAVE_DELAY after the last one. One save at a time: changes made while one is on its
+  // way go in the next (the newest list wins). Nothing is sent while a words block is empty.
 
-  function busy(on) {
-    saveButton.disabled = savePlay.disabled = resetButton.disabled = on;
+  function scheduleSave(delay) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, delay);
+    showSaveState();
   }
 
-  // "Block 3: ..." from the pumpkin: show which block
+  function saveNow() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (saving || resetting || !dirty() || emptyWords()) {
+      showSaveState(); // a save on its way sends the newest list when it's back
+      return saving || Promise.resolve();
+    }
+    const sent = JSON.stringify(blocks);
+    saveError = null;
+    saving = post('/api/show', { blocks: JSON.parse(sent) }, { timeout: 15000 })
+      .then((reply) => {
+        saved = JSON.stringify(reply.blocks);
+        isDefault = false;
+        savedOnce = true;
+        // The pumpkin tidies words (curly quotes made plain...): show its version, unless they've
+        // changed again since
+        if (JSON.stringify(blocks) === sent) useTidied(reply.blocks);
+      })
+      .catch((e) => {
+        saveError = e;
+        showBadBlock(e.message);
+      })
+      .finally(() => {
+        saving = null;
+        if (!saveError && !saveTimer && dirty()) saveNow(); // more changes arrived meanwhile
+        else showSaveState();
+      });
+    showSaveState();
+    return saving;
+  }
+
+  // Wait for any save that's due (for Play and Reset)
+  async function settle() {
+    if (saveTimer) saveNow();
+    while (saving) await saving;
+  }
+
+  function useTidied(tidied) {
+    if (tidied.length !== blocks.length) return;
+    tidied.forEach((block, i) => {
+      if (block.type !== 'words' || blocks[i].type !== 'words' || block.text === blocks[i].text) return;
+      blocks[i].text = block.text;
+      const input = list.children[i] && list.children[i].querySelector('.words-input');
+      if (input) replaceKeepingCaret(input, block.text);
+    });
+  }
+
+  // Change a words box's text without moving the caret of someone typing in it
+  function replaceKeepingCaret(input, text) {
+    if (document.activeElement !== input) {
+      input.value = text;
+      return;
+    }
+    const old = input.value;
+    let head = 0; // characters the same at the start, and at the end
+    while (head < old.length && head < text.length && old[head] === text[head]) head++;
+    let tail = 0;
+    while (tail < old.length - head && tail < text.length - head && old[old.length - 1 - tail] === text[text.length - 1 - tail]) tail++;
+    const map = (at) => (at <= head ? at : at >= old.length - tail ? text.length - (old.length - at) : Math.min(at, text.length));
+    const [start, end] = [map(input.selectionStart), map(input.selectionEnd)];
+    input.value = text;
+    input.setSelectionRange(start, end);
+  }
+
+  // "Block 3: ..." from the pumpkin: outline that block (and show it, unless someone's typing)
   function showBadBlock(message) {
     const match = /^Block (\d+)\b/.exec(message);
     const li = match && list.children[Number(match[1]) - 1];
     if (!li) return;
     li.classList.add('bad');
-    li.scrollIntoView({ block: 'center', behavior: smooth });
-    (li.querySelector('input') || li.querySelector('[data-act=delete]')).focus({ preventScroll: true });
-  }
-
-  async function save() {
-    busy(true);
-    showMessage(msg, 'Saving…');
-    msg.classList.remove('unsaved');
-    try {
-      const sent = JSON.stringify(blocks);
-      const reply = await post('/api/show', { blocks }, { timeout: 15000 });
-      setSaved(reply.blocks); // tidied by the pumpkin: curly quotes made plain and so on
-      isDefault = false;
-      render();
-      showMessage(msg, 'Saved ✓: it plays at switch-on.' + (saved !== sent ? ' (Some words were tidied for the eyes.)' : ''), 'ok');
-      return true;
-    } catch (e) {
-      showError(msg, e);
-      showBadBlock(e.message);
-      return false;
-    } finally {
-      busy(false);
+    if (!(document.activeElement && document.activeElement.matches('.words-input'))) {
+      li.scrollIntoView({ block: 'center', behavior: smooth });
     }
   }
 
-  saveButton.addEventListener('click', save);
-
-  savePlay.addEventListener('click', async () => {
+  // "Saving…", "Saved ✓", or what went wrong (with Try again), in the bar
+  function showSaveState() {
     const unsaved = dirty();
-    if (unsaved && !(await save())) return;
-    busy(true);
+    let text = '';
+    let kind;
+    if (saving || saveTimer) text = 'Saving…';
+    else if (saveError) { text = saveError.message; kind = 'error'; }
+    else if (unsaved && emptyWords()) text = 'Waiting for the words…';
+    else if (savedOnce) { text = 'Saved ✓'; kind = 'ok'; }
+    if (saveState.dataset.text !== text) {
+      saveState.dataset.text = text;
+      showMessage(saveState, text, kind);
+      if (kind === 'error') {
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'linkish';
+        retry.textContent = 'Try again';
+        retry.addEventListener('click', () => { saveError = null; saveNow(); });
+        saveState.append(' ', retry);
+      }
+    }
+    $('which').textContent = isDefault && !unsaved ? 'The original show' : 'Your show';
+    // Leaving now would lose changes the pumpkin hasn't got
+    window.onbeforeunload = unsaved ? (e) => { e.preventDefault(); e.returnValue = ''; return ''; } : null;
+  }
+
+  // ---- Playing and resetting ----
+
+  playButton.addEventListener('click', async () => {
+    playButton.disabled = true;
     try {
+      await settle();
       await setMode('show');
-      showMessage(msg, unsaved ? 'Saved ✓ and playing: it plays at switch-on too.' : '🎃 The show is playing.', 'ok');
+      showNote(dirty() ? '🎃 Playing the last saved show.' : '🎃 The show is playing.');
     } catch (e) {
-      showError(msg, e);
+      showError(note, e);
     } finally {
-      busy(false);
+      playButton.disabled = false;
     }
   });
 
@@ -461,19 +543,26 @@
       return;
     }
     disarmReset();
-    busy(true);
+    resetButton.disabled = true;
     showMessage(resetMsg, 'Resetting…');
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    resetting = true;
     try {
+      while (saving) await saving;
       const reply = await post('/api/show/reset');
       isDefault = true;
+      saveError = null;
       setSaved(reply.blocks);
       render();
-      showMessage(msg, '');
+      showNote('');
       showMessage(resetMsg, 'Done ✓ The original show is back.', 'ok');
     } catch (e) {
       showError(resetMsg, e);
     } finally {
-      busy(false);
+      resetting = false;
+      resetButton.disabled = false;
+      showSaveState();
     }
   });
 
@@ -482,7 +571,7 @@
   function markPlaying() {
     if (drag) return; // after the drop
     list.querySelectorAll('.playing').forEach((li) => li.classList.remove('playing'));
-    if (!player || player.mode !== 'show' || dirty()) return; // the numbers only match the saved show
+    if (!player || player.mode !== 'show' || dirty()) return; // the numbers only match the pumpkin's show
     const li = list.children[player.block];
     if (li) li.classList.add('playing');
   }

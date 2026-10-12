@@ -66,9 +66,8 @@ namespace
     // What may cut short whatever is playing, besides a new request (which cuts short anything)
     enum class CutBy : uint8_t
     {
-        Nothing,              // someone's chosen effect, or an announcement: they finish first
-        Announcement,         // idle eyes
-        AnnouncementOrNewShow // a block of the show (or the show message)
+        Nothing,      // someone's chosen effect, or an announcement: they finish first
+        Announcement, // idle eyes, and the show's blocks and message
     };
 
     // --- Shared between tasks, guarded by lock. Only quick copies inside: no Strings, no logging. ---
@@ -138,8 +137,6 @@ namespace
             return false;
         case CutBy::Announcement:
             return hasAnnouncement.load();
-        case CutBy::AnnouncementOrNewShow:
-            return hasAnnouncement.load() || showDirty.load();
         }
         return false;
     }
@@ -316,7 +313,7 @@ namespace
         if (!message[0])
             return false;
         setStatus(Mode::Show, nullptr, nullptr, kNoBlock);
-        runGuarded(CutBy::AnnouncementOrNewShow, [&] { ::scrollWords(engine, message); });
+        runGuarded(CutBy::Announcement, [&] { ::scrollWords(engine, message); });
         return true;
     }
 
@@ -342,7 +339,7 @@ namespace
         else
             setStatus(Mode::Show, findEffect(block.value.c_str()), nullptr, static_cast<int>(index));
         // Cut short by an announcement, it carries on with the next block; by a new show, from the top
-        runGuarded(CutBy::AnnouncementOrNewShow, [&] { playBlock(engine, block); });
+        runGuarded(CutBy::Announcement, [&] { playBlock(engine, block); });
     }
 
     // --- Buttons mode ---
@@ -636,8 +633,9 @@ namespace player
         }
         if (showDirty.exchange(false))
         {
+            // The show page saves as people edit, so a playing show isn't cut short or restarted: it
+            // carries on from the next block of the new list (wrapping round if that's now past the end)
             loadShow();
-            rewindShow(); // a new show starts from the top (Buttons mode starts it from the top anyway)
         }
 
         // A new request first, then any announcement, then whatever the mode says
@@ -688,7 +686,7 @@ namespace player
 
     void showChanged()
     {
-        showDirty.store(true); // the loop task reads it, and cuts the old show short if it's playing
+        showDirty.store(true); // the loop task picks it up between blocks
     }
 
     void announce(const String &message)

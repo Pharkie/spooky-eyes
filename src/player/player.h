@@ -32,7 +32,8 @@ namespace player
     // Buttons mode (pause the show, idle eyes), or "still here" if already in it. Safe to call often.
     void enterButtons();
 
-    // The saved show changed: use it from now on (restarting the show from the top if it's playing)
+    // The saved show changed: use it from now on. A playing show carries on from its next block (the show
+    // page saves as people edit, so the eyes mustn't jump back to the start at every change).
     void showChanged();
 
     // Scroll a message once, then carry on (the address at boot, or after a BOOT press). It cuts a show
