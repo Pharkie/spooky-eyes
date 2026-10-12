@@ -188,7 +188,8 @@ const WIRES = [
   { label: "Mouth green", colour: "#2e7d32", was: "GP15 · pin 20",      pico: [20],     sm: "3"   },
   { label: "Mouth blue",  colour: "#1565c0", was: "GP16 · pin 21",      pico: [21],     sm: "1"   },
 ];
-// SuperMini pins, top view, USB-C socket at the top (as in board.h)
+// SuperMini pins seen from underneath (the side the wires plug into, where the pin names are printed),
+// USB-C socket at the top (as in board.h)
 const SM_LEFT  = ["5V", "G", "3.3", "4", "3", "2", "1", "0"];
 const SM_RIGHT = ["5", "6", "7", "8", "9", "10", "20", "21"];
 
@@ -288,7 +289,7 @@ if (pumpkinName) {
     if (n === 1) el("rect", { x: p.x - 0.7, y: p.y - 0.7, width: 1.4, height: 1.4, fill: "#d8b25a", stroke: "#8a6d2a", "stroke-width": 0.15 }, pico);
     else el("circle", { cx: p.x, cy: p.y, r: 0.7, fill: "#d8b25a", stroke: "#8a6d2a", "stroke-width": 0.15 }, pico);
   }
-  el("text", { x: P.x + P.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#5d544e", "letter-spacing": 0.2 }, svg, "OLD PICO");
+  el("text", { x: P.x + P.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#5d544e", "letter-spacing": 0.2 }, svg, "OLD PICO, FROM ABOVE");
 
   // ---- New SuperMini ----
   const sm = g({});
@@ -297,16 +298,9 @@ if (pumpkinName) {
   el("rect", { x: S.x + S.w / 2 - 7, y: S.y - 1.9, width: 14, height: 9.5, rx: 1.6, fill: "#c9ccd0", stroke: "#6d7175", "stroke-width": 0.3 }, sm);
   el("rect", { x: S.x + S.w / 2 - 5, y: S.y + 0.6, width: 10, height: 3, rx: 1.2, fill: "#8e9297" }, sm);
   el("text", { x: S.x + S.w / 2, y: S.y + 6.3, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "#3b3f44" }, sm, "USB-C");
-  // BOOT and RST buttons, chip, blue LED, antenna
-  [["BOOT", -2.2], ["RST", 4.6]].forEach(([name, dx]) => {
-    const cx = S.x + S.w / 2 + dx, cy = S.y + 12.6;
-    el("rect", { x: cx - 1.8, y: cy - 1.4, width: 3.6, height: 2.8, rx: 0.4, fill: "#d9d9d9", stroke: "#777", "stroke-width": 0.2 }, sm);
-    el("circle", { cx, cy, r: 0.8, fill: "#555" }, sm);
-    el("text", { x: cx, y: cy - 2.1, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "#fff" }, sm, name);
-  });
-  el("rect", { x: S.x + S.w / 2 - 4.3, y: S.y + 18.5, width: 8.6, height: 8.6, rx: 0.4, fill: "#111", stroke: "#444", "stroke-width": 0.2 }, sm);
-  el("rect", { x: S.x + S.w / 2 + 5, y: S.y + 23.6, width: 1.6, height: 1, fill: "#4aa3ff" }, sm);
-  el("rect", { x: S.x + S.w / 2 - 6, y: S.y + S.h - 6, width: 12, height: 3.4, rx: 0.4, fill: "#e8e2d6", stroke: "#999", "stroke-width": 0.2 }, sm);
+  // Seen from underneath, so no chip, buttons or LED (they're on the other side): just the pins, with the
+  // names printed next to them as on the real board
+  el("text", { x: S.x + S.w / 2, y: S.y + S.h / 2 + 1.2, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7), "font-weight": 700, fill: "rgba(255,255,255,.35)", "letter-spacing": 0.3 }, sm, "UNDERNEATH");
   // pads and printed pin names
   const used = new Map(WIRES.map(w => [w.sm, w]));
   [...SM_LEFT, ...SM_RIGHT].forEach(name => {
@@ -319,7 +313,7 @@ if (pumpkinName) {
       fill: w ? "#fff" : "rgba(255,255,255,.45)"
     }, sm, name);
   });
-  el("text", { x: S.x + S.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#1d1714", "letter-spacing": 0.2 }, svg, "NEW BOARD (ESP32-C3 SUPERMINI)");
+  el("text", { x: S.x + S.w / 2, y: 3.6, "text-anchor": "middle", "font-family": HAND, "font-size": pt(11), fill: "#1d1714", "letter-spacing": 0.2 }, svg, "NEW BOARD, FROM UNDERNEATH");
 
   // ---- Table ----
   const tbl = g({});
