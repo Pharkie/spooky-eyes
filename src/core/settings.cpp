@@ -351,6 +351,12 @@ namespace settings
         LOG("SETTINGS", "Home WiFi forgotten");
     }
 
+    bool checkWifi(const String &ssid, const String &password, String &error)
+    {
+        String kept = password; // the check empties the password when there's no WiFi name
+        return ::checkWifi(ssid, kept, error);
+    }
+
     String hostnameFor(const String &pumpkinName)
     {
         char host[kMaxHostnameLength + 1];

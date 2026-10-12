@@ -22,6 +22,8 @@
 //   and then, and restart to join it once it's back. At most kMaxRetryRestarts in a row. Not after a
 //   wrong password: that won't fix itself, so it waits for the family to type it again.
 // - every WiFi scan, the setup page's included, goes through scanMutex
+// - Scribe's handleTestWiFi() (check the password before saving it) runs here on the network task,
+//   under scanMutex, while the web server only asks and polls (runWifiTest())
 // - left out: printAPDetailsOnStartup() (the eyes scroll the address instead), MQTT, NTP, LogManager and
 //   the custom PCB's RGB status LED
 
@@ -94,6 +96,14 @@ namespace
     // pumpkin on a doorstep at the edge of the WiFi doesn't keep interrupting its show.
     constexpr uint32_t kMaxRetryRestarts = 3;
 
+    // Checking a home WiFi for the setup page (runWifiTest()). A right password joins in 2-5 s; a wrong
+    // one is turned down after about 4 s, and the library tries once more if it's its first join.
+    constexpr uint32_t kWifiTestMaxMs = PumpkinTime::Seconds(12);
+    // After a refusal, how long to wait for that one extra try before calling it a failure
+    constexpr uint32_t kWifiTestSettleMs = PumpkinTime::Seconds(6);
+    // A finished check is kept this long, for a phone that dropped off the setup WiFi meanwhile
+    constexpr uint32_t kWifiTestKeepMs = PumpkinTime::Minutes(1);
+
     // What the network task looks after
     enum class Role : uint8_t
     {
@@ -117,7 +127,8 @@ namespace
     std::atomic<Role> role{Role::Starting};
     std::atomic<Reason> reason{Reason::None};
     std::atomic<uint8_t> lastDisconnectReason{0}; // from the WiFi event task
-    std::atomic<bool> sawAuthFailure{false};      // ditto: sticky, cleared when the boot join starts
+    std::atomic<bool> sawAuthFailure{false};      // ditto: sticky, cleared when a join starts
+    std::atomic<uint8_t> refusalCount{0};         // ditto: goes up with each failed join (wraps round)
     std::atomic<network::ModeListener> modeListener{nullptr};
 
     // Set by begin() before it starts the network task, then only read (from any task)
@@ -140,6 +151,18 @@ namespace
     std::vector<FoundNetwork> pageScanResults;
     bool havePageScanResults = false;
     uint32_t pageScanResultsMs = 0;
+
+    // The setup page's WiFi check: the web server's task asks (startWifiTest()), the network task runs it
+    // (runWifiTest()). testMutex guards these; it's never held while the check waits.
+    SemaphoreHandle_t testMutex = nullptr;
+    bool testPending = false;      // asked for, not started yet
+    bool testRunning = false;      // asked for or under way
+    String testSsid;
+    String testPassword;           // only until the check starts, then wiped
+    network::WifiTestStatus testOutcome = network::WifiTestStatus::Idle; // the last finished check
+    int32_t testRssi = 0;
+    String testReason;
+    uint32_t testFinishedMs = 0;
 
     // Network task only (begin() sets retryRestartsSoFar before starting it)
     uint32_t retryRestartsSoFar = 0;
@@ -226,10 +249,19 @@ namespace
         if (why == WIFI_REASON_ASSOC_LEAVE)
             return; // our own disconnect (WiFi.begin() and WiFi.reconnect() start with one)
         lastDisconnectReason = why;
+        refusalCount++;
         // A router can answer later tries with "not found" after turning down a wrong password, so the
         // last reason alone can't be trusted: remember that it happened at all
         if (isAuthFailure(why))
             sawAuthFailure = true;
+    }
+
+    // Overwrite a String's characters before it's freed, so a password doesn't linger in the heap
+    void wipe(String &text)
+    {
+        if (text.length() > 0)
+            memset(text.begin(), 0, text.length());
+        text = String();
     }
 
     const char *reasonText(uint8_t why)
@@ -645,6 +677,112 @@ namespace
         retryRestart("to join the home WiFi");
     }
 
+    // --- Checking a home WiFi for the setup page (Scribe's handleTestWiFi()) ---
+
+    void finishWifiTest(network::WifiTestStatus outcome, int32_t rssi, const String &why)
+    {
+        Lock lock(testMutex);
+        testOutcome = outcome;
+        testRssi = rssi;
+        testReason = why;
+        testFinishedMs = millis();
+        testRunning = false;
+    }
+
+    // Words for the family when the check fails
+    String testFailureText(const String &ssid, bool authFailed, uint8_t why)
+    {
+        if (authFailed)
+            return "That password didn't work";
+        if (why == WIFI_REASON_NO_AP_FOUND)
+            return "Can't find " + ssid + ": is it a 2.4 GHz network, and in range?";
+        return "Couldn't join " + ssid + ". Check the password, or move the pumpkin closer to the router.";
+    }
+
+    // Setup mode: if the page asked for a check (startWifiTest()), join that WiFi on the station side
+    // while the setup WiFi stays up, note how it went, then leave it again. Nothing is saved. Network task
+    // only. Under scanMutex, so it never meets the page's scan or the look for the home WiFi (one radio
+    // user at a time). The captive DNS and the housekeeping carry on while it waits.
+    //
+    // The radio has one channel: joining a router on another channel moves the setup WiFi there too, so
+    // phones may drop off the setup WiFi for a moment and rejoin. The result is kept for kWifiTestKeepMs
+    // so they can still ask how it went.
+    void runWifiTest()
+    {
+        {
+            Lock lock(testMutex);
+            if (!testPending)
+                return;
+        }
+        Lock radio(scanMutex);
+        collectPageScan(millis());
+        if (pageScanRunning)
+            return; // the page's scan has the radio: try again next time round
+
+        String ssid;
+        String password;
+        {
+            Lock lock(testMutex);
+            testPending = false;
+            ssid = testSsid;
+            password = testPassword;
+            wipe(testPassword);
+        }
+
+        LOG("WIFI", "Checking \"%s\" for the setup page (up to %lu s)", ssid.c_str(),
+            static_cast<unsigned long>(kWifiTestMaxMs / 1000));
+        lastDisconnectReason = 0;
+        sawAuthFailure = false;
+        WiFi.setAutoReconnect(false); // off in setup mode anyway: one try (and the library's one retry)
+        const uint8_t refusalsBefore = refusalCount;
+        WiFi.begin(ssid.c_str(), password.c_str());
+        wipe(password);
+
+        const uint32_t start = millis();
+        uint8_t refusals = 0;
+        uint32_t lastRefusalMs = start;
+        while (WiFi.status() != WL_CONNECTED && millis() - start < kWifiTestMaxMs)
+        {
+            housekeeping();
+            captive_dns::serve(); // phones on the setup WiFi keep getting answers
+            vTaskDelay(pdMS_TO_TICKS(kTaskPeriodMs));
+
+            const uint8_t seen = static_cast<uint8_t>(refusalCount - refusalsBefore);
+            if (seen != refusals)
+            {
+                refusals = seen;
+                lastRefusalMs = millis();
+            }
+            // The library tries once more after the first refusal since switch-on, and never again with
+            // auto-reconnect off. So two refusals, or one and nothing since, means it has given up.
+            const bool joining = (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
+            if (!joining && (refusals >= 2 || (refusals == 1 && millis() - lastRefusalMs >= kWifiTestSettleMs)))
+                break;
+        }
+
+        // Joined but still waiting for an address from the router counts: the password worked
+        const bool joined = WiFi.status() == WL_CONNECTED || (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
+        const int32_t rssi = joined ? WiFi.RSSI() : 0;
+        const uint8_t why = lastDisconnectReason;
+        const bool authFailed = sawAuthFailure;
+        // Leave it again (the station side only: the setup WiFi stays up), and clear the name and
+        // password out of the WiFi driver's memory
+        WiFi.disconnect(false, true);
+
+        if (joined)
+        {
+            LOG("WIFI", "Check: joined \"%s\" (signal %ld dBm) in %lu ms", ssid.c_str(), static_cast<long>(rssi),
+                static_cast<unsigned long>(millis() - start));
+            finishWifiTest(network::WifiTestStatus::Passed, rssi, "");
+        }
+        else
+        {
+            LOG("WIFI", "Check: couldn't join \"%s\": %s%s", ssid.c_str(), reasonText(why),
+                authFailed ? ", after it turned the password down" : "");
+            finishWifiTest(network::WifiTestStatus::Failed, 0, testFailureText(ssid, authFailed, why));
+        }
+    }
+
     // The first thing the network task does, while the show plays: join the home WiFi and register the
     // web name, or start the setup WiFi. Then it tells the mode listener how it went, so the eyes can say
     // how to reach the pumpkin. (Scribe did this in setup(), before anything else ran.)
@@ -708,6 +846,7 @@ namespace
                 break;
             case Role::Setup:
                 captive_dns::serve();
+                runWifiTest();
                 lookForHomeWifi(now);
                 break;
             case Role::Broken:
@@ -742,6 +881,7 @@ namespace network
 
         textMutex = xSemaphoreCreateMutex();
         scanMutex = xSemaphoreCreateMutex();
+        testMutex = xSemaphoreCreateMutex();
 
         const Settings s = settings::get();
         savedSsid = s.wifiSsid;
@@ -904,5 +1044,44 @@ namespace network
         }
         xSemaphoreGive(scanMutex);
         return status;
+    }
+
+    WifiTestStart startWifiTest(const String &ssid, const String &password)
+    {
+        // A check takes the station side off whatever it's doing: only while running the setup WiFi
+        if (testMutex == nullptr || role.load() != Role::Setup || currentMode != Mode::SetupAP)
+            return WifiTestStart::NotInSetup;
+        Lock lock(testMutex);
+        if (testRunning)
+            return WifiTestStart::Busy;
+        testSsid = ssid;
+        testPassword = password;
+        testPending = true;
+        testRunning = true;
+        testOutcome = WifiTestStatus::Idle; // the last result no longer counts
+        testRssi = 0;
+        testReason = "";
+        return WifiTestStart::Started;
+    }
+
+    WifiTest wifiTest()
+    {
+        WifiTest result{WifiTestStatus::Idle, "", 0, ""};
+        if (testMutex == nullptr)
+            return result;
+        Lock lock(testMutex);
+        if (testRunning)
+        {
+            result.status = WifiTestStatus::Running;
+            result.ssid = testSsid;
+        }
+        else if (testOutcome != WifiTestStatus::Idle && millis() - testFinishedMs < kWifiTestKeepMs)
+        {
+            result.status = testOutcome;
+            result.ssid = testSsid;
+            result.rssi = testRssi;
+            result.reason = testReason;
+        }
+        return result;
     }
 }

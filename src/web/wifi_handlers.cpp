@@ -1,5 +1,6 @@
-// WiFi setup API: scan for networks, save the home WiFi, forget it. Ported from Scribe Evolution
-// (handleWiFiScan in src/web/api_system_handlers.cpp and handleSetupPost in api_config_handlers.cpp).
+// WiFi setup API: scan for networks, check a WiFi's password, save the home WiFi, forget it. Ported from
+// Scribe Evolution (handleWiFiScan and handleTestWiFi in src/web/api_system_handlers.cpp, and
+// handleSetupPost in api_config_handlers.cpp).
 // Scribe scans synchronously inside the request; here network::scan() runs it in the background and the
 // page polls, so the web server never stalls for the second or two a scan takes.
 
@@ -58,6 +59,89 @@ namespace web
                 item["secure"] = net.secure;
                 item["channel"] = net.channel;
             }
+            sendJson(request, 200, doc);
+        }
+
+        const char *testStatusName(network::WifiTestStatus status)
+        {
+            switch (status)
+            {
+            case network::WifiTestStatus::Running:
+                return "running";
+            case network::WifiTestStatus::Passed:
+                return "passed";
+            case network::WifiTestStatus::Failed:
+                return "failed";
+            case network::WifiTestStatus::Idle:
+                break;
+            }
+            return "idle";
+        }
+
+        // POST /api/wifi/test {"ssid","password"}: check the pumpkin can join this WiFi before it's saved
+        // (Scribe Evolution's /api/test-wifi). The network task tries it in the background:
+        //   202 {"testing":true}   started: ask GET /api/wifi/test for the result
+        //   200 {"skipped":true,"reason":"..."}   not on the setup WiFi (on home WiFi, say), where a
+        //       check would drop the pumpkin's connection: the page saves without one
+        //   409 a check is already running, 400 bad WiFi name or password,
+        //   403 on the doorstep without a BOOT press (as for saving)
+        // Nothing is saved and the password is never sent back.
+        void handleTestStart(AsyncWebServerRequest *request, JsonDocument &body)
+        {
+            String ssid;
+            String password; // no password sent = an open network
+            String error;
+            if (!readText(body, "ssid", "WiFi name", 1, kMaxSsidBytes, true, ssid, error) ||
+                !readText(body, "password", "WiFi password", 0, kMaxWifiPasswordLength, false, password, error) ||
+                !settings::checkWifi(ssid, password, error))
+            {
+                sendError(request, 400, error);
+                return;
+            }
+            if (!network::isSetupAP())
+            {
+                JsonDocument doc;
+                doc["skipped"] = true;
+                doc["reason"] = "The pumpkin is on its home WiFi, and checking another would cut it off. "
+                                "It saves without a check.";
+                sendJson(request, 200, doc);
+                return;
+            }
+            // Strangers on the setup WiFi mustn't use the pumpkin to try passwords on the neighbours' WiFi
+            if (strangersMayBeConnected() && !requireBootPress(request))
+            {
+                return;
+            }
+            switch (network::startWifiTest(ssid, password))
+            {
+            case network::WifiTestStart::Started:
+            {
+                LOG("WEB", "Checking WiFi \"%s\"", ssid.c_str());
+                JsonDocument doc;
+                doc["testing"] = true;
+                sendJson(request, 202, doc);
+                return;
+            }
+            case network::WifiTestStart::Busy:
+                sendError(request, 409, "A check is already running");
+                return;
+            case network::WifiTestStart::NotInSetup:
+                break;
+            }
+            // The setup WiFi went (or isn't ready) between the two questions
+            sendError(request, 503, "The pumpkin can't check WiFi just now. Try again in a few seconds.");
+        }
+
+        // GET /api/wifi/test: {"status":"idle|running|passed|failed","ssid","rssi","reason"}. A finished
+        // check is kept for a minute.
+        void handleTestResult(AsyncWebServerRequest *request)
+        {
+            const network::WifiTest test = network::wifiTest();
+            JsonDocument doc;
+            doc["status"] = testStatusName(test.status);
+            doc["ssid"] = test.ssid;
+            doc["rssi"] = test.rssi;
+            doc["reason"] = test.reason;
             sendJson(request, 200, doc);
         }
 
@@ -133,6 +217,8 @@ namespace web
     {
         // Longer paths first: the server also matches "/api/wifi" for anything under "/api/wifi/"
         server.on("/api/wifi/scan", HTTP_GET, handleScan);
+        server.on("/api/wifi/test", HTTP_GET, handleTestResult);
+        onJsonPost(server, "/api/wifi/test", handleTestStart);
         onJsonPost(server, "/api/wifi/forget", handleForget);
         onJsonPost(server, "/api/wifi", handleSave);
     }

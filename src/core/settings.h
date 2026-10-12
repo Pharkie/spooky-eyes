@@ -27,6 +27,10 @@ namespace settings
     // Check and save. Returns false (and saves nothing) if a value is out of range; error says why.
     bool save(const Settings &updated, String &error);
 
+    // save()'s rules for a home WiFi name and password, for checking one before it's saved (the setup
+    // page's WiFi check). False if save() would refuse them; error says why.
+    bool checkWifi(const String &ssid, const String &password, String &error);
+
     // Clear the home WiFi name and password (the pumpkin goes back to setup mode after a restart)
     void forgetWifi();
 
