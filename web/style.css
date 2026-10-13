@@ -39,6 +39,7 @@ a { color: var(--yellow); }
 [hidden] { display: none !important; }
 .center { text-align: center; }
 .muted { color: var(--muted); }
+#scan-state:empty { display: none; }
 .hint { color: var(--muted); font-size: 15px; margin: 6px 0 0; }
 .error { color: var(--red); min-height: 22px; font-size: 16px; margin: 6px 0; }
 .ok { color: var(--teal); }

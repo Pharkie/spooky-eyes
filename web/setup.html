@@ -25,30 +25,26 @@
     <button type="button" id="show-form" class="btn secondary wide" style="margin-top:16px">Put it on a different WiFi</button>
   </div>
 
-  <p class="lead" id="intro">Let’s put the pumpkin on your home WiFi, so everyone in the house can use its buttons.</p>
   <p class="notice" id="current" hidden></p>
   <div class="notice problem" id="reason" role="alert" hidden>
     <b></b><br>Check the WiFi name and password below, then save again.
   </div>
-  <p class="notice" id="no-internet" hidden>If your phone says this WiFi has no internet, choose “Use without internet” or “Stay connected”.</p>
   <form id="setup" novalidate>
     <div class="card">
       <h2><label for="name">1. Name your pumpkin</label></h2>
       <input id="name" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Jack's Pumpkin">
-      <p class="hint">It scrolls across the eyes.</p>
     </div>
 
     <div class="card">
-      <h2>2. Choose your home WiFi</h2>
-      <p class="hint" style="margin:0 0 10px">The pumpkin only sees 2.4 GHz WiFi. If your router has two names, choose the one without “5G”.</p>
-      <div class="row">
-        <span id="scan-state" class="muted" style="flex:1" role="status"></span>
-        <button type="button" id="rescan" class="btn small secondary">↻ Look again</button>
-      </div>
+      <h2>2. Choose a WiFi network</h2>
+      <p id="scan-state" class="muted" role="status" style="margin:0 0 10px"></p>
       <ul id="networks" class="networks" aria-label="WiFi networks"></ul>
-      <button type="button" id="manual-toggle" class="linkish">Not in the list? Type its name</button>
+      <div class="row">
+        <button type="button" id="manual-toggle" class="linkish" style="flex:1;text-align:left">Join by SSID</button>
+        <button type="button" id="rescan" class="btn small secondary">↻ Refresh</button>
+      </div>
       <div id="manual" hidden>
-        <label class="label" for="ssid">WiFi name</label>
+        <label class="label" for="ssid">WiFi name (SSID)</label>
         <input id="ssid" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
       </div>
     </div>
@@ -59,32 +55,22 @@
         <input id="password" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
         <button type="button" id="show-password" class="btn small secondary" aria-pressed="false">Show</button>
       </div>
-      <p id="password-hint" class="hint">It’s often on a sticker on the WiFi router.</p>
+      <p id="password-hint" class="hint">🔒 Stored on the pumpkin only, never sent anywhere else.</p>
       <!-- How the check went: "Checking…", "✓ Joined …" or why it didn't work -->
       <p id="check" class="check" role="status" hidden></p>
     </div>
 
     <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
     <p id="error" class="error" role="alert"></p>
-    <button type="submit" id="save" class="btn wide">Check and save</button>
-    <p class="hint center" id="check-hint" hidden>The pumpkin tries your WiFi first (up to 30 seconds), then restarts to join it.</p>
+    <button type="submit" id="save" class="btn wide">Save</button>
   </form>
-  <p class="center" id="play-link" style="margin-top:28px">
-    <a href="/?play=1" class="btn secondary">🎃 No home WiFi? Just play with the pumpkin</a>
-  </p>
 </section>
 
 <section id="done-view" hidden>
-  <div class="card">
+  <div class="card center">
     <h2>🎃 Your pumpkin is alive!</h2>
-    <ol class="steps">
-      <li>The pumpkin is restarting and joining <b class="home-ssid"></b>.</li>
-      <li id="phone-step">Your phone goes back to your home WiFi by itself.</li>
-      <li>Type the address with http:// in front (e.g. <a class="big" id="done-address" href="/"></a>), or the numbers the eyes scroll.
-        Press the small BOOT button on the pumpkin’s board to see them again.</li>
-    </ol>
-    <p class="hint">Some Android phones can’t open “.local” addresses: type the numbers instead, like http://192.168.1.23</p>
-    <p class="hint">If the pumpkin can’t join <b class="home-ssid"></b>, it makes its own WiFi called <b id="setup-ssid"></b> again. Join that and try once more (check the password).</p>
+    <a class="btn wide" id="done-address" href="http://pumpkin.local/">Open pumpkin.local</a>
+    <p class="hint" id="done-hint">If that doesn’t work, type the numbers the eyes scroll instead, like 192.168.1.23</p>
   </div>
 </section>
 </main>
@@ -104,7 +90,7 @@ setTimeout(function () {
 <script>
 'use strict';
 (() => {
-  const { $, get, post, loadStatus, setupReason, signalBars, signalWords, straightQuotes, showMessage, showError } = Pumpkin;
+  const { $, get, post, loadStatus, setupReason, showName, signalBars, signalWords, straightQuotes, showMessage, showError } = Pumpkin;
   const nameInput = $('name');
   const ssidInput = $('ssid');
   const password = $('password');
@@ -120,6 +106,7 @@ setTimeout(function () {
   let setupSsid = '';      // the pumpkin's own WiFi's name
   let passed = null;       // {ssid, password} that the pumpkin joined, so saving needs no second check
   let busy = false;        // checking or saving
+  const PASSWORD_NOTE = $('password-hint').textContent; // the "stored on the pumpkin only" reassurance
 
   // ---- Name ----
 
@@ -176,7 +163,7 @@ setTimeout(function () {
     $('manual-toggle').hidden = false;
     renderNetworks();
     showMessage(errorEl, '');
-    $('password-hint').textContent = net.secure ? 'It’s often on a sticker on the WiFi router.' : 'This WiFi has no password: leave it empty.';
+    $('password-hint').textContent = net.secure ? PASSWORD_NOTE : 'This WiFi has no password: leave it empty.';
     if (net.secure) password.focus();
   }
 
@@ -197,12 +184,12 @@ setTimeout(function () {
             if (selected) wifiChanged();
           }
           renderNetworks();
-          state.textContent = networks.length ? 'Tap your WiFi:' : 'No WiFi found. Move the pumpkin closer to the router and look again.';
+          state.textContent = networks.length ? '' : 'No WiFi found: tap Refresh.';
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      state.textContent = 'That took too long. Look again?';
+      state.textContent = 'That took too long: tap Refresh.';
     } catch (e) {
       state.textContent = e.message;
     } finally {
@@ -218,7 +205,7 @@ setTimeout(function () {
     renderNetworks();
     $('manual').hidden = false;
     $('manual-toggle').hidden = true;
-    $('password-hint').textContent = 'Leave it empty if the WiFi has no password.';
+    $('password-hint').textContent = PASSWORD_NOTE;
     ssidInput.focus();
   });
 
@@ -247,7 +234,7 @@ setTimeout(function () {
   // the router didn't answer in time, the same details can be saved anyway.
   function updateSaveButton() {
     const checked = !onSetupWifi || hasPassed(chosenSsid(), password.value);
-    saveButton.textContent = !checked ? 'Check and save' : passed && passed.unsure ? 'Save anyway' : 'Save and restart';
+    saveButton.textContent = passed && passed.unsure && checked ? 'Save anyway' : 'Save';
   }
 
   // The line under the password: kind 'ok', 'error', or none; spinning adds a spinner
@@ -352,7 +339,7 @@ setTimeout(function () {
     showCheck('✓ Joined ' + ssid + ' (' + signalWords(result.rssi).toLowerCase() + ' signal)', 'ok');
     if (!hasPassed(chosenSsid(), password.value)) {
       // Changed while it was checking: check what's there now
-      showMessage(errorEl, 'The WiFi details changed while the pumpkin was checking. Tap Check and save again.', 'error');
+      showMessage(errorEl, 'The WiFi details changed while the pumpkin was checking. Tap Save again.', 'error');
       return false;
     }
     return true;
@@ -361,14 +348,9 @@ setTimeout(function () {
   async function save(ssid, pass, name) {
     try {
       const reply = await post('/api/wifi', { ssid, password: pass, name });
-      document.querySelectorAll('.home-ssid').forEach((el) => { el.textContent = reply.ssid; });
-      $('done-address').textContent = reply.address;
-      $('done-address').href = reply.address;
-      $('setup-ssid').textContent = reply.setupSsid;
-      if (!onSetupWifi) {
-        // Changed from the home WiFi: the phone stays where it is
-        $('phone-step').textContent = 'If this phone isn’t on ' + reply.ssid + ', join it.';
-      }
+      showName(reply.name);
+      $('done-address').href = reply.address + '/';
+      $('done-address').textContent = 'Open ' + reply.address.replace(/^https?:\/\//, '');
       $('form-view').hidden = true;
       $('done-view').hidden = false;
       window.scrollTo(0, 0);
@@ -394,7 +376,27 @@ setTimeout(function () {
     const name = chosenName();
     const ssid = chosenSsid();
     const pass = password.value;
-    if (!ssid) { showMessage(errorEl, 'Please choose your home WiFi (or type its name).', 'error'); return; }
+    if (!ssid) {
+      // No WiFi: just the name (WiFi is optional); the pumpkin stays on its own WiFi
+      if (!nameTouched || !name) { showMessage(errorEl, 'Choose a WiFi network, or give the pumpkin a name.', 'error'); return; }
+      showMessage(errorEl, '');
+      setBusy('Saving…');
+      try {
+        await post('/api/settings', { name });
+        showName(name);
+        $('done-address').href = '/?play=1';
+        $('done-address').textContent = 'Open the buttons';
+        $('done-hint').hidden = true;
+        $('form-view').hidden = true;
+        $('done-view').hidden = false;
+        window.scrollTo(0, 0);
+      } catch (e) {
+        showError(errorEl, e);
+        if (e.field === 'name' || /name/i.test(e.message)) nameInput.focus();
+      }
+      setBusy('');
+      return;
+    }
     if (pass && pass.length < (limits.minWifiPassword || 0)) {
       showMessage(errorEl, 'WiFi passwords have at least ' + limits.minWifiPassword + ' characters.', 'error');
       password.focus();
@@ -403,7 +405,7 @@ setTimeout(function () {
     // No confirm() here: captive-portal browsers don't always show pop-ups
     if (!pass && (!selected || selected.secure) && !warnedNoPassword) {
       warnedNoPassword = true;
-      showMessage(errorEl, 'No password? Most home WiFi needs one. Tap the button again to carry on without.', 'error');
+      showMessage(errorEl, 'No password? Most WiFi needs one. Tap Save again to carry on without.', 'error');
       password.focus();
       return;
     }
@@ -446,30 +448,24 @@ setTimeout(function () {
       savedSsid = status.homeSsid || '';
       onSetupWifi = status.mode === 'setup';
       setupSsid = status.setupSsid || '';
-      $('no-internet').hidden = !onSetupWifi;
-      $('check-hint').hidden = !onSetupWifi;
       updateSaveButton();
       $('boot-hint').hidden = !status.wifiNeedsBoot;
       if (status.mode === 'connected') {
         const current = $('current');
         current.textContent = 'The pumpkin is on ' + status.homeSsid + ' now. Choosing another WiFi restarts it.';
         current.hidden = false;
-        $('intro').hidden = true;
         $('back').href = '/settings';
       } else if (status.homeWifiOutOfReach) {
         // Lost its home WiFi (on the doorstep?): lead with playing, keep the form for later
         away = true;
         $('away-reason').textContent = setupReason(status) + ' So the pumpkin made its own WiFi, and this phone is on it.';
         $('away').hidden = false;
-        $('intro').hidden = true;
-        $('play-link').hidden = true;
         $('setup').hidden = true;
       } else if (status.mode === 'setup' && status.hasSavedWifi) {
         // e.g. Couldn't join "Home" (wrong password?): say why, so it can be put right
         const reason = $('reason');
         reason.querySelector('b').textContent = setupReason(status);
         reason.hidden = false;
-        $('intro').hidden = true;
       }
     } catch (e) {
       showError(errorEl, e);

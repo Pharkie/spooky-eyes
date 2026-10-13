@@ -91,7 +91,7 @@ namespace network
     // Start a scan if none is running (safe to call from the web server task; never blocks)
     ScanStatus scan(std::vector<FoundNetwork> &found);
 
-    // --- Checking a home WiFi before it's saved (the setup page's "Check and save") ---
+    // --- Checking a home WiFi before it's saved (the setup page's Save button) ---
     //
     // From Scribe Evolution's handleTestWiFi(), but run on the network task so the web server never waits.
 
