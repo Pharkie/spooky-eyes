@@ -298,4 +298,19 @@ namespace show_store
             LOG("SHOW", "Couldn't delete the saved show");
         }
     }
+
+    bool storageInfo(StorageInfo &info)
+    {
+        info = {0, 0, false, -1};
+        Lock lock;
+        if (!mounted)
+        {
+            return false;
+        }
+        info.usedBytes = LittleFS.usedBytes();
+        info.totalBytes = LittleFS.totalBytes();
+        info.showBytes = fileSize(kShowPath);
+        info.showSaved = info.showBytes >= 0;
+        return true;
+    }
 }

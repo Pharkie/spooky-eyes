@@ -32,9 +32,25 @@ namespace
     std::atomic<uint32_t> lastShortPressMs{0};
     std::atomic<bool> unlockOn{false};
 
+    // Set by begin(), so pressFromSerial() knows update() is being called. A serial "unlock" waits here
+    // for the network task.
+    std::atomic<bool> watching{false};
+    std::atomic<bool> serialPress{false};
+
     bool readPressed()
     {
         return digitalRead(kBootButtonPin) == LOW;
+    }
+
+    // A short press, real or from serial: unlock the risky web actions and tell main.cpp. Network task.
+    void shortPress(uint32_t now, const char *how)
+    {
+        lastShortPressMs = now;
+        unlockOn = true;
+        LOG("BUTTON", "Short press%s: updates and WiFi changes allowed for %lu minutes", how,
+            static_cast<unsigned long>(kBootUnlockMs / 60000));
+        if (shortPressHandler)
+            shortPressHandler();
     }
 }
 
@@ -50,6 +66,15 @@ namespace boot_button
         waitForRelease = pressed;
         if (waitForRelease)
             LOG("BUTTON", "BOOT is held at start-up: ignored until it's let go");
+        watching = true;
+    }
+
+    bool pressFromSerial()
+    {
+        if (!watching.load())
+            return false;
+        serialPress = true;
+        return true;
     }
 
     void onShortPress(ShortPressHandler handler)
@@ -67,6 +92,8 @@ namespace boot_button
         const uint32_t now = millis();
         if (unlockOn.load() && now - lastShortPressMs.load() >= kBootUnlockMs)
             unlockOn = false;
+        if (serialPress.exchange(false))
+            shortPress(now, " (from serial)");
 
         const bool reading = readPressed();
         if (reading != lastReading)
@@ -88,14 +115,7 @@ namespace boot_button
             else
             {
                 if (!waitForRelease)
-                {
-                    lastShortPressMs = now;
-                    unlockOn = true;
-                    LOG("BUTTON", "Short press: updates and WiFi changes allowed for %lu minutes",
-                        static_cast<unsigned long>(kBootUnlockMs / 60000));
-                    if (shortPressHandler)
-                        shortPressHandler();
-                }
+                    shortPress(now, "");
                 waitForRelease = false;
             }
             return;

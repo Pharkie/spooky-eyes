@@ -36,9 +36,21 @@ pio test -e native              # golden-frame tests: C++ effects vs the MicroPy
 python3 tools/mock_server.py    # web pages with a fake API, no board needed
 python3 scripts/build_release.py  # release/ images: full (new board, 0x0) and ota (Settings page upload)
 tools/make_instructions.sh      # one-page A4 wiring + setup PDF
+python3 tools/api_check.py --mock   # API cases (test/api/cases.py) on the mock, every WiFi mode
+python3 tools/api_check.py --board http://pumpkin.local [--compare]  # same cases on a board (puts its settings back)
+python3 tools/flash_check.py release/…-full.bin  # erase + flash + check the first boot log (when Adam asks)
+python3 tools/pumpkin_serial.py status|fs|unlock|monitor  # USB serial helper (pyserial: PlatformIO's Python)
 ```
 
 If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
+
+The mock server must answer exactly as the firmware does (status, JSON shape, error text; lengths in UTF-8
+bytes): change an API reply or rule and change `tools/mock_server.py` and `test/api/cases.py` with it, then
+run `api_check --mock`. The firmware is the reference. `api_check` never restarts a board or saves/forgets
+its WiFi without `--allow-restart`/`--allow-wifi-save`/`--allow-forget`; `flash_check` and `pumpkin_serial`
+open the serial port, so the golden rule about boards applies (`--log-file` and `--self-test` don't).
+Serial `status` and `fs` answer in one line, `STATUS {json}` and `FS {json}`; `unlock` is a short BOOT
+press (`boot_button::pressFromSerial()`, carried out by the network task).
 
 ## How it fits together
 

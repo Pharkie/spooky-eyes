@@ -206,16 +206,18 @@
 // ===================== The wiring: must match src/hardware/board.h =====================
 // One line per wire. pin: the new ESP32-C3 (SuperMini) pin, as printed on it. part + end: where the wire's OTHER end
 // goes: a pin of the eye wired to the controller (as printed on it), or a leg of the mouth LED.
+// The sheet is often printed in black and white, where most colours come out the same grey. So wires that run side
+// by side differ in shade (dark, mid, light) or pattern (dash: an SVG dash pattern in mm) as well as colour.
 const WIRES = [
-  { pin: "5V",  part: "eye",   end: "VCC", colour: "#d32f2f" },  // + is red and − near-black, as on the battery pack
-  { pin: "G",   part: "eye",   end: "GND", colour: "#1d1714" },
-  { pin: "7",   part: "eye",   end: "DIN", colour: "#6a3d9a" },
-  { pin: "6",   part: "eye",   end: "CLK", colour: "#00838f" },
-  { pin: "5",   part: "eye",   end: "CS",  colour: "#8d5a2b" },
-  { pin: "3.3", part: "mouth", end: "+",   colour: "#c2185b" },  // the LED's long leg (common anode)
-  { pin: "4",   part: "mouth", end: "R",   colour: "#ef6c00" },
-  { pin: "3",   part: "mouth", end: "G",   colour: "#2e7d32" },
-  { pin: "1",   part: "mouth", end: "B",   colour: "#1565c0" },
+  { pin: "5V",  part: "eye",   end: "VCC", colour: "#d32f2f" },               // + is red and − near-black, as on the
+  { pin: "G",   part: "eye",   end: "GND", colour: "#1d1714" },               // battery pack: mid grey, black
+  { pin: "7",   part: "eye",   end: "DIN", colour: "#6a3d9a", dash: "2.2 0.9" },
+  { pin: "6",   part: "eye",   end: "CLK", colour: "#4db6ac" },               // light
+  { pin: "5",   part: "eye",   end: "CS",  colour: "#8d5a2b", dash: "0.05 1.1" }, // dots
+  { pin: "3.3", part: "mouth", end: "+",   colour: "#c2185b", dash: "2.2 0.8 0.05 0.8" }, // the LED's long leg
+  { pin: "4",   part: "mouth", end: "R",   colour: "#f57c00" },               // light
+  { pin: "3",   part: "mouth", end: "G",   colour: "#2e7d32", dash: "1 0.8" },
+  { pin: "1",   part: "mouth", end: "B",   colour: "#0d47a1" },               // dark
 ];
 // The battery pack's leads join the eye's power wires (often they're already joined): lead -> ESP32-C3 pin
 const BATTERY = { "+": "5V", "−": "G" };
@@ -471,7 +473,7 @@ function drawDiagram() {
   [...WIRES.filter(w => w !== onTop), onTop].forEach(w => {
     const d = wirePath(ROUTES[w.pin]);
     el("path", { d, stroke: PAPER, "stroke-width": 1.65 }, wires);   // a gap where wires cross
-    el("path", { d, stroke: w.colour, "stroke-width": 0.75 }, wires);
+    el("path", Object.assign({ d, stroke: w.colour, "stroke-width": 0.75 }, w.dash ? { "stroke-dasharray": w.dash } : {}), wires);
   });
   WIRES.forEach(w => {
     const s = sp(w.pin), e = partPin(w);
