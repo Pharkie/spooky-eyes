@@ -53,7 +53,9 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
 - **Threads.** Effects run on the Arduino loop task. The async web server has its own task, and so does
   the network housekeeping (captive DNS, reconnects, status LED, BOOT button). A web request sets a pending
   request in the player; `Engine::wait()` notices and throws `EffectInterrupted`, which unwinds the effect
-  at once. That's how a new button press interrupts whatever is playing.
+  at once. That's how a new button press interrupts whatever is playing. C++ exceptions on this chip rely on
+  `scripts/eh_frame_end.py` (links a zero word after the exception table; the build checks it): without it
+  the first interrupted effect can crash the board, depending on the code's size.
 - **Engine** (`src/effects/engine.h`): everything an effect may do (show, brightness, wait, say, random,
   mouth colour, settings). `DeviceEngine` implements it on the board; `test/recording_engine.h` records
   events for the tests.
