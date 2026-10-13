@@ -63,8 +63,9 @@ namespace web
     // holding the pumpkin.
 
     // True on the setup WiFi with home WiFi already saved: the pumpkin is probably on the doorstep and
-    // strangers may be connected, so changing the WiFi or the name needs a BOOT press. A brand-new
-    // pumpkin stays open for setup, and on the home WiFi (a trusted network) these changes stay open.
+    // strangers may be connected, so changing the WiFi, the settings (name included) or the show needs a
+    // BOOT press; the buttons and your own words stay open to everyone. A brand-new pumpkin stays open for
+    // setup, and on the home WiFi (a trusted network) these changes stay open.
     bool strangersMayBeConnected();
 
     constexpr const char *kBootPressMessage = "Press the small BOOT button on the pumpkin's board, then try again";

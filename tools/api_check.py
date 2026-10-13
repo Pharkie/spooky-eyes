@@ -468,7 +468,7 @@ def skip_reason(case, mode, ctx):
     missing -= ctx.flags
     if missing:
         return "needs " + " ".join(sorted(FLAG_OPTIONS[f] for f in missing))
-    if case.boot and ctx.target_kind == "board" and not ctx.serial:
+    if table.for_mode(case.boot, mode) and ctx.target_kind == "board" and not ctx.serial:
         return "needs --serial (presses BOOT)"
     return None
 
@@ -476,8 +476,8 @@ def skip_reason(case, mode, ctx):
 def plan(mode, ctx, only):
     """The cases for this mode, in running order: ordinary, then BOOT ones, then opt-in ones"""
     chosen = [c for c in table.CASES if mode in c.modes and (not only or re.search(only, c.name))]
-    ordinary = [c for c in chosen if not c.boot and not c.needs]
-    boot = [c for c in chosen if c.boot and not c.needs]
+    ordinary = [c for c in chosen if not table.for_mode(c.boot, mode) and not c.needs]
+    boot = [c for c in chosen if table.for_mode(c.boot, mode) and not c.needs]
     risky = [c for c in chosen if c.needs]
     return ordinary + boot + risky
 
@@ -591,7 +591,7 @@ def run_target(target, mode, ctx, args, show_lines=True):
             if reason:
                 result = Result(case, mode, target.kind, skipped=reason)
             else:
-                if case.boot and not boot_pressed:
+                if table.for_mode(case.boot, mode) and not boot_pressed:
                     press_boot(target, ctx)
                     boot_pressed = True
                 if case.needs and boot_pressed:
@@ -723,8 +723,10 @@ def list_cases():
     for case in table.CASES:
         status = case.status if isinstance(case.status, int) else "by mode"
         extra = []
-        if case.boot:
+        if case.boot is True:
             extra.append("BOOT")
+        elif case.boot:
+            extra.append("BOOT on the doorstep")
         extra += [FLAG_OPTIONS[f] for f in sorted(case.needs)]
         extra += [FLAG_OPTIONS[f] + " on a board" for f in sorted(case.board_needs)]
         if case.targets != ("mock", "board"):

@@ -22,8 +22,8 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
 - Every restart goes through `firmware::restart()`. A firmware update is only kept after running 30 s
   without crashing; otherwise the bootloader rolls back.
 - Every POST from the pages carries the `X-Pumpkin: 1` header (cheap CSRF protection). Risky actions
-  (firmware update; WiFi changes while strangers could be on the setup WiFi) also need a short BOOT press in
-  the last 5 minutes (`boot_button::unlocked()`).
+  (firmware update; WiFi, settings and show changes while strangers could be on the setup WiFi) also need a
+  short BOOT press in the last 5 minutes (`boot_button::unlocked()`). The buttons and words stay open.
 - The repo is public: no real people's names in it. Credits with names go in `local/credits.h` (gitignored,
   in the main checkout where releases are built), e.g. `#define MINECRAFT_BY "..."` for the Minecraft heading
   (`groupTitle()` in `src/effects/registry.cpp`).

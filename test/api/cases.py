@@ -43,6 +43,7 @@ password and pumpkin name here is invented.
 
 import json
 import sys
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple
@@ -83,6 +84,8 @@ MODES = ("home", "setup", "lost", "wrong", "off")
 ALL = MODES
 SETUP_WIFI = ("setup", "lost", "wrong")    # the pumpkin's own WiFi: captive portal
 DOORSTEP = ("lost", "wrong")               # its own WiFi with home WiFi saved: strangers may be on it
+# Settings and show changes need a BOOT press there (the buttons and words don't)
+BOOT_ON_DOORSTEP = None  # set below, once by_mode() exists
 NOT_SETUP_WIFI = ("home", "off")
 SAVES_NOT_GATED = ("home", "setup", "off")  # where WiFi changes don't need a BOOT press
 
@@ -121,6 +124,9 @@ class ByMode:
 
 def by_mode(**values):
     return ByMode(values)
+
+
+BOOT_ON_DOORSTEP = by_mode(lost=True, wrong=True, default=False)
 
 
 def for_mode(value, mode):
@@ -187,7 +193,7 @@ class Case:
     content_type: Optional[str] = None
     forbid: Tuple[str, ...] = ()
     poll: Optional[Poll] = None
-    boot: bool = False
+    boot: Any = False      # press BOOT first (True, or by_mode(...))
     needs: FrozenSet[str] = frozenset()
     board_needs: FrozenSet[str] = frozenset()
     targets: Tuple[str, ...] = ("mock", "board")
@@ -308,13 +314,21 @@ def wifi_check_refused(name, body, error):
     return Case(f"wifi check: {name}", "POST", "/api/wifi/test", body, status=400, shape=ERROR, error=error)
 
 
+def with_boot_on_doorstep(cases):
+    """Settings and show changes need a BOOT press on the doorstep: a sequence of them (save, read back...)
+    keeps its order and runs after the press there"""
+    return [dataclasses.replace(case, boot=BOOT_ON_DOORSTEP) for case in cases]
+
+
 def settings_case(name, body, status=200, error=None, expect=None, **fields):
     shape = SAVED if status == 200 else ERROR
+    fields.setdefault("boot", BOOT_ON_DOORSTEP)
     return Case(f"settings: {name}", "POST", "/api/settings", body, status=status, shape=shape, error=error,
                 expect=expect, **fields)
 
 
 def show_refused(name, blocks, error, **fields):
+    fields.setdefault("boot", BOOT_ON_DOORSTEP)
     return Case(f"show: {name}", "POST", "/api/show", {"blocks": blocks}, status=400, shape=ERROR, error=error,
                 **fields)
 
@@ -560,7 +574,16 @@ CASES = [
                   expect={"settings.brightness": 1, "settings.eyeGap": MAX_EYE_GAP, "settings.mouthLed": False,
                           "settings.wifiSaver": False}),
 
+    # --- Settings and show changes on the doorstep need a BOOT press first ---
+    Case("settings on the doorstep without BOOT", "POST", "/api/settings", {"name": "Prank Pumpkin"},
+         modes=DOORSTEP, status=403, shape=BOOT_ERROR, expect={"needsBoot": True}, error=BOOT_PRESS),
+    Case("show on the doorstep without BOOT", "POST", "/api/show", {"blocks": A_SHOW},
+         modes=DOORSTEP, status=403, shape=BOOT_ERROR, expect={"needsBoot": True}, error=BOOT_PRESS),
+    Case("show reset on the doorstep without BOOT", "POST", "/api/show/reset", {},
+         modes=DOORSTEP, status=403, shape=BOOT_ERROR, expect={"needsBoot": True}, error=BOOT_PRESS),
+
     # --- The show creator: /api/show (a board's show is put back afterwards) ---
+    *with_boot_on_doorstep([
     Case("show: save", "POST", "/api/show", {"blocks": A_SHOW}, shape=SHOW_SAVED, expect={"blocks": A_SHOW}),
     Case("show: read back", "GET", "/api/show", shape=SHOW, expect={"blocks": A_SHOW, "isDefault": False}),
     Case("show: words tidied", "POST", "/api/show",
@@ -597,6 +620,7 @@ CASES = [
     Case("show: reset", "POST", "/api/show/reset", {}, shape=SHOW_SAVED, expect={"blocks": DEFAULT_SHOW}),
     Case("show: back to the original", "GET", "/api/show", shape=SHOW,
          expect={"blocks": DEFAULT_SHOW, "isDefault": True}),
+    ]),
 
     # --- The setup page's WiFi check: POST /api/wifi/test ---
     wifi_check_refused("no WiFi name", {"password": TEST_PASSWORD}, "Please fill in the WiFi name"),
