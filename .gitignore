@@ -20,8 +20,5 @@ __pycache__/
 # Release builds (attach to GitHub releases instead)
 release/
 
-# Personalised instruction sheets: make them with tools/make_instructions.sh "Name's Pumpkin"
-docs/instructions/2026-wifi-upgrade-*.pdf
-
 # Personal files kept out of the repo (e.g. the 2024 instructions sheet, which has a sign-off)
 local/

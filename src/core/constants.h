@@ -12,9 +12,13 @@ namespace PumpkinTime
     constexpr uint32_t Minutes(uint32_t m) { return m * 60UL * 1000UL; }
 }
 
-// Setup WiFi network the pumpkin makes when it has no home WiFi (or can't find it).
-// Its name is the pumpkin's name, e.g. "Jack's Pumpkin". The password is printed in the instructions.
+// Setup WiFi network the pumpkin makes when it has no home WiFi (or can't find it), and its web address
+// on the home WiFi (http://pumpkin.local). Both are fixed, not made from the pumpkin's name, so they're
+// easy to remember and the instructions can print them. (Scribe Evolution names them after the device
+// because a house can have several; a house has one pumpkin.)
+constexpr const char *kSetupApName = "Spooky Pumpkin";
 constexpr const char *kSetupApPassword = "spookyeyes";
+constexpr const char *kHostname = "pumpkin";
 
 // WiFi timings (from Scribe Evolution's network code)
 constexpr uint32_t kWifiConnectTimeoutMs = PumpkinTime::Seconds(15);
@@ -27,8 +31,8 @@ constexpr uint32_t kLostWifiFallbackMs = PumpkinTime::Minutes(3);
 // Hold BOOT this long to forget the home WiFi and go back to setup mode
 constexpr uint32_t kForgetWifiHoldMs = PumpkinTime::Seconds(5);
 
-// A short BOOT press unlocks the risky web actions (firmware update, and changing WiFi or the name while
-// strangers could be on the setup WiFi) for this long. Proves someone has the pumpkin in their hands.
+// A short BOOT press unlocks the risky web actions (firmware update, and changing the WiFi while strangers
+// could be on the setup WiFi) for this long. Proves someone has the pumpkin in their hands.
 constexpr uint32_t kBootUnlockMs = PumpkinTime::Minutes(5);
 
 // The setup instructions scroll in every show pass for this long after switch-on, then stop (so they
@@ -76,10 +80,9 @@ constexpr bool kDefaultWifiSaver = true;  // switch the WiFi off when nobody's u
 constexpr uint8_t kChipMaxBrightness = 15; // the MAX7219's top setting
 constexpr uint8_t kMaxBrightness = 11;     // flashes go +4 above the normal brightness
 constexpr uint8_t kMaxEyeGap = 16;
-constexpr size_t kMaxNameLength = 24;      // fits the 32-byte WiFi name limit with room to spare
+constexpr size_t kMaxNameLength = 24;      // scrolls past in a few seconds
 constexpr size_t kMaxWordsLength = 200;    // "your own words" box
 constexpr size_t kMaxSsidBytes = 32;       // WiFi standard
 constexpr size_t kMinWifiPasswordLength = 8;  // WPA2: 8-63 characters, or exactly 64 hex digits
 constexpr size_t kMaxWifiPasswordLength = 64;
-constexpr size_t kMaxHostnameLength = 32;
 constexpr size_t kMaxShowBlocks = 60;      // blocks in a saved show

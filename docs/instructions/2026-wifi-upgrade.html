@@ -5,12 +5,12 @@
 <title>Spooky Pumpkin Eyes: WiFi Brain Transplant</title>
 <!--
   One-page A4 sheet for swapping a 2024 pumpkin's Raspberry Pi Pico for the ESP32-C3 SuperMini.
-  Render it with tools/make_instructions.sh (add a pumpkin name to personalise it).
+  Render it with tools/make_instructions.sh. The setup WiFi's name, its password and the web address are fixed in the
+  firmware (src/core/constants.h), so one sheet does for every pumpkin.
 
   The wiring lives in ONE place: the WIRES list in the script at the bottom. The diagram is drawn from it (with
   checks that every drawn wire runs between the pins it names), and it must match src/hardware/board.h.
 
-  Personalise by opening this file with ?name=Jack's%20Pumpkin (and optionally &host=jacks-pumpkin).
   The artwork in assets/ comes from the 2024 sheet (assets/extract-2024-artwork.sh).
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -139,9 +139,6 @@
   .tips p:last-child { margin-bottom: 0; }
   .tips .lead { font-size: 11pt; }
 
-
-  /* generic sheet vs one personalised for a named pumpkin */
-  .named .generic-only, html:not(.named) .named-only { display: none; }
   .layout-problem { position: absolute; left: 30mm; right: 30mm; top: 20mm; padding: 3mm; background: #c00; color: #fff;
                     font: bold 14pt sans-serif; z-index: 9; }
 </style>
@@ -169,17 +166,17 @@
       <legend>New in 2026</legend>
       <div class="cols"><ul>
         <li><svg class="icon" aria-hidden="true"><use href="#i-show"/></svg><span class="lead">Design your own show.</span> Line up effects
-          and your own messages on your phone: it plays them every time it’s switched on.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg><span class="lead">A button pad on your phone.</span> About 50
+          and your own messages: it plays them every time it’s switched on.</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg><span class="lead">A button pad.</span> About 50
           effects (creepers, a witch on a broomstick, Pac-Man, a Nether portal, lots more Minecraft), each cutting
           in instantly.</li>
       </ul><ul>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg><span class="lead">A talking pumpkin.</span> Your phone speaks
-          along.</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg><span class="lead">A talking pumpkin,</span> voiced by your
+          phone or laptop.</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-words"/></svg><span class="lead">Your own words</span> scroll across its
           glowing eyes.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg><span class="lead">No laptop or cable.</span> It lives on your
-          home WiFi.</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg><span class="lead">No cable.</span> Use any phone, tablet or
+          laptop.</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-update"/></svg><span class="lead">New effects later</span> by WiFi: no more
           brain surgery.</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-battery"/></svg><span class="lead">Kinder to batteries.</span> WiFi switches
@@ -205,18 +202,16 @@
     <div class="step"><span class="n">3</span><span class="lead">Switch on.</span>
       The eyes start their show and, the first time, scroll the WiFi details for step 4. It’s alive!</div>
     <div class="step"><span class="n">4</span><span class="lead">Introduce it to your WiFi</span> (first time only).
-      On a phone, join the WiFi
-      <span class="generic-only">called <b class="nowrap">Spooky Pumpkin</b></span><span class="named-only">called
-        <b class="nowrap" data-fill="name">Jack's Pumpkin</b></span>,
+      On a phone, tablet or laptop, join the WiFi called <b class="nowrap">Spooky Pumpkin</b>,
       password <b>spookyeyes</b> (if it says “no internet”, choose <i>Use without internet</i> or
       <i>Stay connected</i>). A page pops up (if not within 20 seconds, open <span class="addr">192.168.4.1</span>):
-      <span class="generic-only">name your pumpkin (e.g. <i>Jack's Pumpkin</i>), </span>pick your home
+      name your pumpkin (e.g. <i>Jack's Pumpkin</i>), pick your home
       WiFi, enter its password and tap <b>Check and save</b>. It only sees 2.4 GHz WiFi: pick your
       main network, not a guest one (if there are two, the one ending <i>2.4G</i>).</div>
     <div class="step"><span class="n">5</span><span class="lead">Play.</span>
       It restarts, joins your home WiFi and scrolls its address,
-      <span class="generic-only">made from its name, e.g. </span><span class="addr">http://<span data-fill="host">jacks-pumpkin.local</span></span>
-      or numbers like <span class="addr">192.168.1.23</span>: open it on a phone or computer on your WiFi for
+      <span class="addr">http://pumpkin.local</span>
+      or numbers like <span class="addr">192.168.1.23</span>: open it on a phone, tablet or laptop on your WiFi for
       everything above, and Settings (if the name won’t open, common on Android, use the numbers). Eyes say <i>Join WiFi</i> again? Probably a wrong
       password: join the pumpkin’s WiFi and retry (the page says what went wrong).</div>
 
@@ -259,28 +254,6 @@ const SM_RIGHT = ["5", "6", "7", "8", "9", "10", "20", "21"];
 // their usual order (the long leg second), top to bottom as drawn
 const EYE_PINS = ["CLK", "CS", "DIN", "GND", "VCC"];
 const LED_LEGS = ["R", "+", "G", "B"];
-
-// ===================== Personalisation (?name=...&host=...) =====================
-function hostnameFor(name) { // same rule as settings::hostnameFor() in the firmware
-  let host = "", gap = false;
-  for (const ch of name.replace(/['‘’]/g, "").toLowerCase()) {
-    if (/[a-z0-9]/.test(ch)) {
-      if (gap && host) { if (host.length + 2 > 32) break; host += "-"; }
-      else if (host.length + 1 > 32) break;
-      host += ch; gap = false;
-    } else gap = true;
-  }
-  return host || "pumpkin";
-}
-const params = new URLSearchParams(location.search);
-const pumpkinName = params.get("name");
-if (pumpkinName) {
-  const host = (params.get("host") || hostnameFor(pumpkinName)) + ".local";
-  document.documentElement.classList.add("named");
-  document.querySelectorAll('[data-fill="name"]').forEach(el => el.textContent = pumpkinName);
-  document.querySelectorAll('[data-fill="host"]').forEach(el => el.textContent = host);
-  document.title = pumpkinName + ": WiFi Brain Transplant";
-}
 
 // ===================== Diagram (units: mm) =====================
 // Left: the new ESP32-C3 from underneath. Right: where each wire's other end goes: the eye wired to the controller,

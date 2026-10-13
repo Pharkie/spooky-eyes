@@ -10,6 +10,19 @@
 #include "effects/effects.h"
 #include "effects/primitives.h"
 
+// Who made the Minecraft effects, for their heading: "Minecraft (Eyes Edition, by ...)". Real names stay
+// out of this public repo, so the name lives in local/credits.h (not in git) as
+//   #define MINECRAFT_BY "Name"
+// and builds without that file leave the "by" out.
+#if __has_include("../../local/credits.h")
+#include "../../local/credits.h"
+#endif
+#ifdef MINECRAFT_BY
+#define MINECRAFT_TITLE "Minecraft (Eyes Edition, by " MINECRAFT_BY ")"
+#else
+#define MINECRAFT_TITLE "Minecraft (Eyes Edition)"
+#endif
+
 namespace
 {
     // In button order: id, label, emoji, section, phrase, function, whether the surprise show picks it.
@@ -106,6 +119,11 @@ const char *groupName(EffectGroup group)
         return "Words";
     }
     return "";
+}
+
+const char *groupTitle(EffectGroup group)
+{
+    return group == EffectGroup::Minecraft ? MINECRAFT_TITLE : groupName(group);
 }
 
 void playEffect(Engine &engine, const EffectInfo &effect)

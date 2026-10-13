@@ -35,8 +35,11 @@ const EffectInfo *allEffects(size_t &count);
 // The effect with this id, or nullptr
 const EffectInfo *findEffect(const char *id);
 
-// Section heading for a group, e.g. "Minecraft"
+// Short name for a group, e.g. "Minecraft": the pages key their colours and remembered section on it
 const char *groupName(EffectGroup group);
+
+// Section heading for a group, e.g. "Minecraft (Eyes Edition)"
+const char *groupTitle(EffectGroup group);
 
 // Play an effect the way a button press does: say its phrase (if it has one), then play it once
 void playEffect(Engine &engine, const EffectInfo &effect);

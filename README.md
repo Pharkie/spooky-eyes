@@ -2,8 +2,8 @@
 
 LED eyes for a Halloween pumpkin: two 8x8 LED matrices and a colour-changing mouth LED, run by an ESP32-C3
 SuperMini with WiFi. Out of the box it plays a show of eyes, pictures and messages. Open its web page on a
-phone and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
-Pac-Man, a Nether portal...), a talking pumpkin (the phone speaks along), and a box for scrolling your own
+phone, tablet or laptop and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
+Pac-Man, a Nether portal...), a talking pumpkin (the phone or laptop speaks along), and a box for scrolling your own
 words across the eyes. The show page builds your own show from effects and messages (it saves as you go), and
 that's what the pumpkin plays at switch-on.
 
@@ -14,14 +14,15 @@ Pictures, effects and ideas by a six-year-old Halloween fan.
 The one-page guide is in [docs/instructions/](docs/instructions/): how to move the wires from the old
 Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
 
-1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network, named after the pumpkin
-   (a new one is called "Spooky Pumpkin"), and its eyes scroll how to join it. The password is `spookyeyes`.
-2. Join it on a phone. A setup page pops up (or open http://192.168.4.1): give the pumpkin a name (e.g.
+1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network called "Spooky Pumpkin",
+   and its eyes scroll how to join it. The password is `spookyeyes`.
+2. Join it on a phone, tablet or laptop. A setup page pops up (or open http://192.168.4.1): give the pumpkin a name (e.g.
    "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Check and save.
    The pumpkin tries the password first (about 10 seconds) and only saves one that works.
-3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes, e.g.
-   `http://jacks-pumpkin.local  or  192.168.1.23`. Open that on any phone or computer on the same WiFi
-   (Android phones often need the numbers).
+3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes:
+   `http://pumpkin.local  or  192.168.1.23`. Open that on any phone, tablet or laptop on the same WiFi
+   (Android phones often need the numbers). The name and address are the same on every pumpkin (one per
+   house), so the guide can print them; the name you give it is what it scrolls on its eyes.
 
 If the eyes say "Join WiFi..." again after that, the password was probably wrong: join the pumpkin's WiFi
 again and the setup page says what went wrong. If it loses home WiFi for 3 minutes (carried out to the
@@ -33,8 +34,7 @@ minutes); hold it for 5 seconds to make it forget the home WiFi. If the eyes say
 they mean it: weak batteries can't power the WiFi.
 
 To make the batteries last, the pumpkin switches its WiFi off when nobody has used it for 10 minutes (no
-page open on a phone, no phone on its own WiFi). The eyes say "WiFi off to save batteries" and the show
-carries on. To get the WiFi back, press BOOT quickly or switch the pumpkin off and on. You can switch this
+page open on a phone, no phone on its own WiFi). The show carries on as usual. To get the WiFi back, press BOOT quickly or switch the pumpkin off and on. You can switch this
 off in Settings ("Save batteries").
 
 ## Wiring (ESP32-C3 SuperMini)

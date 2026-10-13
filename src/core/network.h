@@ -1,6 +1,6 @@
 #pragma once
 // WiFi, ported from Scribe Evolution (src/core/network.cpp there):
-// - with home WiFi saved: scan for it, connect, register name.local (mDNS)
+// - with home WiFi saved: scan for it, connect, register pumpkin.local (mDNS)
 // - with none saved, or it can't be found / joined: start the pumpkin's own WiFi (AP+STA) with a
 //   captive-portal DNS server, so a phone that joins gets the setup page
 // - a background task keeps the DNS server answering, reconnects after dropouts, blinks the
@@ -46,11 +46,10 @@ namespace network
 
     String ipAddress();   // home WiFi address, 192.168.4.1 in setup mode, or "" (connecting, no WiFi)
     String mdnsHostname(); // registered name without ".local", or "" if mDNS isn't running (yet)
-    String apSsid();      // the setup WiFi's name
+    String apSsid();      // the setup WiFi's name (kSetupApName)
     String homeSsid();    // the home WiFi it's on (or trying)
     String setupReason(); // why it's in setup mode with home WiFi saved, e.g. "Couldn't join \"Home\" — wrong password?"
     bool homeWifiOutOfReach(); // in setup mode because the home WiFi wasn't found at boot, or was lost later
-    String apNameFor(const String &pumpkinName); // the setup WiFi's name for this pumpkin name
     int rssi();           // home WiFi signal strength in dBm (0 if not connected)
 
     // Called on the network task so the eyes can say how to reach the pumpkin. First when the joining at
