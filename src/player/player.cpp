@@ -15,6 +15,7 @@
 #include <atomic>
 #include <cstring>
 #include <exception>
+#include <new>
 #include <string>
 #include <utility>
 #include "core/constants.h"
@@ -273,11 +274,22 @@ namespace
     void loadShow()
     {
         bool isDefault = true;
-        Show loaded = show_store::load(isDefault);
+        Show loaded;
         std::string error;
-        if (!checkShow(loaded, error))
+        try
         {
-            LOG("PLAYER", "Can't play the saved show (%s): playing the original one", error.c_str());
+            loaded = show_store::load(isDefault);
+            if (!checkShow(loaded, error))
+            {
+                LOG("PLAYER", "Can't play the saved show (%s): playing the original one", error.c_str());
+                loaded = defaultShow();
+                isDefault = true;
+            }
+        }
+        catch (const std::bad_alloc &)
+        {
+            // Memory almost gone (exceptions are on, so a failed new throws): the original show, not a crash
+            LOG("PLAYER", "Not enough memory for the saved show: playing the original one");
             loaded = defaultShow();
             isDefault = true;
         }
@@ -379,7 +391,9 @@ namespace
     {
         LOG("PLAYER", "Playing %s", effect.id);
         setStatus(Mode::Buttons, &effect, nullptr, kNoBlock, true);
-        runGuarded(CutBy::Nothing, [&] { playEffect(engine, effect); });
+        // One that never ends (the surprise show) gives way to an announcement, e.g. the address after a BOOT
+        // press; anything else finishes first
+        runGuarded(canBeInShow(effect) ? CutBy::Nothing : CutBy::Announcement, [&] { playEffect(engine, effect); });
         chosenFinished();
     }
 
