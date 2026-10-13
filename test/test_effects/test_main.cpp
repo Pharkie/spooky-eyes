@@ -13,6 +13,8 @@
 //
 // Registry tests: ids, labels, emoji and phrases are usable by the web page, the player and the font.
 //
+// Fruit machine tests: the odds of winning, and the reels land on the symbols they were meant to.
+//
 //   pio test -e native        run them (add -v to see the side-by-side context for a mismatch)
 //
 // Set PUMPKIN_ACTUAL_DIR=/some/folder to also save what the C++ recorded, for diffing by hand.
@@ -963,6 +965,224 @@ static void test_random_dots()
     TEST_ASSERT_EQUAL_UINT32(0, c.randomCalls);
 }
 
+// ---- The fruit machine (effects.cpp) ----
+
+namespace fm = fruit_machine;
+
+static const char *symbolName(fm::Symbol symbol)
+{
+    static const char *const names[] = {"cherries", "bell", "BAR", "melon", "double BAR", "JACK/POT"};
+    const int i = static_cast<int>(symbol);
+    return i >= 0 && i < fm::kSymbols ? names[i] : "(not a symbol)";
+}
+
+// Every roll and pick: the jackpot is 1 roll in 16 and any win 4 in 16. Wins show the same symbol on
+// both reels (never JACK and POT), loses two different ones (never JACK and POT together), and every
+// symbol that can win, and every pair that loses, comes up equally often.
+static void test_fruit_machine_odds()
+{
+    static std::string failure; // static: Unity fails a test with longjmp
+    failure.clear();
+    int jackpots = 0, wins = 0, loses = 0;
+    for (uint32_t roll = 0; roll < fm::kRolls; roll++)
+    {
+        const fm::Result result = fm::spinFor(roll, 0).result;
+        jackpots += result == fm::Result::Jackpot;
+        wins += result == fm::Result::Win;
+        loses += result == fm::Result::Lose;
+        int winning[fm::kSymbols] = {};
+        int losing[fm::kSymbols][fm::kSymbols] = {};
+        for (uint32_t pick = 0; pick < fm::kPicks; pick++)
+        {
+            const fm::Spin spin = fm::spinFor(roll, pick);
+            const int left = static_cast<int>(spin.left);
+            const int right = static_cast<int>(spin.right);
+            const std::string at = " roll " + std::to_string(roll) + " pick " + std::to_string(pick) + " (" +
+                                   symbolName(spin.left) + ", " + symbolName(spin.right) + "):";
+            if (spin.result != result)
+                failure += at + " the pick changed the result;";
+            if (left < 0 || left >= fm::kSymbols || right < 0 || right >= fm::kSymbols)
+            {
+                failure += at + " not a symbol;";
+                continue;
+            }
+            const bool jackAndPot = spin.left == fm::Symbol::JackOrPot && spin.right == fm::Symbol::JackOrPot;
+            switch (spin.result)
+            {
+            case fm::Result::Jackpot:
+                if (!jackAndPot)
+                    failure += at + " a jackpot that isn't JACK and POT;";
+                break;
+            case fm::Result::Win:
+                if (left != right || jackAndPot)
+                    failure += at + " a win needs the same symbol twice (but not JACK and POT);";
+                winning[left]++;
+                break;
+            case fm::Result::Lose:
+                if (left == right)
+                    failure += at + " a lose with the same symbol twice;";
+                losing[left][right]++;
+                break;
+            }
+        }
+        for (int a = 0; a < fm::kSymbols; a++)
+        {
+            const bool canWin = a != static_cast<int>(fm::Symbol::JackOrPot);
+            if (result == fm::Result::Win && winning[a] != (canWin ? 6 : 0))
+                failure += " roll " + std::to_string(roll) + ": " + symbolName(static_cast<fm::Symbol>(a)) + " wins " +
+                           std::to_string(winning[a]) + " picks in 30;";
+            for (int b = 0; b < fm::kSymbols && result == fm::Result::Lose; b++)
+                if (losing[a][b] != (a != b ? 1 : 0))
+                    failure += " roll " + std::to_string(roll) + ": " + symbolName(static_cast<fm::Symbol>(a)) + " and " +
+                               symbolName(static_cast<fm::Symbol>(b)) + " lose " + std::to_string(losing[a][b]) +
+                               " times;";
+        }
+    }
+    if (jackpots != 1 || wins != 3 || loses != 12)
+        failure += " rolls: " + std::to_string(jackpots) + " jackpot, " + std::to_string(wins) + " win, " +
+                   std::to_string(loses) + " lose (should be 1, 3 and 12 in 16);";
+    if (!failure.empty())
+    {
+        failure = "Fruit machine odds:" + failure;
+        TEST_FAIL_MESSAGE(failure.c_str());
+    }
+}
+
+// The frames (as "F ..." event lines) and the total time of a recording
+static std::vector<std::string> framesOf(const std::vector<std::string> &events, long &totalMs)
+{
+    std::vector<std::string> frames;
+    totalMs = 0;
+    for (const std::string &e : events)
+    {
+        long ms = 0;
+        if (e.size() == 35 && e[0] == 'F')
+            frames.push_back(e);
+        else if (isWait(e, ms))
+            totalMs += ms;
+    }
+    return frames;
+}
+
+static std::string frameLine(const Frame &left, const Frame &right)
+{
+    return "F " + RecordingEngine::hex(left) + " " + RecordingEngine::hex(right);
+}
+
+// Every pair of symbols: the reels stop on them, the left one first, after 3 to 5 seconds of spinning
+static void test_fruit_machine_reels_land()
+{
+    static std::string failure;
+    failure.clear();
+    for (int a = 0; a < fm::kSymbols; a++)
+    {
+        for (int b = 0; b < fm::kSymbols; b++)
+        {
+            const fm::Spin spin = {fm::Result::Lose, static_cast<fm::Symbol>(a), static_cast<fm::Symbol>(b)};
+            const std::string label = std::string(" ") + symbolName(spin.left) + " and " + symbolName(spin.right) + ":";
+            RecordingEngine engine;
+            engine.eventLimit = kSmokeEventLimit;
+            fm::spinReels(engine, spin);
+            long ms = 0;
+            const std::vector<std::string> frames = framesOf(engine.events, ms);
+            const std::string leftEye = RecordingEngine::hex(fm::picture(spin.left, false));
+            const std::string rightEye = RecordingEngine::hex(fm::picture(spin.right, true));
+            if (frames.empty() || frames.back() != frameLine(fm::picture(spin.left, false), fm::picture(spin.right, true)))
+            {
+                failure += label + " the reels stop on " + (frames.empty() ? "nothing" : frames.back()) + ";";
+                continue;
+            }
+            // The last frame each reel is still moving (or wobbling)
+            long leftMoving = -1, rightMoving = -1;
+            for (size_t i = 0; i < frames.size(); i++)
+            {
+                if (frames[i].substr(2, 16) != leftEye)
+                    leftMoving = static_cast<long>(i);
+                if (frames[i].substr(19, 16) != rightEye)
+                    rightMoving = static_cast<long>(i);
+            }
+            if (leftMoving >= rightMoving)
+                failure += label + " the left reel should land first;";
+            if (ms < 3000 || ms > 5000)
+                failure += label + " spins for " + std::to_string(ms) + " ms;";
+        }
+    }
+    if (!failure.empty())
+    {
+        failure = "Fruit machine reels:" + failure;
+        TEST_FAIL_MESSAGE(failure.c_str());
+    }
+}
+
+// Each kind of result at every smoke-test setting: it lands on the right symbols (the first picture held
+// for a while), says the right thing, and passes the smoke checks
+static void test_fruit_machine_results()
+{
+    static std::string failure;
+    failure.clear();
+    using fm::Result;
+    using fm::Symbol;
+    const struct
+    {
+        fm::Spin spin;
+        const char *says;
+    } cases[] = {
+        {{Result::Lose, Symbol::Bell, Symbol::Melon}, "Oh no! Try again!"},
+        {{Result::Lose, Symbol::JackOrPot, Symbol::Cherries}, "Oh no! Try again!"}, // so near!
+        {{Result::Lose, Symbol::DoubleBar, Symbol::JackOrPot}, "Oh no! Try again!"},
+        {{Result::Win, Symbol::Cherries, Symbol::Cherries}, "You win!"},
+        {{Result::Win, Symbol::Bar, Symbol::Bar}, "You win!"},
+        {{Result::Jackpot, Symbol::JackOrPot, Symbol::JackOrPot}, "Jackpot!"},
+    };
+    for (const auto &c : cases)
+    {
+        for (const SmokeSettings &settings : smokeSettings(false))
+        {
+            const std::string label = std::string(" ") + symbolName(c.spin.left) + " and " + symbolName(c.spin.right) +
+                                      " at maxBright " + std::to_string(settings.maxBright) + ", eyeGap " +
+                                      std::to_string(settings.eyeGap) + ":";
+            RecordingEngine engine(settings.maxBright, settings.eyeGap, settings.name.c_str());
+            engine.eventLimit = kSmokeEventLimit;
+            try
+            {
+                fm::play(engine, c.spin);
+            }
+            catch (...)
+            {
+                failure += label + " threw (or never finished);";
+                continue;
+            }
+            long at = -1;
+            const std::string problem = checkRecording(engine.events, settings.maxBright, true, at);
+            if (!problem.empty())
+                failure += label + " " + problem + ";";
+            // The landed reels: the first picture that stays up for 400 ms or more
+            std::string landed;
+            for (size_t i = 0; i < engine.events.size() && landed.empty(); i++)
+            {
+                long held = 0, ms = 0;
+                for (size_t j = i + 1; j < engine.events.size() && isWait(engine.events[j], ms); j++)
+                    held += ms;
+                if (engine.events[i][0] == 'F' && held >= 400)
+                    landed = engine.events[i];
+            }
+            const std::string expected = frameLine(fm::picture(c.spin.left, false), fm::picture(c.spin.right, true));
+            if (landed != expected)
+                failure += label + " landed on \"" + landed + "\";";
+            bool said = false;
+            for (const std::string &e : engine.events)
+                said = said || e == std::string("S ") + c.says;
+            if (!said)
+                failure += label + " never says \"" + c.says + "\";";
+        }
+    }
+    if (!failure.empty())
+    {
+        failure = "Fruit machine results:" + failure;
+        TEST_FAIL_MESSAGE(failure.c_str());
+    }
+}
+
 int main()
 {
     gGoldenDir = findGoldenDir();
@@ -980,6 +1200,9 @@ int main()
     RUN_TEST(test_registry_ids);
     RUN_TEST(test_registry_buttons);
     RUN_TEST(test_registry_phrases);
+    RUN_TEST(test_fruit_machine_odds);
+    RUN_TEST(test_fruit_machine_reels_land);
+    RUN_TEST(test_fruit_machine_results);
 
     std::vector<std::string> ids;
     if (gGoldenDir.empty() || !readLines(gGoldenDir + "index.txt", ids) || ids.empty())

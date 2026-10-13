@@ -74,6 +74,9 @@ namespace Eyes
     extern const Frame sleepy2;
     extern const Frame sleepy3;
     extern const Frame sleepy4;
+    // Sad eyes, looking down: the angry eyes' lids the other way round, drooping at the outside
+    extern const Frame sadLeft;
+    extern const Frame sadRight;
     // Enderman face: two thin eyes, small enough to fit in one pumpkin eye
     extern const Frame enderFace;
 }
@@ -190,4 +193,17 @@ namespace Shapes
     extern const Frame dice4;
     extern const Frame dice5;
     extern const Frame dice6;
+    // Fruit machine: the symbols on the reels (JACK on the left reel and POT on the right make the
+    // jackpot), and WIN! and LOSE split across the eyes
+    extern const Frame cherries;
+    extern const Frame bell;
+    extern const Frame bar;
+    extern const Frame melon;
+    extern const Frame doubleBar;
+    extern const Frame jack;
+    extern const Frame pot;
+    extern const Frame winLeft;   // "WI"
+    extern const Frame winRight;  // "N!"
+    extern const Frame loseLeft;  // "LO"
+    extern const Frame loseRight; // "SE"
 }

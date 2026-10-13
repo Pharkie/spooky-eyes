@@ -76,6 +76,7 @@ namespace
         {"dice", "Roll the dice", "🎲", EffectGroup::Games, "Rolling the dice!", rollDice, true},
         {"magic", "Magic pumpkin", "🎱", EffectGroup::Games, "Hmm, let me think.", magicAnswer, true},
         {"boo", "3, 2, 1… BOO!", "😱", EffectGroup::Games, nullptr, countdownBoo, true},
+        {"fruit", "Fruit machine", "🎰", EffectGroup::Games, "Spin to win!", fruitMachine, true},
         {"surprise", "Surprise show", "🔀", EffectGroup::Games, "Surprise!", surpriseShow, false},
         // Words
         {"name", "My name", "⭐", EffectGroup::Words, nullptr, scrollName, true}, // says the name itself
