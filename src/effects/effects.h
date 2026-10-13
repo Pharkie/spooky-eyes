@@ -56,6 +56,7 @@ void crossEyed(Engine &engine);  // both eyes look in at the nose
 void rollDice(Engine &engine);     // two dice, one on each eye
 void magicAnswer(Engine &engine);  // thinks hard, then answers yes, no, maybe...
 void countdownBoo(Engine &engine); // 3, 2, 1... BOO!
+void fruitMachine(Engine &engine); // the eyes are two reels: win 1 in 4, JACKPOT 1 in 16
 void surpriseShow(Engine &engine); // random effects until interrupted (in registry.cpp, as it uses the list)
 
 // --- Words ---
@@ -63,3 +64,53 @@ void scrollName(Engine &engine); // the pumpkin's name, e.g. "Jack's Pumpkin"
 void witchesSpell(Engine &engine);
 void trickOrTreat(Engine &engine);
 void happyHalloween(Engine &engine);
+
+// --- Inside the fruit machine (here so the tests can check the odds and where the reels stop) ---
+namespace fruit_machine
+{
+    // The symbols, in order round both reels. The last one says JACK on the left reel and POT on the
+    // right, so a pair of them is the jackpot.
+    enum class Symbol : uint8_t
+    {
+        Cherries,
+        Bell,
+        Bar,
+        Melon,
+        DoubleBar,
+        JackOrPot,
+    };
+    constexpr int kSymbols = 6;
+
+    enum class Result : uint8_t
+    {
+        Lose,    // two different symbols
+        Win,     // the same symbol on both reels
+        Jackpot, // JACK and POT
+    };
+
+    struct Spin
+    {
+        Result result;
+        Symbol left; // where each reel stops
+        Symbol right;
+    };
+
+    // A spin needs two random numbers. The roll decides the result: 0 is the jackpot, 1 to 3 a win and
+    // the rest a lose, so any win is 1 in 4 and the jackpot 1 in 16. The pick decides the symbols: 30
+    // shares out evenly between the 5 symbols that can win, and between the 30 pairs of different
+    // symbols (6 on the left x 5 others on the right) that lose.
+    constexpr uint32_t kRolls = 16;
+    constexpr uint32_t kPicks = 30;
+
+    // Where the reels stop for a roll (0 to kRolls - 1) and a pick (0 to kPicks - 1)
+    Spin spinFor(uint32_t roll, uint32_t pick);
+
+    // A symbol's picture on one reel (they're the same on both, except JACK and POT)
+    const Frame &picture(Symbol symbol, bool rightReel);
+
+    // Spin both reels until they stop on the spin's symbols, the left reel first
+    void spinReels(Engine &engine, const Spin &spin);
+
+    // The whole effect for a spin: the reels, then the win, lose or jackpot
+    void play(Engine &engine, const Spin &spin);
+}
