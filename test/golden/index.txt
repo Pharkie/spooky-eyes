@@ -34,7 +34,6 @@ enderman
 dice
 magic
 boo
-emerald
 panda
 mining
 dig
@@ -67,3 +66,5 @@ prim_slide_still
 prim_flip_odd
 prim_sparkles_keep
 prim_explode_one_eye
+# Old effects changed on purpose, so not compared (no file), but still in the old surprise show:
+~emerald

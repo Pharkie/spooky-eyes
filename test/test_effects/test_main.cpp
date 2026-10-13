@@ -1211,6 +1211,11 @@ int main()
     }
     for (const std::string &id : ids)
     {
+        if (id[0] == '~')
+        {
+            gOldIds.insert(id.substr(1)); // an old effect changed on purpose: no recording to compare
+            continue;
+        }
         gCases.push_back({id, "golden_" + id});
         if (!looksExtra(id))
             gOldIds.insert(id);

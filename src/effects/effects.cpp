@@ -335,6 +335,32 @@ void enderman(Engine &engine)
     stare(1500);
 }
 
+namespace
+{
+    // What the villager gives for the emerald: its two pictures (the same one twice if it doesn't move)
+    // and what the pumpkin says
+    struct TradeItem
+    {
+        const Frame &first;
+        const Frame &second;
+        const char *words;
+    };
+
+    const TradeItem kTradeItems[] = {
+        {S::diamond1, S::diamond2, "You traded an emerald for a diamond!"},
+        {S::sword1, S::sword2, "You traded an emerald for a sword!"},
+        {S::pickaxe, S::pickaxe, "You traded an emerald for a pickaxe!"},
+        {S::shovel, S::shovel, "You traded an emerald for a shovel!"},
+        {S::axe, S::axe, "You traded an emerald for an axe!"},
+        {S::poppy, S::poppy, "You traded an emerald for a poppy!"},
+        {S::torch, S::torch, "You traded an emerald for a torch!"},
+        {S::iron1, S::iron2, "You traded an emerald for some iron!"},
+        {S::redstone1, S::redstone2, "You traded an emerald for some redstone!"},
+        {S::tnt, S::tntFlash, "You traded an emerald for some TNT!"},
+    };
+}
+
+// The old pumpkin always got a diamond for the emerald; now the villager picks what to give
 void emeraldTrade(Engine &engine)
 {
     const Frame &villager = S::villager;
@@ -348,9 +374,11 @@ void emeraldTrade(Engine &engine)
     engine.say("Hurrmm! Hurrmm!");
     for (int i = 0; i < 3; i++)
         sequence(engine, {{nod, blank, 150}, {villager, blank, 150}});
-    slide(engine, {S::diamond1}, 8, far, villager, kBlank, 60);
+    const TradeItem &item = kTradeItems[engine.random(sizeof(kTradeItems) / sizeof(kTradeItems[0]))];
+    slide(engine, {item.first}, 8, far, villager, kBlank, 60);
+    engine.say(item.words);
     for (int i = 0; i < 3; i++)
-        sequence(engine, {{villager, S::diamond1, 300}, {villager, S::diamond2, 300}});
+        sequence(engine, {{villager, item.first, 300}, {villager, item.second, 300}});
 }
 
 void panda(Engine &engine)
