@@ -70,6 +70,18 @@
   }
   .subtitle small { font-size: 9.5pt; }
 
+  /* ---------- The colour version's QR code, in the blank space right of the title ---------- */
+  /* Straight on the parchment, no box: 0.67 mm modules, so 24.8 mm of code inside its 4-module quiet zone (30.15 mm in
+     all), which the artwork's ink stays out of. The quiet zone starts where the title art's image ends. Above it a
+     heading, below it the web address, centred (on its own line, under the title art). checkLayout() checks all this
+     against the artwork. */
+  .qr { position: absolute; left: 146.6mm; top: 41mm; width: 30.15mm; }
+  .qr svg { display: block; width: 30.15mm; height: 30.15mm; }
+  .qr p { margin: 0 -4mm; text-align: center; }
+  .qr .qr-head { position: absolute; bottom: 100%; left: 0; right: 0; margin-bottom: .2mm; font-family: var(--hand);
+                 font-size: 10.5pt; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .qr .qr-foot { margin-top: .4mm; font-size: 7.5pt; line-height: 1.15; color: var(--soft-ink); }
+
   /* ---------- New in 2026: why it's worth swapping the brain ---------- */
   .new { margin: 0 0 2.6mm; text-align: center; }
   .new h2 {
@@ -80,14 +92,16 @@
   .new ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1mm 7mm; }
   .new li { display: flex; align-items: center; gap: 1.6mm; font-family: var(--hand); font-size: 12.5pt;
             letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .new li small { font-family: var(--body); font-style: italic; font-size: 9.5pt; letter-spacing: 0; text-transform: none; }
   .icon { width: 4.4mm; height: 4.4mm; flex: none; fill: none; stroke: var(--ink);
           stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .icon .solid { fill: var(--ink); stroke: none; }
 
   /* ---------- Steps ---------- */
   .steps { font-size: 9.5pt; line-height: 1.2; }
-  .step { position: relative; padding-left: 7.2mm; margin: 0 0 2.6mm; }
-  .top .step { margin-bottom: 2mm; }
+  .step { position: relative; padding-left: 7.2mm; margin: 0 0 3.4mm; }
+  .top .step { margin: 0 0 3mm -8mm; } /* its numbers out to the same left edge as steps 4 and 5 (above and below the
+                                          left branch's brushes) */
   .step .n {
     position: absolute; left: 0; top: -.6mm;
     font-family: var(--display); font-size: 14pt; line-height: 1;
@@ -105,27 +119,27 @@
 
   .top { left: 35mm; top: 80.2mm; width: 146mm; }
   /* Bottom: text runs beside the 2024 raven (part of the frame artwork) and the sign-off above its head */
-  .bottom { left: 27mm; top: 181mm; width: 160mm; } /* below the left branch's brushes (they end 166 mm down) */
-  .keep-clear-head { float: right; width: 29mm; height: 5mm; } /* above the raven's head, which starts 186 mm down */
+  .bottom { left: 27mm; top: 175.6mm; width: 160mm; } /* below the left branch's brushes (they end 166 mm down) */
+  .keep-clear-head { float: right; width: 20mm; height: 10.4mm; } /* above the raven's head, which starts 186 mm down */
   .keep-clear-raven { float: right; clear: right; width: 48.6mm; height: 76mm; }
 
-  #diagram { display: block; width: 146mm; height: 53.4mm; margin-top: .6mm; overflow: visible; }
-  .diagram-notes { margin: .4mm 0 1.8mm; font-size: 9pt; line-height: 1.15; }
+  #diagram { display: block; width: 146mm; height: 53.4mm; margin: .6mm 0 3mm; overflow: visible; }
 
-  /* ---------- The pumpkin's WiFi at a glance: narrow enough to sit beside the raven ---------- */
+  /* ---------- The pumpkin's WiFi at a glance, in step 4: narrow enough to sit beside the raven ---------- */
   .wifi-card {
     width: max-content;
-    margin: 0 0 3mm 7.2mm; padding: 1.6mm 3.6mm;
+    margin: 1.2mm 0 1.4mm; padding: 1.6mm 3.2mm;
     border: .5mm solid var(--ink); border-radius: 4mm;
     background: rgba(255, 255, 255, .45);
   }
-  .wifi-card dl { display: grid; grid-template-columns: repeat(4, auto); gap: .6mm 2.2mm; margin: 0; align-items: baseline; }
+  /* one column per item, its label above it, in the order you use them */
+  .wifi-card dl { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; gap: .3mm 4.5mm; margin: 0; }
   .wifi-card dt { font-family: var(--hand); font-size: 10.5pt; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
-  .wifi-card dd { margin: 0 2.6mm 0 0; font-weight: 700; font-size: 10.5pt; line-height: 1.15; }
-  .wifi-card dd:nth-of-type(even) { margin-right: 0; }
+  .wifi-card dd { margin: 0; font-weight: 700; font-size: 10pt; line-height: 1.15; white-space: nowrap; }
+  .wifi-card .or { font-weight: 400; }
 
   /* ---------- Small print ---------- */
-  .faq { display: flow-root; margin-top: 3.5mm; font-size: 8pt; line-height: 1.2; color: var(--soft-ink); }
+  .faq { display: flow-root; margin-top: 3.2mm; font-size: 8pt; line-height: 1.2; color: var(--soft-ink); }
   .faq p { margin: 0 0 .9mm; }
   .faq b { color: var(--ink); }
 
@@ -138,6 +152,19 @@
   <img class="frame" src="assets/2024-frame.jpg" alt="">
   <img class="header-art" src="assets/2024-header.png" alt="Knowles &amp; Skrodermoose: The All Hallows Spooky Pumpkin Eyes™">
   <div class="subtitle">The WiFi Brain Transplant</div>
+
+  <!-- The colour version, for anyone with a black-and-white print. A QR code (37 x 37 modules, made with segno) of
+       https://github.com/Pharkie/pico-pumpkin/raw/main/docs/instructions/2026-wifi-upgrade.pdf, printed straight on the
+       parchment. The svg includes the 4-module quiet zone scanners need, which must stay clear of the artwork's ink.
+       checkLayout() keeps it big enough, inside the frame and clear of the title. -->
+  <div class="qr" id="qr">
+    <svg viewBox="-4 -4 45 45" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" role="img"
+         aria-label="QR code: the colour version of this sheet">
+      <path fill="none" stroke="#1d1714" d="M0 0.5h7m3 0h1m3 0h2m3 0h5m3 0h1m2 0h7m-37 1h1m5 0h1m2 0h1m3 0h3m1 0h1m1 0h1m2 0h2m1 0h1m1 0h2m1 0h1m5 0h1m-37 1h1m1 0h3m1 0h1m1 0h1m2 0h1m2 0h1m1 0h1m1 0h3m5 0h1m3 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m2 0h1m2 0h1m1 0h3m2 0h2m1 0h2m2 0h1m3 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m2 0h1m2 0h1m1 0h2m3 0h2m1 0h2m3 0h2m1 0h1m1 0h3m1 0h1m-37 1h1m5 0h1m3 0h3m1 0h2m3 0h2m2 0h6m1 0h1m5 0h1m-37 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-29 1h1m2 0h1m1 0h1m2 0h2m2 0h3m1 0h3m1 0h1m-29 1h3m1 0h5m3 0h1m1 0h8m1 0h3m1 0h4m3 0h1m-35 1h1m2 0h2m2 0h1m1 0h1m1 0h3m3 0h2m2 0h2m5 0h4m1 0h2m1 0h1m-34 1h1m2 0h2m3 0h2m1 0h1m2 0h1m3 0h2m1 0h1m4 0h1m1 0h2m3 0h1m-37 1h1m1 0h1m1 0h1m2 0h2m1 0h1m1 0h2m1 0h3m3 0h2m1 0h3m3 0h1m1 0h2m2 0h1m-36 1h9m1 0h1m2 0h1m1 0h3m2 0h5m2 0h3m5 0h1m-37 1h1m1 0h1m1 0h1m2 0h1m3 0h1m4 0h1m3 0h1m3 0h3m1 0h1m5 0h1m1 0h1m-35 1h1m1 0h7m2 0h1m2 0h1m3 0h2m4 0h1m3 0h2m1 0h1m1 0h2m-35 1h1m2 0h1m2 0h2m1 0h1m3 0h4m1 0h4m1 0h1m1 0h1m1 0h1m2 0h2m1 0h1m-36 1h4m1 0h4m1 0h1m1 0h1m3 0h2m1 0h3m1 0h3m1 0h4m5 0h1m-32 1h1m2 0h1m1 0h4m2 0h3m1 0h1m3 0h1m3 0h3m3 0h1m1 0h1m-37 1h1m2 0h1m1 0h2m4 0h2m1 0h1m2 0h1m4 0h1m2 0h2m1 0h1m2 0h1m1 0h1m1 0h2m-37 1h2m1 0h3m1 0h4m1 0h4m1 0h2m1 0h4m1 0h3m1 0h1m1 0h1m3 0h1m-36 1h1m1 0h5m1 0h1m2 0h1m2 0h1m1 0h2m1 0h3m2 0h2m3 0h2m4 0h2m-37 1h3m2 0h1m1 0h3m1 0h1m2 0h1m1 0h1m3 0h1m3 0h1m3 0h3m5 0h1m-33 1h1m1 0h3m4 0h1m2 0h1m1 0h1m2 0h1m4 0h1m3 0h1m2 0h1m1 0h2m-37 1h1m2 0h1m1 0h1m3 0h3m5 0h3m1 0h1m1 0h4m1 0h1m3 0h1m2 0h1m-36 1h3m3 0h1m5 0h1m4 0h1m1 0h3m1 0h3m1 0h4m4 0h2m-36 1h1m2 0h1m3 0h2m1 0h3m2 0h2m2 0h3m1 0h1m5 0h2m1 0h2m1 0h1m-37 1h1m1 0h1m3 0h2m2 0h3m1 0h1m2 0h1m2 0h3m2 0h1m4 0h1m2 0h4m-36 1h3m1 0h1m1 0h3m2 0h3m1 0h2m1 0h4m1 0h2m1 0h5m3 0h1m-36 1h1m2 0h4m1 0h4m2 0h1m1 0h2m3 0h1m1 0h4m1 0h6m-26 1h1m2 0h1m2 0h1m1 0h1m3 0h3m4 0h2m3 0h1m2 0h2m-37 1h7m1 0h1m1 0h1m2 0h1m2 0h1m1 0h1m6 0h1m1 0h2m1 0h1m1 0h1m1 0h3m-37 1h1m5 0h1m1 0h1m2 0h1m3 0h1m1 0h2m2 0h1m2 0h3m1 0h1m3 0h1m2 0h1m-36 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m4 0h2m1 0h2m3 0h1m2 0h5m-33 1h1m1 0h3m1 0h1m2 0h1m1 0h3m2 0h1m3 0h3m1 0h3m4 0h4m-35 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m6 0h2m2 0h2m4 0h2m1 0h3m-37 1h1m5 0h1m1 0h1m3 0h10m1 0h1m1 0h1m1 0h4m4 0h1m-36 1h7m1 0h1m1 0h2m2 0h1m2 0h1m3 0h1m2 0h2m1 0h3m1 0h3m1 0h2"/>
+    </svg>
+    <p class="qr-head">Colour PDF</p>
+    <p class="qr-foot">or visit <span class="nowrap">github.com/Pharkie/pico-pumpkin</span></p>
+  </div>
 
   <!-- icons for the New in 2026 list and the WiFi card (24 x 24, drawn in ink like the 2024 bulb) -->
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
@@ -156,47 +183,47 @@
       <ul>
         <li><svg class="icon" aria-hidden="true"><use href="#i-show"/></svg>Design your own show</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg>A button pad to trigger effects</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg>A talking pumpkin</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg><span>A talking pumpkin <small>(on your phone)</small></span></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-words"/></svg>Your own words</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-battery"/></svg>Longer battery life</li>
       </ul>
     </div>
     <div class="step"><span class="n">1</span><span class="lead">Switch Spooky Eyes off.</span></div>
-    <div class="step"><span class="n">2</span><span class="lead">Move the wires.</span>
-      Move each wire from the old Pico to the new ESP32-C3, by where the wire’s other end goes.
-      <b>Your wire colours may not match the drawing</b> (except red and black, which are standard).</div>
+    <div class="step"><span class="n">2</span><span class="lead">Connect the wires.</span>
+      Connect each wire to the new ESP32-C3.</div>
     <svg id="diagram" viewBox="0 0 146 53.4" xmlns="http://www.w3.org/2000/svg"
          role="img" aria-label="Wiring diagram: which pin of the new ESP32-C3 each wire goes on, by where its other end goes"></svg>
-    <p class="diagram-notes"><b>The mouth LED’s long leg (+) must go on 3.3.</b> Short legs mixed up? Any order
-      works: the mouth just shows other colours. <b>Match the pin names printed on the ESP32-C3.</b></p>
-    <div class="step"><span class="n">3</span><span class="lead">Bring yourself back online, Dolores.</span>
-      Switch Spooky Eyes on. The eyes start their show. It’s alive!</div>
+    <div class="step"><span class="n">3</span><span class="lead">Power on.</span>
+      Switch Spooky Eyes on: the eyes start their show.</div>
   </section>
 
   <section class="abs bottom steps" id="bottom">
     <div class="keep-clear-head"></div>
     <div class="keep-clear-raven"></div>
-    <div class="wifi-card">
-      <dl>
-        <dt>Join</dt><dd>Spooky Pumpkin</dd><dt>Setup page</dt><dd>192.168.4.1</dd>
-        <dt>Password</dt><dd>spookyeyes</dd><dt>On your WiFi</dt><dd>http://pumpkin.local</dd>
-      </dl>
-    </div>
-    <div class="step"><span class="n">4</span><span class="lead">Introduce Spooky Eyes to your WiFi</span> (optional).
-      On a phone, tablet or laptop, join the Spooky Pumpkin WiFi (above). After a few seconds, a setup page should open: name your
-      pumpkin, pick your home WiFi (2.4 GHz), enter the WiFi password and tap <b>Check and save</b>.
-      Your WiFi password never leaves Spooky Eyes.</div>
-    <div class="step"><span class="n">5</span><span class="lead">Play.</span>
-      Spooky Eyes restarts, joins your WiFi, scrolls the address once and carries on with the show. Open
-      <span class="addr">http://pumpkin.local</span> on a phone, tablet or laptop on your WiFi (on Android, type
-      the scrolled numbers instead).</div>
+    <div class="step"><span class="n">4</span><span class="lead">Connect to your WiFi</span> (optional).
+      On a phone, tablet or laptop, join the WiFi Spooky Eyes makes:
+      <!-- In the order you use them: join the network, then open the setup page. pumpkin.local works on Spooky Eyes'
+           own WiFi too (the firmware starts mDNS with it); 192.168.4.1 is there for phones that don't do .local. -->
+      <div class="wifi-card">
+        <dl>
+          <dt>Network</dt><dd>Spooky Pumpkin</dd><dt>Password</dt><dd>spookyeyes</dd>
+          <dt>Setup page</dt><dd>pumpkin.local <span class="or">or</span> 192.168.4.1</dd>
+        </dl>
+      </div>
+      After a few seconds, a setup page should open (if not, tap <b>Sign in</b> or open the setup page above): name your
+      pumpkin, pick your WiFi (2.4 GHz), enter your WiFi password and tap <b>Connect</b>.</div>
+    <div class="step"><span class="n">5</span><span class="lead">Enjoy.</span>
+      Open <span class="addr">http://pumpkin.local</span> on your phone (if that doesn’t work, type the numbers the eyes
+      scroll instead).<br>Then try the buttons, design your own show and make Spooky Eyes talk!</div>
     <div class="faq">
       <p><b>Setup page won’t open?</b> Forget Spooky Pumpkin in your phone’s WiFi settings, switch Spooky Eyes
         off and on, then join again (switching mobile data off can help).</p>
-      <p><b>Page won’t open later?</b> Check your phone is on your home WiFi, or switch Spooky Eyes off and on.</p>
+      <p><b>Spooky Pumpkin WiFi gone?</b> Unused for 10 minutes, it switches off to save batteries: press BOOT.</p>
+      <p><b>Page won’t open later?</b> Check your phone is on your WiFi, or switch Spooky Eyes off and on.</p>
       <p><b>On the doorstep?</b> Out of reach of your WiFi for 3 minutes, Spooky Eyes brings back the Spooky
-        Pumpkin WiFi: join and open 192.168.4.1. Back in range, Spooky Eyes rejoins your WiFi (or switch it off and on).</p>
-      <p><b>BOOT button</b> (on the board): press to repeat the address; hold 5 seconds to forget your home WiFi.</p>
+        Pumpkin WiFi: join and open pumpkin.local. Back in range, Spooky Eyes rejoins your WiFi.</p>
+      <p><b>BOOT button</b> (on the board): press to repeat the address; hold 5 seconds to forget your WiFi.</p>
+      <p><b>No WiFi to hand?</b> On the setup page, “just use the buttons” works on Spooky Eyes’ own WiFi.</p>
     </div>
   </section>
 
@@ -211,9 +238,9 @@
 const WIRES = [
   { pin: "5V",  part: "eye",   end: "VCC", colour: "#d32f2f" },               // + is red and − near-black, as on the
   { pin: "G",   part: "eye",   end: "GND", colour: "#1d1714" },               // battery pack: mid grey, black
-  { pin: "7",   part: "eye",   end: "DIN", colour: "#6a3d9a", dash: "2.2 0.9" },
-  { pin: "6",   part: "eye",   end: "CLK", colour: "#4db6ac" },               // light
-  { pin: "5",   part: "eye",   end: "CS",  colour: "#8d5a2b", dash: "0.05 1.1" }, // dots
+  { pin: "5",   part: "eye",   end: "DIN", colour: "#6a3d9a", dash: "2.2 0.9" },
+  { pin: "6",   part: "eye",   end: "CS",  colour: "#8d5a2b", dash: "0.05 1.1" }, // dots
+  { pin: "7",   part: "eye",   end: "CLK", colour: "#4db6ac" },               // light
   { pin: "3.3", part: "mouth", end: "+",   colour: "#c2185b", dash: "2.2 0.8 0.05 0.8" }, // the LED's long leg
   { pin: "4",   part: "mouth", end: "R",   colour: "#f57c00" },               // light
   { pin: "3",   part: "mouth", end: "G",   colour: "#2e7d32", dash: "1 0.8" },
@@ -225,16 +252,19 @@ const BATTERY = { "+": "5V", "−": "G" };
 // USB-C socket at the top (as in board.h)
 const SM_LEFT  = ["5V", "G", "3.3", "4", "3", "2", "1", "0"];
 const SM_RIGHT = ["5", "6", "7", "8", "9", "10", "20", "21"];
-// The eye's input header as printed on the MAX7219 module, top to bottom as drawn, and the mouth LED's legs in
-// their usual order (the long leg second), top to bottom as drawn
-const EYE_PINS = ["CLK", "CS", "DIN", "GND", "VCC"];
+// The eye is wired from BEHIND, where its pin names are printed. From there its input header (the one with DIN) is
+// on the right-hand edge, top to bottom as below, and its output header (DOUT, to the other eye) on the left.
+// The mouth LED's legs in their usual order (the long leg second), top to bottom as drawn.
+const EYE_PINS = ["VCC", "GND", "DIN", "CS", "CLK"];
 const LED_LEGS = ["R", "+", "G", "B"];
 
 // ===================== Diagram (units: mm) =====================
-// Left: the new ESP32-C3 from underneath. Right: where each wire's other end goes: the eye wired to the controller,
-// the mouth LED and the battery pack. The wires are routed by hand (two unavoidable crossings: CS/CLK and the
-// LED's red/long leg), and checked against the WIRES list: every drawn wire must run from the ESP32-C3 pin the
-// list names to the eye pin or LED leg it names, and the battery's leads must join the right wires.
+// Left: the eye wired to the controller, from behind. Right: the new ESP32-C3, from underneath. Between them, the
+// battery pack (its leads join the eye's power wires) and the mouth LED. The eye's power wires run across to 5V and
+// G (the + wire loops up round the battery pack); its data wires go down, under the ESP32-C3 and up through the
+// middle of its underside into 5, 6 and 7. The wires are routed by hand (one unavoidable crossing: the LED's
+// red/long leg), and checked against the WIRES list: every drawn wire must run from the ESP32-C3 pin the list
+// names to the eye pin or LED leg it names, and the battery's leads must join the right wires.
 const PROBLEMS = []; // shown on the page (and so failing tools/make_instructions.sh) by checkLayout()
 function drawDiagram() {
   const svg = document.getElementById("diagram");
@@ -260,8 +290,8 @@ function drawDiagram() {
     return found[0];
   };
 
-  // ---- layout: the new ESP32-C3, from underneath ----
-  const S = { x: 12, y: 7.4, s: 1.6 };             // top-left corner, and scale (x real size)
+  // ---- layout: the new ESP32-C3, from underneath, on the right ----
+  const S = { x: 116.4, y: 11.6, s: 1.6 };         // top-left corner, and scale (x real size)
   S.w = 18 * S.s; S.h = 22.52 * S.s;
   const smPad = name => {                          // pad centre for a printed pin name
     let r = SM_LEFT.indexOf(name), left = true;
@@ -271,45 +301,59 @@ function drawDiagram() {
   };
   const sp = name => { const p = smPad(name); return { x: p.x, y: p.y }; };
 
-  // ---- the eye wired to the controller: input header on its left edge, DIN level with its ESP32-C3 pin ----
-  const E = { x: 107, w: 33, pitch: 4.9 };
+  // ---- the eye wired to the controller, from behind, on the left: input header on its right edge, its pins as far
+  //      apart as the ESP32-C3's and its top one level with the pin its wire goes to ----
+  const E = { x: 6.6, w: 32, pitch: 2.54 * S.s, margin: 6 };
   const eyeY = name => {
     const i = EYE_PINS.indexOf(name);
     if (i < 0) throw new Error("No eye pin " + name);
-    return sp(wireTo("eye", "DIN").pin).y + (i - EYE_PINS.indexOf("DIN")) * E.pitch;
+    return sp(wireTo("eye", EYE_PINS[0]).pin).y + i * E.pitch;
   };
-  E.pinX = E.x + 1.3;                              // input header pins
-  E.outX = E.x + E.w - 1.3;                        // output header pins, to the other eye
-  E.y = eyeY(EYE_PINS[0]) - 4.6;
-  E.h = eyeY(EYE_PINS[EYE_PINS.length - 1]) + 4.6 - E.y;
+  E.pinX = E.x + E.w - 1.3;                        // input header pins, from the ESP32-C3
+  E.outX = E.x + 1.3;                              // output header pins, to the other eye
+  E.y = eyeY(EYE_PINS[0]) - E.margin;
+  E.h = eyeY(EYE_PINS[EYE_PINS.length - 1]) + E.margin - E.y;
   const eyePin = name => ({ x: E.pinX, y: eyeY(name) });
 
-  // ---- the mouth LED, on its side: dome to the left, legs to the right ----
-  const M = { x: 45, yc: 33.6, pitch: 3.6, body: 12, d: 9.5, flange: 1.4, leg: 7, longer: 3 };
+  // ---- the mouth LED, on its side between them: dome to the left, legs to the right, the G leg level with its pin ----
+  const M = { x: 55, pitch: 3.3, body: 12, d: 9.5, flange: 1.4, leg: 7, longer: 3 };
   M.legX = M.x + M.body + M.flange;                // where the legs leave the LED
   const legY = name => {
     const i = LED_LEGS.indexOf(name);
     if (i < 0) throw new Error("No LED leg " + name);
-    return M.yc + (i - (LED_LEGS.length - 1) / 2) * M.pitch;
+    return sp(wireTo("mouth", "G").pin).y + (i - LED_LEGS.indexOf("G")) * M.pitch;
   };
+  M.yc = (legY(LED_LEGS[0]) + legY(LED_LEGS[LED_LEGS.length - 1])) / 2;
   const legEnd = name => ({ x: M.legX + M.leg + (name === "+" ? M.longer : 0), y: legY(name) });
   const partPin = w => w.part === "eye" ? eyePin(w.end) : w.part === "mouth" ? legEnd(w.end) : null;
 
+  // ---- the battery pack, inside a loop of the eye's + wire, above its − wire; its leads join them ----
+  const LOOP = { left: E.x + E.w + 2.4, top: 5.4 }; // the + wire goes up and over the battery pack
+  const B = { w: 19, h: 9 };
+  B.x = LOOP.left + 3.4; B.y = LOOP.top + 2.1;
+  LOOP.right = B.x + B.w + 2.6;
+  const LEADS = { "+": B.y + 2.2, "−": B.y + B.h - 2.2 }; // where each lead leaves the pack
+  const JOINS = { "+": { x: LOOP.right, y: LEADS["+"] }, "−": { x: B.x - 1.8, y: eyeY("GND") } };
+
   // ---- wire lanes ----
-  // Wires from the board's left edge go out to the left and round its bottom, lower pins on the inside...
-  const viaBottom = WIRES.filter(w => smPad(w.pin).left)
-                         .sort((a, b) => SM_LEFT.indexOf(b.pin) - SM_LEFT.indexOf(a.pin));
-  const laneX = {}, laneY = {};
-  viaBottom.forEach((w, i) => {
-    laneX[w.pin] = S.x - (i + 1) * LANE;
-    laneY[w.pin] = S.y + S.h + 0.25 + (i + 1) * LANE;
+  // The eye's data wires go to the board's far column: down past the mouth LED, under the board, up through the
+  // middle of its underside (between the pin columns) and right into their pins, each just below its pin's name
+  // and then up into it. Nested with the top pin's wire innermost, they keep the eye's order: no crossings.
+  const farSide = WIRES.filter(w => w.part === "eye" && !smPad(w.pin).left)
+                       .sort((a, b) => smPad(a.pin).y - smPad(b.pin).y);
+  // Up the dark board they're further apart than LANE: their paper outlines (HALO) would merge into one pale band,
+  // so a strip of board at least as wide as a wire shows between them
+  const HALO = 1.4, RISE_GAP = HALO + 1.2;
+  const armX = {}, underY = {}, riseX = {};
+  farSide.forEach((w, i) => {
+    armX[w.pin] = E.x + E.w + 9.4 - i * LANE;
+    underY[w.pin] = S.y + S.h + 0.25 + (i + 1) * LANE;
+    riseX[w.pin] = S.x + 13.25 + i * RISE_GAP;
   });
-  // ...then up into the LED's legs (inner lanes first), and up to the eye's GND and VCC, either side of the battery
-  const riserX = {};
-  viaBottom.filter(w => w.part === "mouth").forEach((w, i) => riserX[w.pin] = legEnd("+").x + 2.2 + i * LANE);
-  riserX[wireTo("eye", "GND").pin] = legEnd("+").x + 2.2 + 4 * LANE + 1.4;
-  riserX[wireTo("eye", "VCC").pin] = E.pinX - 3;
-  const SWAP = { up: 57, down: 64 };              // where the CLK and CS wires swap over
+  const BELOW_PIN = 1.95;                          // between a pin's name and the next one down
+  // The mouth LED's wires jog up or down at these distances left of the board. The + wire jogs furthest from the
+  // board, so it crosses the R wire just once, where that one already runs level with its leg.
+  const JOG = { "+": 30, "R": 25.5, "B": 21 };
 
   // Orthogonal path through points, with rounded corners
   function wirePath(pts, r = 0.9) {
@@ -332,25 +376,26 @@ function drawDiagram() {
     moves.forEach(m => { cur = { ...cur, ...m }; pts.push(cur); });
     return pts;
   };
-  const roundBottom = (pin, ...moves) => route(sp(pin), { x: laneX[pin] }, { y: laneY[pin] }, { x: riserX[pin] }, ...moves);
-  const ROUTES = {                                 // by ESP32-C3 pin
-    "7":   route(sp("7"), { x: E.pinX }),          // straight across
-    "5":   route(sp("5"), { x: SWAP.down }, { y: eyeY("CS") },  { x: E.pinX }),
-    "6":   route(sp("6"), { x: SWAP.up },   { y: eyeY("CLK") }, { x: E.pinX }),
-    "G":   roundBottom("G",   { y: eyeY("GND") }, { x: E.pinX }),
-    "5V":  roundBottom("5V",  { y: eyeY("VCC") }, { x: E.pinX }),
-    "3.3": roundBottom("3.3", { y: legY("+") }, { x: legEnd("+").x }),
-    "4":   roundBottom("4",   { y: legY("R") }, { x: legEnd("R").x }),
-    "3":   roundBottom("3",   { y: legY("G") }, { x: legEnd("G").x }),
-    "1":   roundBottom("1",   { y: legY("B") }, { x: legEnd("B").x }),
+  // Each wire is drawn from its eye pin or LED leg, left to right, to its ESP32-C3 pin (and stored the other way round)
+  const toBoard = (pin, ...moves) => {
+    const w = wireFor(pin), end = sp(pin);
+    return route(partPin(w), ...moves, { y: end.y }, { x: end.x }).reverse();
   };
-
-  // ---- the battery pack, between the eye's GND and VCC wires; its leads join them ----
-  const B = { w: 19, h: 10 };
-  B.x = (riserX["G"] + riserX["5V"]) / 2 - B.w / 2;
-  B.y = eyeY("VCC") + 1.6;
-  const leadY = B.y + 2.4;
-  const JOINS = { "−": { x: riserX["G"], y: leadY }, "+": { x: riserX["5V"], y: leadY } }; // on the wires' way up
+  const straight = pin => route(partPin(wireFor(pin)), { x: sp(pin).x }).reverse(); // level with its pin already
+  const viaMiddle = pin => route(partPin(wireFor(pin)), { x: armX[pin] }, { y: underY[pin] }, { x: riseX[pin] },
+                                 { y: sp(pin).y + BELOW_PIN }, { x: sp(pin).x }, { y: sp(pin).y }).reverse();
+  const jog = pin => toBoard(pin, { x: smPad(pin).x - JOG[wireFor(pin).end] });
+  const ROUTES = {                                 // by ESP32-C3 pin
+    "5V":  toBoard("5V", { x: LOOP.left }, { y: LOOP.top }, { x: LOOP.right }),
+    "G":   straight("G"),
+    "5":   viaMiddle("5"),
+    "6":   viaMiddle("6"),
+    "7":   viaMiddle("7"),
+    "3.3": jog("3.3"),
+    "4":   jog("4"),
+    "3":   straight("3"),
+    "1":   jog("1"),
+  };
 
   // ---- checks: the drawing must say what the WIRES list says ----
   const near = (p, q) => Math.abs(p.x - q.x) < 0.01 && Math.abs(p.y - q.y) < 0.01;
@@ -362,6 +407,11 @@ function drawDiagram() {
     const r = ROUTES[w.pin], end = partPin(w);
     if (!r || !end || !near(r[0], sp(w.pin)) || !near(r[r.length - 1], end))
       throw new Error(`the wire drawn for the ${w.part}'s ${w.end} doesn't run to it from pin ${w.pin}`);
+    r.slice(1).forEach((b, i) => {
+      const a = r[i];
+      if (near(a, b) || (Math.abs(a.x - b.x) > 0.01 && Math.abs(a.y - b.y) > 0.01))
+        throw new Error(`the wire from pin ${w.pin} has a zero-length or slanting stretch`);
+    });
   });
   EYE_PINS.forEach(n => wireTo("eye", n));        // one wire on each eye pin...
   LED_LEGS.forEach(n => wireTo("mouth", n));      // ...and on each LED leg
@@ -373,17 +423,19 @@ function drawDiagram() {
   // ---- draw: the new ESP32-C3 ----
   const used = new Map(WIRES.map(w => [w.pin, w]));
   const sm = g();
-  const usb = () => el("rect", { x: S.x + S.w / 2 - 4 * S.s, y: S.y - 1.1 * S.s, width: 8 * S.s, height: 5.4 * S.s, rx: 0.9 * S.s,
+  // the USB-C socket, sticking out at the top (kept short, so the wire into 5 passes below it)
+  const usb = () => el("rect", { x: S.x + S.w / 2 - 3.7 * S.s, y: S.y - 1.1 * S.s, width: 7.4 * S.s, height: 3.9 * S.s, rx: 0.9 * S.s,
                                  fill: "#c9ccd0", stroke: "#6d7175", "stroke-width": 0.3 }, sm);
   usb();
   el("rect", { x: S.x, y: S.y, width: S.w, height: S.h, rx: 0.8 * S.s, fill: "#22304a", stroke: "#0f1626", "stroke-width": 0.35 }, sm);
   usb();
-  el("rect", { x: S.x + S.w / 2 - 2.85 * S.s, y: S.y + 0.35 * S.s, width: 5.7 * S.s, height: 1.7 * S.s, rx: 0.7 * S.s, fill: "#8e9297" }, sm);
-  el("text", { x: S.x + S.w / 2, y: S.y + 3.6 * S.s, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7),
+  el("rect", { x: S.x + S.w / 2 - 2.7 * S.s, y: S.y - 0.55 * S.s, width: 5.4 * S.s, height: 1.2 * S.s, rx: 0.6 * S.s, fill: "#8e9297" }, sm);
+  el("text", { x: S.x + S.w / 2, y: S.y + 2.45 * S.s, "text-anchor": "middle", "font-family": SILK, "font-size": pt(7),
                "font-weight": 700, fill: "#3b3f44" }, sm, "USB-C");
   // Seen from underneath, so no chip, buttons or LED (they're on the other side): just the pins, with the names
-  // printed next to them as on the real board. Pins with no wire are greyed out.
-  const mid = { x: S.x + S.w / 2 + 0.9, y: S.y + S.h * 0.62 };
+  // printed next to them as on the real board. Pins with no wire are greyed out. "UNDERNEATH" runs up the left of
+  // the middle, beside the eye's wires.
+  const mid = { x: S.x + 10.4, y: S.y + S.h * 0.69 };
   el("text", { x: mid.x, y: mid.y, transform: `rotate(-90 ${mid.x} ${mid.y})`, "text-anchor": "middle", "font-family": SILK,
                "font-size": pt(7), "font-weight": 700, fill: "rgba(255,255,255,.35)", "letter-spacing": 0.3 }, sm, "UNDERNEATH");
   [...SM_LEFT, ...SM_RIGHT].forEach(name => {
@@ -396,37 +448,44 @@ function drawDiagram() {
     }, sm, name);
   });
 
-  // ---- draw: the eye (a MAX7219 8x8 LED matrix module), from its pin side ----
+  // ---- draw: the eye (a MAX7219 8x8 LED matrix module), from behind: bare circuit board, not the LEDs. No chip or
+  //      other part (there's none on the back, and people would try to line one up): the two headers with their
+  //      printed names, the solder pads where the matrix's legs come through, and the mounting holes ----
   const eye = g();
   el("rect", { x: E.x, y: E.y, width: E.w, height: E.h, rx: 1.2, fill: "#2e5236", stroke: "#183020", "stroke-width": 0.3 }, eye);
   const header = (x, fill) => {
-    const top = eyeY(EYE_PINS[0]) - E.pitch / 2 + 0.7, bottom = eyeY(EYE_PINS[EYE_PINS.length - 1]) + E.pitch / 2 - 0.7;
+    const top = eyeY(EYE_PINS[0]) - E.pitch / 2 + 0.5, bottom = eyeY(EYE_PINS[EYE_PINS.length - 1]) + E.pitch / 2 - 0.5;
     el("rect", { x: x - 1.1, y: top, width: 2.2, height: bottom - top, rx: 0.3, fill: "#151515" }, eye);
     EYE_PINS.forEach(n => el("rect", { x: x - 0.65, y: eyeY(n) - 0.65, width: 1.3, height: 1.3, fill }, eye));
   };
   header(E.pinX, "#d9b45a");
   header(E.outX, "#8c7a52");
-  EYE_PINS.forEach(n => el("text", { x: E.x + 3.3, y: eyeY(n) + 1.0, "font-family": SILK, "font-size": pt(8), "font-weight": 700,
-                                     fill: "#fff" }, eye, n));
-  // the matrix, showing a picture from the pumpkin (Eyes::straight)
-  const MX = { side: 19 };
-  MX.x = E.outX - 2.2 - MX.side; MX.y = E.y + (E.h - MX.side) / 2;
-  el("rect", { x: MX.x, y: MX.y, width: MX.side, height: MX.side, rx: 0.5, fill: "#151313" }, eye);
-  [0x3c, 0x7e, 0xff, 0xe7, 0xe7, 0xff, 0x7e, 0x3c].forEach((row, r) => {
-    for (let c = 0; c < 8; c++) {
-      const lit = row & (0x80 >> c), step = MX.side / 8;
-      el("circle", { cx: MX.x + (c + 0.5) * step, cy: MX.y + (r + 0.5) * step, r: step * 0.36,
-                     fill: lit ? "#ff7a1a" : "#3a2622" }, eye);
+  // pin names as printed: the input header's beside it, and the output header's (DOUT, not DIN), smaller and dimmer
+  EYE_PINS.forEach(n => {
+    el("text", { x: E.pinX - 2.1, y: eyeY(n) + 1.0, "text-anchor": "end", "font-family": SILK, "font-size": pt(8),
+                 "font-weight": 700, fill: "#fff" }, eye, n);
+    el("text", { x: E.outX + 2.1, y: eyeY(n) + 0.9, "font-family": SILK, "font-size": pt(7), "font-weight": 700,
+                 fill: "rgba(255,255,255,.55)" }, eye, n === "DIN" ? "DOUT" : n);
+  });
+  // the matrix's 16 legs, soldered: a row of 8 along the top edge and 8 along the bottom
+  const PADS = { n: 8, pitch: 2.5, inset: 2.1 };
+  [E.y + PADS.inset, E.y + E.h - PADS.inset].forEach(y => {
+    for (let i = 0; i < PADS.n; i++) {
+      const x = E.x + E.w / 2 + (i - (PADS.n - 1) / 2) * PADS.pitch;
+      el("circle", { cx: x, cy: y, r: 0.72, fill: "#c4c7cb", stroke: "#7f858b", "stroke-width": 0.15 }, eye);
     }
   });
-  // the wires to the other eye (not to the ESP32-C3)
+  // a mounting hole in each corner: you see through the board
+  [[E.x + 2.3, E.y + 2.3], [E.x + E.w - 2.3, E.y + 2.3], [E.x + 2.3, E.y + E.h - 2.3], [E.x + E.w - 2.3, E.y + E.h - 2.3]]
+    .forEach(([cx, cy]) => el("circle", { cx, cy, r: 1.05, fill: PAPER, stroke: "#183020", "stroke-width": 0.25 }, eye));
+  // the wires to the other eye (not to the ESP32-C3), off to the left
   const others = g({ fill: "none", stroke: "#9b918a", "stroke-width": 0.45, "stroke-linecap": "round" });
   const othersEnd = E.y + E.h + 2.2;
   EYE_PINS.forEach((n, i) => {
-    const x = E.x + E.w + 1.2 + (EYE_PINS.length - 1 - i) * 0.9;
+    const x = E.x - 1.2 - (EYE_PINS.length - 1 - i) * 0.9;
     el("path", { d: wirePath([{ x: E.outX, y: eyeY(n) }, { x, y: eyeY(n) }, { x, y: othersEnd }], 0.6) }, others);
   });
-  el("text", { x: 146, y: othersEnd + 3.2, "text-anchor": "end", "font-family": HAND, "font-size": pt(9), fill: "#5d544e",
+  el("text", { x: 0.2, y: othersEnd + 3.2, "font-family": HAND, "font-size": pt(9), fill: "#5d544e",
                "letter-spacing": 0.15 }, svg, "TO THE OTHER EYE");
 
   // ---- draw: the mouth LED (common anode) ----
@@ -455,24 +514,27 @@ function drawDiagram() {
     el("rect", { x: cx0, y: cy + 0.35, width: cw, height: ch - 0.7, rx: (ch - 0.7) / 2, fill: "#b8742f" }, bat);
     el("rect", { x: plusRight ? cx0 + cw : cx0 - 0.7, y: cy + ch / 2 - 0.55, width: 0.7, height: 1.1, rx: 0.2, fill: "#c9ccd0" }, bat);
   }
-  const lead = (from, to, colour) => el("path", { d: `M${from.x},${from.y} L${to.x},${to.y}`, stroke: colour, "stroke-width": 0.6,
-                                                   fill: "none" }, bat);
-  lead({ x: B.x, y: leadY }, JOINS["−"], wireFor(BATTERY["−"]).colour);
-  lead({ x: B.x + B.w, y: leadY }, JOINS["+"], wireFor(BATTERY["+"]).colour);
-  [["−", B.x - 1.6], ["+", B.x + B.w + 1.6]].forEach(([t, x]) =>
-    el("text", { x, y: leadY - 0.8, "text-anchor": "middle", "font-family": SILK, "font-size": pt(8), "font-weight": 700, fill: INK }, bat, t));
-  el("text", { x: B.x + B.w / 2, y: B.y + B.h + 3.5, "text-anchor": "middle", "font-family": HAND, "font-size": pt(10.5),
-               fill: INK, "letter-spacing": 0.2 }, bat, "BATTERY PACK");
-  const often = el("text", { "text-anchor": "middle", "font-family": BODY, "font-style": "italic", "font-size": pt(8), fill: "#4a3f38" }, bat);
+  const lead = (pts, colour) => el("path", { d: wirePath(pts, 0.6), stroke: colour, "stroke-width": 0.6, fill: "none",
+                                             "stroke-linejoin": "round" }, bat);
+  lead([{ x: B.x + B.w, y: LEADS["+"] }, JOINS["+"]], wireFor(BATTERY["+"]).colour);
+  lead([{ x: B.x, y: LEADS["−"] }, { x: JOINS["−"].x, y: LEADS["−"] }, JOINS["−"]], wireFor(BATTERY["−"]).colour);
+  el("text", { x: B.x + B.w + 1.3, y: LEADS["+"] - 0.8, "text-anchor": "middle", "font-family": SILK, "font-size": pt(8),
+               "font-weight": 700, fill: INK }, bat, "+");
+  el("text", { x: B.x - 0.9, y: LEADS["−"] - 0.8, "text-anchor": "middle", "font-family": SILK, "font-size": pt(8),
+               "font-weight": 700, fill: INK }, bat, "−");
+  const label = { x: LOOP.right + 3, y: LOOP.top + 2.9 };   // above the + wire's way to the board
+  el("text", { x: label.x, y: label.y, "font-family": HAND, "font-size": pt(10.5), fill: INK, "letter-spacing": 0.2 }, bat,
+     "BATTERY PACK");
+  const often = el("text", { "font-family": BODY, "font-style": "italic", "font-size": pt(8), fill: "#4a3f38" }, bat);
   ["(often already joined", "to the eye’s wires)"].forEach((t, k) =>
-    el("tspan", { x: B.x + B.w / 2, y: B.y + B.h + 6.5 + k * 2.8 }, often, t));
+    el("tspan", { x: label.x, y: label.y + 2.7 + k * 2.65 }, often, t));
 
   // ---- draw: the wires ----
   const wires = g({ fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" });
-  const onTop = wireTo("mouth", "+");              // drawn last, so it runs on over the red leg's wire it crosses
-  [...WIRES.filter(w => w !== onTop), onTop].forEach(w => {
+  const onTop = [wireTo("mouth", "+")];           // drawn last, so it runs on over the red leg's wire it crosses
+  [...WIRES.filter(w => !onTop.includes(w)), ...onTop].forEach(w => {
     const d = wirePath(ROUTES[w.pin]);
-    el("path", { d, stroke: PAPER, "stroke-width": 1.65 }, wires);   // a gap where wires cross
+    el("path", { d, stroke: PAPER, "stroke-width": HALO }, wires);   // a gap where wires cross
     el("path", Object.assign({ d, stroke: w.colour, "stroke-width": 0.75 }, w.dash ? { "stroke-dasharray": w.dash } : {}), wires);
   });
   WIRES.forEach(w => {
@@ -484,11 +546,11 @@ function drawDiagram() {
     el("circle", { cx: p.x, cy: p.y, r: 1, fill: wireFor(BATTERY[lead]).colour, stroke: PAPER, "stroke-width": 0.3 }));
 
   // ---- captions ----
-  const caption = (x, y, t, size = 11) => el("text", { x, y, "text-anchor": "middle", "font-family": HAND, "font-size": pt(size),
-                                                       fill: INK, "letter-spacing": 0.2 }, svg, t);
-  caption(S.x + S.w / 2, 3.1, "NEW ESP32-C3, FROM UNDERNEATH");
-  caption(E.x + E.w / 2, 3.1, "THE EYE WIRED TO THE CONTROLLER");
-  caption(M.x + (legEnd("+").x - M.x) / 2, legY(LED_LEGS[0]) - 4.6, "MOUTH LED", 10.5);
+  const caption = (x, y, t, size = 11, anchor = "middle") => el("text", { x, y, "text-anchor": anchor, "font-family": HAND,
+                                                       "font-size": pt(size), fill: INK, "letter-spacing": 0.2 }, svg, t);
+  caption(E.x + E.w / 2, 3.1, "THE EYE, FROM BEHIND");
+  caption(146, 3.1, "NEW ESP32-C3, FROM UNDERNEATH", 11, "end");
+  caption(M.x + (legEnd("+").x - M.x) / 2, legY(LED_LEGS[LED_LEGS.length - 1]) + 5.6, "MOUTH LED", 10.5);
 
   // for debugging: how many places wires cross
   const segs = WIRES.flatMap(w => ROUTES[w.pin].slice(1).map((b, i) => ({ pin: w.pin, a: ROUTES[w.pin][i], b })));
@@ -517,13 +579,42 @@ function checkLayout() {
     problems.push("the subtitle runs into New in 2026");
   const topEnd = mmDown(document.querySelector("#top > :last-child")), bottomStart = mmTop(document.getElementById("bottom"));
   const bottomEnd = mmDown(document.querySelector("#bottom > :last-child"));
-  document.documentElement.dataset.layout = // for debugging: mm from the top of the page
+  const cardRight = (document.querySelector(".wifi-card").getBoundingClientRect().right - page.left) * 25.4 / 96;
+  document.documentElement.dataset.layout = // for debugging: mm from the top (or left) of the page
     `diagram ${mmTop(document.getElementById("diagram")).toFixed(1)}-${mmDown(document.getElementById("diagram")).toFixed(1)}, ` +
-    `step 3 ends ${topEnd.toFixed(1)}, step 4 starts ${bottomStart.toFixed(1)}, small print ends ${bottomEnd.toFixed(1)}`;
+    `step 3 ends ${topEnd.toFixed(1)}, step 4 starts ${bottomStart.toFixed(1)}, small print ends ${bottomEnd.toFixed(1)}, ` +
+    `WiFi box right edge ${cardRight.toFixed(1)}`;
   if (topEnd > bottomStart + 0.3) problems.push(`step 3 runs ${(topEnd - bottomStart - 0.3).toFixed(1)} mm into step 4`);
-  const card = document.querySelector(".wifi-card").getBoundingClientRect();
-  if ((card.right - page.left) * 25.4 / 96 > 138.4) problems.push("the WiFi box runs into the raven");
+  if (cardRight > 138.4) problems.push("the WiFi box runs into the raven");
   if (bottomEnd > 260) problems.push(`the small print runs ${(bottomEnd - 260).toFixed(1)} mm too close to the frame`);
+
+  // The step numbers, in the top block and beside the raven, share one left edge
+  const numbers = [...document.querySelectorAll(".step .n")].map(n => (n.getBoundingClientRect().left - page.left) * 25.4 / 96);
+  if (Math.max(...numbers) - Math.min(...numbers) > 0.2) problems.push("the step numbers don't line up");
+
+  // The colour version's QR code: at least 24 mm of code, to scan from a cheap print. It and its quiet zone (4 modules
+  // round it, part of the svg: no ink allowed there) and each line of its heading and caption sit in the blank space
+  // right of the title, clear of the title and the frame. Measured on the artwork: the frame's swag ends 34 mm down;
+  // below that the edge of its curtain runs from 177.7 mm across (38 mm down) to 185.5 mm (53 mm down), then the
+  // border is at 191.6 mm, so a box's top corner is the part nearest the curtain. The title art's ink stops 0.8 mm
+  // short of its image's right edge.
+  const mmRect = r => ({ x0: (r.left - page.left) * 25.4 / 96, y0: (r.top - page.top) * 25.4 / 96,
+                         x1: (r.right - page.left) * 25.4 / 96, y1: (r.bottom - page.top) * 25.4 / 96 });
+  const textOf = el => { const range = document.createRange(); range.selectNodeContents(el); return range; };
+  const inkOf = el => mmRect(textOf(el).getBoundingClientRect());
+  const linesOf = el => [...textOf(el).getClientRects()].filter(r => r.width > 1).map(mmRect); // each line's text
+  const qrCode = mmRect(document.querySelector("#qr svg").getBoundingClientRect());
+  const qrParts = [qrCode, ...linesOf(document.querySelector("#qr .qr-head")), ...linesOf(document.querySelector("#qr .qr-foot"))];
+  document.documentElement.dataset.layout += ", QR code (with quiet zone), heading and caption lines " +
+    qrParts.map(b => `${b.x0.toFixed(1)}-${b.x1.toFixed(1)} x ${b.y0.toFixed(1)}-${b.y1.toFixed(1)}`).join(", ");
+  if ((qrCode.x1 - qrCode.x0) * 37 / 45 < 24 - 0.01) problems.push("the QR code is too small to scan");
+  const frameEdge = y => (y < 55 ? 175.6 + (y - 34) * 0.4 : 190.4) - 0.8; // a little inside the measured edge
+  if (qrParts.some(b => b.y0 < 34.5 || b.x1 > frameEdge(b.y0) || b.y1 > mmTop(document.getElementById("top")) - 1))
+    problems.push("the QR code runs into the frame");
+  const art = mmRect(document.querySelector(".header-art").getBoundingClientRect());
+  const titleParts = [{ ...art, x1: art.x1 - 0.8 }, inkOf(document.querySelector(".subtitle"))];
+  if (qrParts.some(b => titleParts.some(t => b.x0 < t.x1 + 0.5 && t.x0 < b.x1 + 0.5 && b.y0 < t.y1 + 0.5 && t.y0 < b.y1 + 0.5)))
+    problems.push("the QR code runs into the title");
 
   // Diagram labels: at least 7 pt, inside the drawing, clear of each other and of the wires (units: mm)
   const svg = document.getElementById("diagram"), view = svg.viewBox.baseVal;

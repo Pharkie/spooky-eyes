@@ -12,8 +12,10 @@ settings you can change, three nearly flat AA batteries, and the `-ota.bin` of t
 ## Setup through the captive portal
 
 - [ ] iPhone: join "Spooky Pumpkin" (password `spookyeyes`). The sign-in sheet opens the setup page by
-      itself. Name it, pick the home WiFi, check and save; the "what next" page shows until the setup WiFi
-      goes. The eyes then scroll `http://pumpkin.local or <IP>`, and both open the buttons.
+      itself. Name it, pick the WiFi, tap Save; "Your pumpkin is alive!" shows until the setup WiFi goes.
+      The eyes then scroll `http://pumpkin.local or <IP>`, and both open the buttons.
+- [ ] "Skip WiFi for now: just use the buttons" (under Save) opens the buttons on the setup WiFi, and
+      they work there.
 - [ ] Android: the same, from the "Sign in to network" notification. Note whether `pumpkin.local` opens;
       the IP address must.
 - [ ] Wrong password first: the check says the password didn't work and nothing is saved (the pumpkin

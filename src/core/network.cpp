@@ -1,6 +1,6 @@
 // WiFi, closely ported from Scribe Evolution's src/core/network.cpp:
 //   connectToWiFi()          -> connectHome(): look for the home WiFi first, then join with a timeout
-//   startFallbackAP()        -> startSetupAP(): AP+STA (so the setup page can scan) plus captive DNS
+//   startFallbackAP()        -> startSetupAP(): AP+STA (so the setup page can scan) plus captive DNS and mDNS
 //   setupmDNS()              -> startMdns(): ping each candidate name, then claim the first free one
 //   handleWiFiReconnection() -> keepConnected(), now without blocking
 //   handleDNSServer() and updateStatusLED(), which Scribe called from loop() -> networkTask()
@@ -715,6 +715,21 @@ namespace
         return channel;
     }
 
+    // pumpkin.local (no check that the name's free first, as Scribe did: a house has one pumpkin, and the
+    // check could hold up the BOOT button for 15 s). Answers on whichever WiFi is up: home or setup.
+    void startMdns()
+    {
+        if (!MDNS.begin(kHostname))
+        {
+            LOG("MDNS", "Couldn't register %s.local: use the IP address", kHostname);
+            return;
+        }
+        MDNS.setInstanceName(settings::get().pumpkinName); // shown by Bonjour browsers
+        MDNS.addService("http", "tcp", kWebServerPort);
+        setRegisteredMdnsName(kHostname);
+        LOG("MDNS", "Web address http://%s.local", kHostname);
+    }
+
     // channel 0: the driver's default (1)
     bool startSetupAP(int32_t channel = 0)
     {
@@ -734,6 +749,9 @@ namespace
                 currentMode = Mode::SetupAP;
                 LOG("WIFI", "Setup WiFi \"%s\" is on (password \"%s\", channel %d), page at http://%s", kSetupApName,
                     kSetupApPassword, static_cast<int>(WiFi.channel()), ip.toString().c_str());
+                // pumpkin.local on the setup WiFi too: phones look up .local names by multicast (mDNS), which
+                // the captive DNS never sees
+                startMdns();
                 return true;
             }
             LOG("WIFI", "Setup WiFi didn't start (attempt %d of %d)", attempt, kSetupApAttempts);
@@ -741,21 +759,6 @@ namespace
             waitFor(kSetupApRetryMs);
         }
         return false;
-    }
-
-    // pumpkin.local (no check that the name's free first, as Scribe did: a house has one pumpkin, and the
-    // check could hold up the BOOT button for 15 s)
-    void startMdns()
-    {
-        if (!MDNS.begin(kHostname))
-        {
-            LOG("MDNS", "Couldn't register %s.local: use the IP address", kHostname);
-            return;
-        }
-        MDNS.setInstanceName(settings::get().pumpkinName); // shown by Bonjour browsers
-        MDNS.addService("http", "tcp", kWebServerPort);
-        setRegisteredMdnsName(kHostname);
-        LOG("MDNS", "Web address http://%s.local", kHostname);
     }
 
     void reportStack(const char *when)

@@ -439,7 +439,7 @@ class Pumpkin:
                 "hasSavedWifi": bool(self.wifi_ssid),
                 "homeSsid": self.wifi_ssid,
                 "ip": "192.168.1.23" if home else "" if self.mode == "off" else "192.168.4.1",
-                "hostname": HOSTNAME if home else "",
+                "hostname": "" if self.mode == "off" else HOSTNAME,  # mDNS runs on the setup WiFi too
                 "rssi": -58 if home else 0,
                 "setupSsid": SETUP_SSID,
                 "setupReason": self.setup_reason(),
@@ -1122,7 +1122,7 @@ class Handler(BaseHTTPRequestHandler):
             "ok": True, "ssid": ssid, "name": name, "address": f"http://{HOSTNAME}.local",
             "setupSsid": SETUP_SSID, "message": f"Saved. The pumpkin is restarting and joining {ssid}.",
         })
-        # Longer than usual: the phone shows the "what next" page until the setup WiFi goes
+        # A moment for the reply to reach the phone, whose page then waits for the pumpkin on that WiFi
         pumpkin.restart_soon(WIFI_SAVED_RESTART_DELAY_SECONDS, "home")
 
     def api_wifi_forget(self, query):

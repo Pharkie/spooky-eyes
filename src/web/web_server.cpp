@@ -329,7 +329,7 @@ namespace web
             server.on("/", HTTP_GET,
                       [](AsyncWebServerRequest *request)
                       {
-                          // "?play": the setup page's "Open the buttons", after saving just a name
+                          // "?play": the setup page's "Use the buttons now" (and "Open the buttons" after saving just a name)
                           if (needsSetup() && !request->hasParam("play"))
                           {
                               request->redirect("/setup");

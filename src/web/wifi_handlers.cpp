@@ -198,7 +198,7 @@ namespace web
             doc["setupSsid"] = network::apSsid();
             doc["message"] = "Saved. The pumpkin is restarting and joining " + saved.wifiSsid + ".";
             sendJson(request, 200, doc);
-            // Longer than usual: the phone shows the "what next" page until the setup WiFi goes
+            // A moment for the reply to reach the phone, whose page then waits for the pumpkin on that WiFi
             restartSoon("Saved the home WiFi", kWifiSavedRestartDelayMs);
         }
 

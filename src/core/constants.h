@@ -62,8 +62,9 @@ constexpr uint32_t kFirmwareTrialMs = PumpkinTime::Seconds(30);
 
 // Delay before a restart asked for from a web page, so the reply (and the page's next steps) get out
 constexpr uint32_t kRestartDelayMs = PumpkinTime::Seconds(2);
-// After saving the home WiFi: long enough to read the "what next" page before the setup WiFi vanishes
-constexpr uint32_t kWifiSavedRestartDelayMs = PumpkinTime::Seconds(10);
+// After saving the home WiFi: long enough for the reply to reach the phone (the setup page then waits for
+// the pumpkin to answer on that WiFi and opens the buttons by itself), and no longer: people are waiting
+constexpr uint32_t kWifiSavedRestartDelayMs = PumpkinTime::Seconds(3);
 
 // Buttons mode lasts this long after the last press, or the last heartbeat from an open button page
 // (which sends one every kButtonsHeartbeatMs while it's on screen); then it's back to the show

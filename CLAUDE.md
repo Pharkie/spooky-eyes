@@ -88,7 +88,8 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
 - **WiFi** is ported from Scribe Evolution (`~/dev/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
   `src/core/network.cpp`): pre-scan, connect, AP+STA fallback with captive DNS, mDNS, reconnects, status LED.
   Unlike Scribe, the setup WiFi ("Spooky Pumpkin") and web address (`pumpkin.local`) are fixed, not made from
-  the name (`kSetupApName`, `kHostname`): one pumpkin per house, and the guide prints them. SuperMini boards need reduced
+  the name (`kSetupApName`, `kHostname`): one pumpkin per house, and the guide prints them. mDNS answers on
+  the setup WiFi too (phones look up .local names by multicast, which the captive DNS never sees). SuperMini boards need reduced
   WiFi transmit power to connect reliably. Our own captive-portal DNS (`captive_dns.cpp`) replaces
   Arduino's, which ignores queries with EDNS records. Losing home WiFi for 3 minutes (carried out to the
   doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range. Before saving, the setup

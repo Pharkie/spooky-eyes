@@ -1,5 +1,7 @@
 # Spooky Pumpkin Eyes
 
+**[Colour guide (PDF)](docs/instructions/2026-wifi-upgrade.pdf)**: wiring and setup on one page.
+
 LED eyes for a Halloween pumpkin: two 8x8 LED matrices and a colour-changing mouth LED, run by an ESP32-C3
 SuperMini with WiFi. Out of the box it plays a show of eyes, pictures and messages. Open its web page on a
 phone, tablet or laptop and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
@@ -11,15 +13,16 @@ Pictures, effects and ideas by a six-year-old Halloween fan.
 
 ## For the people with a pumpkin
 
-The one-page guide is in [docs/instructions/](docs/instructions/): how to move the wires from the old
+The one-page guide is in [docs/instructions/](docs/instructions/): how to connect the wires from the old
 Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
 
 1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network called "Spooky Pumpkin",
    and its eyes scroll how to join it. The password is `spookyeyes`.
-2. Join it on a phone, tablet or laptop. A setup page pops up (or open http://192.168.4.1): give the pumpkin a name (e.g.
+2. Join it on a phone, tablet or laptop. A setup page pops up (or open http://pumpkin.local or http://192.168.4.1): give the pumpkin a name (e.g.
    "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Save.
    The pumpkin tries the password first (up to 30 seconds) and only saves one that works. WiFi is
-   optional: save just a name and the pumpkin keeps its own WiFi.
+   optional: save just a name, or tap "just use the buttons" at the bottom, and the pumpkin keeps its own
+   WiFi.
 3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes:
    `http://pumpkin.local  or  192.168.1.23`. Open that on any phone, tablet or laptop on the same WiFi
    (Android phones often need the numbers). The name and address are the same on every pumpkin (one per

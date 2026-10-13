@@ -10,10 +10,11 @@
 
 #include <cstdint>
 
-// Eyes: two daisy-chained MAX7219 8x8 matrices on SPI (three neighbouring pins on the right side)
-constexpr int kEyesCsPin = 5;  // CS / LOAD
-constexpr int kEyesClkPin = 6; // CLK
-constexpr int kEyesDinPin = 7; // DIN (MOSI)
+// Eyes: two daisy-chained MAX7219 8x8 matrices on SPI (three neighbouring pins on the right side, in the
+// same order as the eye's header: DIN, CS, CLK from top to bottom)
+constexpr int kEyesDinPin = 5; // DIN (MOSI)
+constexpr int kEyesCsPin = 6;  // CS / LOAD
+constexpr int kEyesClkPin = 7; // CLK
 constexpr uint32_t kEyesSpiHz = 1000000; // slow and steady: long wires inside a pumpkin
 
 // Mouth: common-anode RGB LED, long leg to 3.3. A pin driven LOW lights that colour.

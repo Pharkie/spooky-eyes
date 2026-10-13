@@ -39,7 +39,7 @@
       <h2>2. Choose a WiFi network</h2>
       <p id="scan-state" class="muted" role="status" style="margin:0 0 10px"></p>
       <ul id="networks" class="networks" aria-label="WiFi networks"></ul>
-      <div class="row">
+      <div class="row" style="margin-top:12px">
         <button type="button" id="manual-toggle" class="linkish" style="flex:1;text-align:left">Join by SSID</button>
         <button type="button" id="rescan" class="btn small secondary">↻ Refresh</button>
       </div>
@@ -62,13 +62,18 @@
 
     <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
     <p id="error" class="error" role="alert"></p>
-    <button type="submit" id="save" class="btn wide">Save</button>
+    <button type="submit" id="save" class="btn wide">Connect</button>
+    <p class="hint center" id="play-now" style="margin-top:28px" hidden>
+      <a href="/?play=1" style="color:inherit">Skip WiFi for now: just use the buttons</a>
+    </p>
   </form>
 </section>
 
 <section id="done-view" hidden>
   <div class="card center">
     <h2>🎃 Your pumpkin is alive!</h2>
+    <p class="muted" id="done-wait" role="status" hidden><span class="spinner"></span>Joining <span id="done-ssid"></span>…</p>
+    <p class="hint" id="done-patience" hidden>Please wait, this can take up to 30 seconds.</p>
     <a class="btn wide" id="done-address" href="http://pumpkin.local/">Open pumpkin.local</a>
     <p class="hint" id="done-hint">If that doesn’t work, type the numbers the eyes scroll instead, like 192.168.1.23</p>
   </div>
@@ -234,7 +239,9 @@ setTimeout(function () {
   // the router didn't answer in time, the same details can be saved anyway.
   function updateSaveButton() {
     const checked = !onSetupWifi || hasPassed(chosenSsid(), password.value);
-    saveButton.textContent = passed && passed.unsure && checked ? 'Save anyway' : 'Save';
+    // Connect when there's a WiFi to join; Save for just a name
+    const label = chosenSsid() ? 'Connect' : 'Save';
+    saveButton.textContent = passed && passed.unsure && checked ? label + ' anyway' : label;
   }
 
   // The line under the password: kind 'ok', 'error', or none; spinning adds a spinner
@@ -345,6 +352,54 @@ setTimeout(function () {
     return true;
   }
 
+  // After a WiFi save the pumpkin carries on for a few seconds (so this page arrives), restarts, joins
+  // the WiFi, and the phone has to get back onto it too. A link tapped meanwhile goes nowhere, or back to
+  // the setup page, so wait until the pumpkin answers on its WiFi and then open the buttons by ourselves.
+  // The button and the numbers-on-the-eyes hint show only if that takes a while.
+  function openWhenHome(home, ssid) {
+    const started = Date.now();
+    const sameOrigin = new URL(home).host === location.host;
+    $('done-ssid').textContent = ssid;
+    $('done-wait').hidden = false;
+    $('done-patience').hidden = false;
+    $('done-address').hidden = true;
+    $('done-hint').hidden = true;
+    const attempt = async () => {
+      const waited = Date.now() - started;
+      if (waited > 45000) {
+        // Slow (or this phone stayed on another WiFi): offer the way by hand, and keep trying
+        $('done-wait').textContent = 'Is this phone on ' + ssid + '? Then:';
+        $('done-patience').hidden = true;
+        $('done-address').hidden = false;
+        $('done-hint').hidden = false;
+      }
+      if (waited > 180000) return;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      try {
+        if (sameOrigin) {
+          // pumpkin.local: ask it, and go once it's on the WiFi (not still on its own, before restarting)
+          const reply = await fetch('/api/status', { cache: 'no-store', signal: controller.signal });
+          const status = reply.ok ? await reply.json() : {};
+          // Only answers from after the restart count (before it, it's still on its old WiFi)
+          const restarted = status.uptime * 1000 < waited;
+          if (restarted && status.mode === 'connected') { location.href = home; return; }
+          // Restarted but couldn't join (it's back on its own WiFi): the setup page says why
+          if (restarted && status.mode === 'setup') { location.href = '/setup'; return; }
+        } else {
+          // Opened at 192.168.4.1: pumpkin.local is another site, so all we can tell is that it answers
+          await fetch(home + 'api/status', { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+          location.href = home;
+          return;
+        }
+      } catch (e) { /* not back yet */ } finally { clearTimeout(timer); }
+      setTimeout(attempt, 2000);
+    };
+    // The restart comes kWifiSavedRestartDelayMs (3 s) after the save. pumpkin.local answers from before
+    // it are told apart by the uptime; from 192.168.4.1 they can't be, so start once it has gone.
+    setTimeout(attempt, sameOrigin ? 2000 : 5000);
+  }
+
   async function save(ssid, pass, name) {
     try {
       const reply = await post('/api/wifi', { ssid, password: pass, name });
@@ -354,6 +409,7 @@ setTimeout(function () {
       $('form-view').hidden = true;
       $('done-view').hidden = false;
       window.scrollTo(0, 0);
+      openWhenHome(reply.address + '/', reply.ssid);
       return true;
     } catch (e) {
       if (e.unreachable) {
@@ -470,6 +526,8 @@ setTimeout(function () {
     } catch (e) {
       showError(errorEl, e);
     }
+    // On the pumpkin's own WiFi the buttons work too, without setting up a WiFi
+    $('play-now').hidden = !onSetupWifi || away;
     // Looking for WiFi takes the radio away from the pumpkin's own WiFi for a moment: only when wanted
     if (!away) scan();
   })();
