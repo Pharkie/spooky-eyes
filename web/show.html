@@ -43,6 +43,8 @@
 
   <div class="card">
     <h2>↩️ Start again</h2>
+    <button id="clear" class="btn secondary wide" type="button">Clear the show</button>
+    <p id="clear-msg" class="hint" role="status">Starts a new show with just one block, the pumpkin’s name, to build on.</p>
     <button id="reset" class="btn danger" type="button">Reset to the original show</button>
     <p id="reset-msg" class="hint" role="status"></p>
   </div>
@@ -182,7 +184,9 @@ setTimeout(function () {
       emoji.textContent = fx ? fx.emoji : '❓';
       what.append(emoji, fx ? fx.label : block.id);
     }
-    li.append(num, what, tool('delete', BIN, 'Delete block ' + number, false), grip, ...extra);
+    const last = blocks.length <= 1; // a show needs at least one block, or there'd be nothing to play
+    li.append(num, what, tool('delete', BIN, last ? 'A show needs at least one block' : 'Delete block ' + number, last),
+      grip, ...extra);
     return li;
   }
 
@@ -562,6 +566,33 @@ setTimeout(function () {
     } finally {
       playButton.disabled = false;
     }
+  });
+
+  // Clear the show: a blank slate to build block by block. A show needs at least one block (or there'd be
+  // nothing to play), so it keeps one: the pumpkin's name. The first tap asks, the second clears.
+  const clearButton = $('clear');
+  const clearMsg = $('clear-msg');
+  const CLEAR_HINT = clearMsg.textContent;
+  let clearTimer = 0;
+  function disarmClear() {
+    clearTimeout(clearTimer);
+    clearTimer = 0;
+    clearButton.textContent = 'Clear the show';
+  }
+  clearButton.addEventListener('click', () => {
+    if (!clearTimer) {
+      clearTimer = setTimeout(() => { disarmClear(); showMessage(clearMsg, CLEAR_HINT); }, 6000);
+      clearButton.textContent = 'Tap again to clear';
+      showMessage(clearMsg, 'This takes out all ' + blocks.length + ' blocks and leaves just the pumpkin’s name.');
+      return;
+    }
+    disarmClear();
+    blocks = [{ type: 'effect', id: 'name' }];
+    deleted = null;
+    render();
+    changed('Cleared the show: add your own blocks.');
+    showMessage(clearMsg, 'Done ✓ Now add your own blocks.', 'ok');
+    list.firstElementChild.scrollIntoView({ block: 'center', behavior: smooth });
   });
 
   // No confirm() (captive-portal browsers don't always show pop-ups): the first tap asks, the second resets
