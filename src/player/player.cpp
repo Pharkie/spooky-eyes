@@ -79,8 +79,7 @@ namespace
     size_t announceFirst = 0;
     size_t announceCount = 0;
     char showMessage[kTextSize] = {};
-    uint32_t showMessageSetMs = 0;
-    uint32_t showMessageForMs = 0; // 0 = until changed
+    int showMessagePasses = -1; // passes it has left (-1 = every pass until changed)
 
     // Buttons mode's idle timer: the last press, heartbeat, or chosen effect finishing (millis())
     uint32_t buttonsActiveMs = 0;
@@ -300,14 +299,16 @@ namespace
         setStatus(Mode::Show, nullptr, nullptr, kNoBlock, true);
     }
 
-    // The timed message (e.g. which WiFi to join) at the start of a pass. False if there isn't one.
+    // The message (e.g. which WiFi to join) at the start of a pass. False if there isn't one.
     bool playShowMessage()
     {
         char message[kTextSize];
         {
             Locked locked;
-            if (showMessageForMs && millis() - showMessageSetMs >= showMessageForMs)
-                showMessage[0] = '\0'; // its time is up
+            if (showMessagePasses == 0)
+                showMessage[0] = '\0'; // shown as often as it was meant to be
+            else if (showMessagePasses > 0)
+                showMessagePasses--;
             strlcpy(message, showMessage, sizeof message);
         }
         if (!message[0])
@@ -709,15 +710,13 @@ namespace player
         hasAnnouncement.store(true);
     }
 
-    void setShowMessage(const String &message, uint32_t durationMs)
+    void setShowMessage(const String &message, int passes)
     {
         char cleaned[kTextSize];
         cleanText(message.c_str(), cleaned);
-        const uint32_t now = millis();
         Locked locked;
         strlcpy(showMessage, cleaned, sizeof showMessage);
-        showMessageSetMs = now;
-        showMessageForMs = durationMs;
+        showMessagePasses = passes;
     }
 
     void settingsChanged()

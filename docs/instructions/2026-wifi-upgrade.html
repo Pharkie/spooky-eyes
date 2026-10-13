@@ -71,34 +71,23 @@
   .subtitle small { font-size: 9.5pt; }
 
   /* ---------- New in 2026: why it's worth swapping the brain ---------- */
-  .new {
-    margin: 0 -1mm 1.4mm -8mm;       /* a little wider than the steps, clear of the frame's leaves and smoke */
-    min-width: 0;
-    border: .5mm solid var(--ink);
-    border-radius: 6mm;
-    padding: 0 3mm 1mm;
-    font-size: 9pt;
-    line-height: 1.12;
+  .new { margin: 0 0 2.6mm; text-align: center; }
+  .new h2 {
+    display: flex; align-items: center; gap: 3mm; margin: 0 0 1.4mm;
+    font-family: var(--display); font-weight: normal; font-size: 11pt; line-height: 1; letter-spacing: .03em;
   }
-  .new legend {
-    margin: 0 auto;
-    padding: 0 2.5mm;
-    font-family: var(--display);
-    font-size: 11pt;
-    line-height: 1;
-    letter-spacing: .03em;
-  }
-  .new .cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: 4.5mm; }
-  .new ul { list-style: none; margin: 0; padding: 0; }
-  .new li { position: relative; padding-left: 5.6mm; margin-bottom: .6mm; }
-  .new .icon { position: absolute; left: 0; top: -.2mm; width: 4mm; height: 4mm; fill: none; stroke: var(--ink);
-               stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .new .icon .solid { fill: var(--ink); stroke: none; }
-  .new .lead { font-size: 11pt; }
+  .new h2::before, .new h2::after { content: ""; flex: 1; border-top: .35mm solid var(--ink); }
+  .new ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 1mm 7mm; }
+  .new li { display: flex; align-items: center; gap: 1.6mm; font-family: var(--hand); font-size: 12.5pt;
+            letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .icon { width: 4.4mm; height: 4.4mm; flex: none; fill: none; stroke: var(--ink);
+          stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .icon .solid { fill: var(--ink); stroke: none; }
 
   /* ---------- Steps ---------- */
-  .steps { font-size: 9pt; line-height: 1.15; }
-  .step { position: relative; padding-left: 7.2mm; margin: 0 0 1.1mm; }
+  .steps { font-size: 9.5pt; line-height: 1.2; }
+  .step { position: relative; padding-left: 7.2mm; margin: 0 0 2.6mm; }
+  .top .step { margin-bottom: 2mm; }
   .step .n {
     position: absolute; left: 0; top: -.6mm;
     font-family: var(--display); font-size: 14pt; line-height: 1;
@@ -114,30 +103,32 @@
   .addr { font-weight: 700; white-space: nowrap; }
   .nowrap { white-space: nowrap; }
 
-  .top { left: 35mm; top: 73.1mm; width: 146mm; }
+  .top { left: 35mm; top: 74mm; width: 146mm; }
   /* Bottom: text runs beside the 2024 raven (part of the frame artwork) and the sign-off above its head */
-  .bottom { left: 27mm; top: 179.8mm; width: 160mm; } /* below the left branch's brushes */
-  .keep-clear-head { float: right; width: 29mm; height: 6.2mm; } /* space above the raven's head, 186 mm down */
+  .bottom { left: 27mm; top: 175mm; width: 160mm; } /* below the left branch's brushes (they end 166 mm down) */
+  .keep-clear-head { float: right; width: 29mm; height: 14mm; } /* beside the raven's head, down to its beak */
   .keep-clear-raven { float: right; clear: right; width: 48.6mm; height: 76mm; }
 
   #diagram { display: block; width: 146mm; height: 53.4mm; margin-top: .6mm; overflow: visible; }
-  .diagram-notes { margin: .4mm 0 0; font-size: 9pt; line-height: 1.15; }
+  .diagram-notes { margin: .4mm 0 1.8mm; font-size: 9pt; line-height: 1.15; }
 
-  /* ---------- Tips box, like 2024's ---------- */
-  .tips {
-    display: flow-root; /* sits beside the raven instead of under it */
-    margin-top: 1.8mm;
-    border: .7mm solid var(--ink);
-    border-radius: 9mm;
-    padding: 1.5mm 5mm 1.7mm 12mm;
-    position: relative;
-    font-size: 9pt;
-    line-height: 1.15;
+  /* ---------- The pumpkin's WiFi at a glance: above the raven's head ---------- */
+  .wifi-card {
+    display: flex; align-items: center; gap: 3.5mm; width: max-content;
+    margin: 0 0 3mm 7.2mm; padding: 1.5mm 4mm;
+    border: .5mm solid var(--ink); border-radius: 4mm;
+    background: rgba(255, 255, 255, .45);
   }
-  .tips .bulb { position: absolute; left: 3.5mm; top: 50%; width: 6.5mm; transform: translateY(-50%); }
-  .tips p { margin: 0 0 .6mm; }
-  .tips p:last-child { margin-bottom: 0; }
-  .tips .lead { font-size: 11pt; }
+  .wifi-card .icon { width: 7mm; height: 7mm; }
+  .wifi-card dl { display: grid; grid-template-columns: repeat(4, auto); gap: .6mm 2.5mm; margin: 0; align-items: baseline; }
+  .wifi-card dt { font-family: var(--hand); font-size: 11pt; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .wifi-card dd { margin: 0 3mm 0 0; font-weight: 700; font-size: 11pt; line-height: 1.15; }
+  .wifi-card dd:nth-of-type(even) { margin-right: 0; }
+
+  /* ---------- Small print ---------- */
+  .faq { display: flow-root; margin-top: 3.5mm; font-size: 8pt; line-height: 1.2; color: var(--soft-ink); }
+  .faq p { margin: 0 0 .9mm; }
+  .faq b { color: var(--ink); }
 
   .layout-problem { position: absolute; left: 30mm; right: 30mm; top: 20mm; padding: 3mm; background: #c00; color: #fff;
                     font: bold 14pt sans-serif; z-index: 9; }
@@ -149,7 +140,7 @@
   <img class="header-art" src="assets/2024-header.png" alt="Knowles &amp; Skrodermoose: The All Hallows Spooky Pumpkin Eyes™">
   <div class="subtitle">The WiFi Brain Transplant</div>
 
-  <!-- icons for the New in 2026 list (24 x 24, drawn in ink like the 2024 bulb) -->
+  <!-- icons for the New in 2026 list and the WiFi card (24 x 24, drawn in ink like the 2024 bulb) -->
   <svg width="0" height="0" style="position: absolute" aria-hidden="true">
     <symbol id="i-show" viewBox="0 0 24 24"><path d="M4.2 19.8l1.1-4.7L15.6 4.8a2 2 0 0 1 2.8 0l.8.8a2 2 0 0 1 0 2.8L8.9 18.7z"/><path d="M13.9 6.5l3.6 3.6M5.3 15.1l3.6 3.6"/></symbol>
     <symbol id="i-pad" viewBox="0 0 24 24"><rect x="5.5" y="1.8" width="13" height="20.4" rx="2.3"/><path d="M10.5 19.2h3"/>
@@ -157,73 +148,58 @@
     <symbol id="i-talk" viewBox="0 0 24 24"><path d="M2.5 9.3h3.6L11 5.2v13.6l-4.9-4.1H2.5z"/><path d="M14.6 9a4.2 4.2 0 0 1 0 6M17.6 6.2a8.2 8.2 0 0 1 0 11.6M20.6 3.5a12.2 12.2 0 0 1 0 17"/></symbol>
     <symbol id="i-words" viewBox="0 0 24 24"><path d="M4.5 3.8h15a1.7 1.7 0 0 1 1.7 1.7v9.3a1.7 1.7 0 0 1-1.7 1.7h-8.3l-4.8 4v-4H4.5a1.7 1.7 0 0 1-1.7-1.7V5.5a1.7 1.7 0 0 1 1.7-1.7z"/><path d="M6.8 8.3h10.4M6.8 12.2h6.6"/></symbol>
     <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.2 9a14.5 14.5 0 0 1 19.6 0M5.6 12.6a9.6 9.6 0 0 1 12.8 0M9 16.1a4.7 4.7 0 0 1 6 0"/><circle class="solid" cx="12" cy="19.6" r="1.6"/></symbol>
-    <symbol id="i-update" viewBox="0 0 24 24"><path d="M19.6 12a7.6 7.6 0 0 1-13.2 5.1M4.4 12a7.6 7.6 0 0 1 13.2-5.1"/><path d="M18 2.9v4.2h-4.2M6 21.1v-4.2h4.2"/></symbol>
     <symbol id="i-battery" viewBox="0 0 24 24"><rect x="2" y="6.8" width="17.6" height="10.4" rx="2"/><path d="M22 10.2v3.6"/><path class="solid" d="M10.8 15.3l-3-2.9a1.75 1.75 0 0 1 2.5-2.5l.5.5.5-.5a1.75 1.75 0 0 1 2.5 2.5z"/></symbol>
   </svg>
 
   <section class="abs top steps" id="top">
-    <fieldset class="new">
-      <legend>New in 2026</legend>
-      <div class="cols"><ul>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-show"/></svg><span class="lead">Design your own show.</span> Line up effects
-          and your own messages: it plays them every time it’s switched on.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg><span class="lead">A button pad.</span> About 50
-          effects (creepers, a witch on a broomstick, Pac-Man, a Nether portal, lots more Minecraft), each cutting
-          in instantly.</li>
-      </ul><ul>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg><span class="lead">A talking pumpkin,</span> voiced by your
-          phone or laptop.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-words"/></svg><span class="lead">Your own words</span> scroll across its
-          glowing eyes.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg><span class="lead">No cable.</span> Use any phone, tablet or
-          laptop.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-update"/></svg><span class="lead">New effects later</span> by WiFi: no more
-          brain surgery.</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-battery"/></svg><span class="lead">Kinder to batteries.</span> WiFi switches
-          itself off when nobody’s using it (switch off and on to wake it).</li>
-      </ul></div>
-    </fieldset>
-    <div class="step"><span class="n">1</span><span class="lead">Switch off.</span>
-      Switch the battery pack off (the switch is on its back).</div>
+    <div class="new">
+      <h2>New in 2026</h2>
+      <ul>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-show"/></svg>Design your own show</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg>A button pad to trigger effects</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg>A talking pumpkin</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-words"/></svg>Your own words</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-battery"/></svg>Longer battery life</li>
+      </ul>
+    </div>
+    <div class="step"><span class="n">1</span><span class="lead">Switch off.</span></div>
     <div class="step"><span class="n">2</span><span class="lead">Move the wires.</span>
-      Unplug each wire from the old Pico (keep it: it still works) and push it onto the new ESP32-C3 by
-      where its other end goes. <b>Your wire colours may not match the drawing</b> (only red + and black − are
-      usual).</div>
+      Unplug each wire from the old Pico and push it onto the new ESP32-C3 by where its other end goes.
+      <b>Your wire colours may not match the drawing</b> (except red and black, which are standard).</div>
     <svg id="diagram" viewBox="0 0 146 53.4" xmlns="http://www.w3.org/2000/svg"
          role="img" aria-label="Wiring diagram: which pin of the new ESP32-C3 each wire goes on, by where its other end goes"></svg>
     <p class="diagram-notes"><b>The mouth LED’s long leg (+) must go on 3.3.</b> Short legs mixed up? Any order
       works: the mouth just shows other colours. Two separate + (or −) wires? Twist both onto the pin.
       <b>Match the pin names printed on the ESP32-C3.</b></p>
+    <div class="step"><span class="n">3</span><span class="lead">Bring yourself online, Dolores.</span>
+      Turn it on. The eyes start their show. It’s alive!</div>
   </section>
 
   <section class="abs bottom steps" id="bottom">
     <div class="keep-clear-head"></div>
     <div class="keep-clear-raven"></div>
-    <div class="step"><span class="n">3</span><span class="lead">Switch on.</span>
-      The eyes start their show and, the first time, scroll the WiFi details for step 4. It’s alive!</div>
-    <div class="step"><span class="n">4</span><span class="lead">Introduce it to your WiFi</span> (first time only).
-      On a phone, tablet or laptop, join the WiFi called <b class="nowrap">Spooky Pumpkin</b>,
-      password <b>spookyeyes</b> (if it says “no internet”, choose <i>Use without internet</i> or
-      <i>Stay connected</i>). A page pops up (if not within 20 seconds, open <span class="addr">192.168.4.1</span>):
-      name your pumpkin (e.g. <i>Jack's Pumpkin</i>), pick your home
-      WiFi, enter its password and tap <b>Check and save</b>. It only sees 2.4 GHz WiFi: pick your
-      main network, not a guest one (if there are two, the one ending <i>2.4G</i>).</div>
+    <div class="wifi-card">
+      <svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg>
+      <dl>
+        <dt>Join</dt><dd>Spooky Pumpkin</dd><dt>Setup page</dt><dd>192.168.4.1</dd>
+        <dt>Password</dt><dd>spookyeyes</dd><dt>On your WiFi</dt><dd>http://pumpkin.local</dd>
+      </dl>
+    </div>
+    <div class="step"><span class="n">4</span><span class="lead">Introduce it to your WiFi</span> (optional).
+      On a phone, tablet or laptop, join the pumpkin’s WiFi (above). A setup page pops up: name your pumpkin,
+      pick your home WiFi (2.4 GHz, not a guest one), enter its password and tap <b>Check and save</b>.
+      Your password stays on the pumpkin: it’s never sent anywhere else. No WiFi? It plays its show anyway.</div>
     <div class="step"><span class="n">5</span><span class="lead">Play.</span>
-      It restarts, joins your home WiFi and scrolls its address,
-      <span class="addr">http://pumpkin.local</span>
-      or numbers like <span class="addr">192.168.1.23</span>: open it on a phone, tablet or laptop on your WiFi for
-      everything above, and Settings (if the name won’t open, common on Android, use the numbers). Eyes say <i>Join WiFi</i> again? Probably a wrong
-      password: join the pumpkin’s WiFi and retry (the page says what went wrong).</div>
-
-    <div class="tips">
-      <img class="bulb" src="assets/2024-bulb.png" alt="">
-      <p><span class="lead">On the doorstep?</span> If it loses your home WiFi for 3 minutes, it makes its
-        own: join it and open <span class="addr">192.168.4.1</span>. It goes back to your WiFi by itself.</p>
-      <p><span class="lead">BOOT button:</span> a quick press repeats the address, or the setup message
-        (which stops after 15 minutes). Hold it for 5 seconds to forget your home WiFi.</p>
-      <p><span class="lead">Hungry brain:</span> fresh AA batteries, or a USB power bank in the USB-C socket
-        (battery pack off). WiFi switches off after 10 minutes with nobody using it; switch off and on (or press
-        BOOT) to get it back.</p>
+      It restarts, joins your WiFi, scrolls its address once and carries on with its show. Open
+      <span class="addr">http://pumpkin.local</span> on a phone, tablet or laptop on your WiFi (on Android, type
+      the numbers it scrolls instead).</div>
+    <div class="faq">
+      <p><b>Page won’t open?</b> With nobody using it for 10 minutes, the WiFi sleeps to save batteries:
+        press BOOT, or switch off and on.</p>
+      <p><b>On the doorstep?</b> Away from your WiFi for 3 minutes, it makes its own again: join it and open
+        192.168.4.1. It goes back to your WiFi by itself.</p>
+      <p><b>BOOT button</b> (on the board): a quick press repeats the address or WiFi details; hold it for
+        5 seconds to forget your home WiFi.</p>
     </div>
   </section>
 
@@ -539,14 +515,15 @@ function checkLayout() {
   const mmTop = el => (el.getBoundingClientRect().top - page.top) * 25.4 / 96;
   const problems = [...PROBLEMS];
   if (mmDown(document.querySelector(".subtitle")) > mmTop(document.getElementById("top")))
-    problems.push("the subtitle runs into the New in 2026 panel");
+    problems.push("the subtitle runs into New in 2026");
   const topEnd = mmDown(document.querySelector("#top > :last-child")), bottomStart = mmTop(document.getElementById("bottom"));
   const bottomEnd = mmDown(document.querySelector("#bottom > :last-child"));
   document.documentElement.dataset.layout = // for debugging: mm from the top of the page
     `diagram ${mmTop(document.getElementById("diagram")).toFixed(1)}-${mmDown(document.getElementById("diagram")).toFixed(1)}, ` +
-    `notes end ${topEnd.toFixed(1)}, step 3 starts ${bottomStart.toFixed(1)}, tips end ${bottomEnd.toFixed(1)}`;
-  if (topEnd > bottomStart + 0.3) problems.push(`the diagram runs ${(topEnd - bottomStart - 0.3).toFixed(1)} mm into step 3`);
-  if (bottomEnd > 260) problems.push(`the tips run ${(bottomEnd - 260).toFixed(1)} mm too close to the frame`);
+    `step 3 ends ${topEnd.toFixed(1)}, step 4 starts ${bottomStart.toFixed(1)}, small print ends ${bottomEnd.toFixed(1)}`;
+  if (topEnd > bottomStart + 0.3) problems.push(`step 3 runs ${(topEnd - bottomStart - 0.3).toFixed(1)} mm into step 4`);
+  if (mmDown(document.querySelector(".wifi-card")) > 189) problems.push("the WiFi box runs into the raven's beak");
+  if (bottomEnd > 260) problems.push(`the small print runs ${(bottomEnd - 260).toFixed(1)} mm too close to the frame`);
 
   // Diagram labels: at least 7 pt, inside the drawing, clear of each other and of the wires (units: mm)
   const svg = document.getElementById("diagram"), view = svg.viewBox.baseVal;

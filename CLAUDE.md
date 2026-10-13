@@ -64,7 +64,8 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
 - **Talking pumpkin:** effects call `engine.say()`; the web server forwards it to phones as a server-sent
   event and the phone speaks it with `speechSynthesis`. Button presses say the effect's phrase as it starts; the show is silent (the player mutes the engine while a show block plays).
 - **What the eyes say about WiFi** (`main.cpp`): in setup mode, "Join WiFi: <name>  Password: spookyeyes
-  then open 192.168.4.1" at the start of each show pass for 15 minutes; on home WiFi, "http://pumpkin.local
+  then open 192.168.4.1" once and again at the start of the next show pass, then the show plays on by
+  itself (WiFi is optional); on home WiFi, "http://pumpkin.local
   or <IP>" once. A short BOOT press repeats it. After a brownout restart it skips WiFi and asks for new
   batteries.
 - **WiFi** is ported from Scribe Evolution (`~/dev/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
