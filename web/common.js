@@ -88,10 +88,14 @@ const Pumpkin = (() => {
       });
       source.addEventListener('say', (e) => { if (handlers.say) handlers.say(e.data); });
     };
-    // Phones drop connections while the screen is off: reconnect when the page is looked at again
+    // Out of sight (another tab, screen off): let go, so a forgotten tab doesn't keep the pumpkin's WiFi
+    // on all night. Looked at again: listen again.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && source && source.readyState === 2) {
-        source.close();
+      if (document.visibilityState === 'hidden') {
+        if (source) source.close();
+        stopPolling();
+      } else if (!source || source.readyState === 2) {
+        if (source) source.close();
         connect();
       }
     });
