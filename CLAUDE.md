@@ -10,9 +10,9 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
   the full image with an erase (`esptool --chip esp32c3 --port /dev/cu.usbmodem… write-flash -e 0x0
   release/…-full.bin`, outside the sandbox), and read the log by opening the port with DTR and RTS low and
   pulsing RTS to reset it (pyserial is in PlatformIO's Python, /Library/Frameworks/Python.framework/…/python3).
-  Opening or closing the port can itself reset the board (seen Oct 2026: a short serial session ended with a
-  restart), so never open the port while Adam is using the board unless he's said so; keep one session
-  open rather than many short ones.
+  One program at a time on the port: a forgotten background logger garbles reads ("multiple access on
+  port"), can reset the board, and made esptool fail mid-write once, leaving it boot-looping. Before
+  flashing, check `lsof /dev/cu.usbmodem*` is empty, and stop loggers by PID (`pkill -f` missed them).
 - Pins live only in `src/hardware/board.h`, and the wiring guide (`docs/instructions/`) must match it.
 - Effects code (`src/display/`, `src/effects/`) is portable: no Arduino headers, so it runs in native tests.
 - The effects table in `src/effects/registry.cpp` is the single source of truth for buttons, phrases and the
