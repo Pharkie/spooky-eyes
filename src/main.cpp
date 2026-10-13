@@ -106,9 +106,9 @@ void setup()
     // eyes' SPI, the mouth LED's PWM and the serial port keep their speeds; effects time in milliseconds.
     const bool slowed = setCpuFrequencyMhz(kCpuMhz);
     Serial.begin(115200);
-    // Plugged into a computer that isn't reading the USB port, a log line waits at most this long before
-    // it's dropped (100 ms by default). Not 0: in this core that means wait for ever.
-    Serial.setTxTimeoutMs(10);
+    // (The USB log's default send timeout, 100 ms, stays: at 10 ms long lines lost characters in the middle
+    // even with a computer reading the port. A computer holding the port without reading it costs each log
+    // line up to 100 ms, which only happens on the bench.)
     LOG("BOOT", "Spooky Pumpkin Eyes %s", FIRMWARE_VERSION);
     if (!slowed)
         LOG("BOOT", "Couldn't slow the processor to %lu MHz", static_cast<unsigned long>(kCpuMhz));

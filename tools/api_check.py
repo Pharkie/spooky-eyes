@@ -547,9 +547,20 @@ def press_boot(target, ctx):
         import pumpkin_serial
     except ImportError as e:
         raise Unreachable(f"--serial needs pyserial ({e}): run this with PlatformIO's Python")
+    # The port can hiccup just after it's opened (macOS sometimes reports it gone and back), and a log line
+    # can be lost, so the proof is the board's own status line, asked for until it says unlocked
     with pumpkin_serial.PumpkinSerial(None if ctx.serial == "auto" else ctx.serial) as board:
-        board.send("unlock")
-        board.expect(r"\[BUTTON\] Short press", timeout=3)
+        time.sleep(0.5)
+        for _ in range(3):
+            board.send("unlock")
+            time.sleep(0.3)
+            board.send("status")
+            try:
+                if '"unlocked":true' in board.expect(r"STATUS \{", timeout=3).string:
+                    return
+            except TimeoutError:
+                continue
+        raise Unreachable("pressed BOOT over USB, but the board doesn't say it's unlocked")
 
 
 def release_boot(target):
