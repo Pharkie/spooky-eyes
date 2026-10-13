@@ -261,10 +261,17 @@ input[type=file] { font: inherit; font-size: 16px; color: var(--muted); max-widt
 .save-bar .btn { flex: none; padding: 10px 14px; font-size: 17px; }
 .words-hint { grid-column: 1 / -1; margin: 0 0 2px 4px; font-size: 15px; color: var(--yellow); }
 
-.spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid var(--line); border-top-color: var(--yellow); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+/* Waiting: a pair of glowing pumpkin eyes rolling round */
+.spinner { display: inline-flex; gap: 3px; vertical-align: -2px; margin-right: 8px; }
+.spinner::before, .spinner::after {
+  content: ""; width: 17px; height: 17px; border-radius: 50%;
+  background: radial-gradient(circle at 50% 28%, var(--bg) 0 3.4px, var(--orange) 4px);
+  box-shadow: 0 0 6px rgba(242, 140, 40, .6);
+  animation: spin 1.2s linear infinite;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .spinner { animation-duration: 3s; }
+  .spinner::before, .spinner::after { animation-duration: 3s; }
   .tile, .switch, .switch::after, .chev { transition: none; }
   .block.flash { animation: none; box-shadow: inset 0 0 0 3px var(--yellow); }
 }
