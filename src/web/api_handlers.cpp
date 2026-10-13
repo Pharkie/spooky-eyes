@@ -153,14 +153,15 @@ namespace web
             sendOk(request);
         }
 
-        // POST /api/mode {"mode":"show"} or {"mode":"buttons"}. The button page sends "buttons" when it
-        // opens and every kButtonsHeartbeatMs while it's on screen, so this is quiet when it works.
+        // POST /api/mode {"mode":"show"} (resume where it was paused; "fromTop":true from the first block)
+        // or {"mode":"buttons"}. The button page sends "buttons" when it opens and every
+        // kButtonsHeartbeatMs while it's on screen, so this is quiet when it works.
         void handleMode(AsyncWebServerRequest *request, JsonDocument &body)
         {
             const char *mode = body["mode"] | "";
             if (strcmp(mode, "show") == 0)
             {
-                player::startShow();
+                player::startShow(body["fromTop"] | false);
             }
             else if (strcmp(mode, "buttons") == 0)
             {

@@ -26,8 +26,10 @@ namespace player
     // Scroll someone's own words (trimmed to kMaxWordsLength, only characters the font has)
     void scrollWords(const String &words);
 
-    // Show mode: play the saved show from the top (does nothing if it's already playing)
-    void startShow();
+    // Show mode: carry on with the saved show where it was paused (the block a button press cut short
+    // plays again), or with fromTop from its first block (the show page's "Play the show", after edits).
+    // Does nothing if it's already playing, unless fromTop.
+    void startShow(bool fromTop = false);
 
     // Buttons mode (pause the show, idle eyes), or "still here" if already in it. Safe to call often.
     void enterButtons();

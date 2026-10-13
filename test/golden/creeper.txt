@@ -3,7 +3,7 @@
 # 70 events. Do not edit: re-run the capture script instead.
 F 006666183c3c2400 006666183c3c2400
 W 1500
-S Shhhhhhhhhh!
+S Hissss!
 F 006666183c3c2400 006666183c3c2400
 W 300
 F ff9999e7c3c3dbff ff9999e7c3c3dbff

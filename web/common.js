@@ -150,7 +150,7 @@ const Pumpkin = (() => {
   // ---- Effects and the player (the button page and the show creator) ----
 
   // Show mode (the saved show, round and round) or buttons mode (the show pauses, each press plays one)
-  const setMode = (mode) => post('/api/mode', { mode });
+  const setMode = (mode, options) => post('/api/mode', Object.assign({ mode }, options));
 
   // "💥 Creeper" for an effect from /api/effects
   const effectName = (fx) => fx.emoji + ' ' + fx.label;
@@ -261,7 +261,7 @@ const Pumpkin = (() => {
     if (player.mode === 'show') return '🎃 The show is playing' + (now ? ': ' + now : '');
     if (player.effectId === 'words') return 'Scrolling: ' + now;
     if (now) return 'Playing: ' + now + ' …';
-    return '⏸️ Buttons mode: the show is paused';
+    return 'Buttons mode: show paused';
   }
 
   // iPhones type curly quotes; the pumpkin's font has straight ones

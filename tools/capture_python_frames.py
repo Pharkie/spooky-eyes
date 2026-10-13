@@ -400,10 +400,11 @@ RECORDED_NAME = "Jack's Pumpkin"
 
 
 # Sounds respelt so phone voices make the sound instead of spelling out the letters ("S, S, S..."). The
-# Mac voice the old page used coped; speechSynthesis on phones doesn't.
+# Mac voice the old page used coped; speechSynthesis on phones doesn't. The TNT's and the creeper's fuses
+# are cue words: the button page plays a fizz and a hiss for them (web/index.html, SOUND_WORDS).
 SPOKEN = {
-    'Sssssssss': 'Shhhhhhh!',
-    'Sssssssssssss': 'Shhhhhhhhhh!',
+    'Sssssssss': 'Fizzzz!',
+    'Sssssssssssss': 'Hissss!',
     'Hrrmm?': 'Hurrmm?',
     'Hrrm! Hrrm!': 'Hurrmm! Hurrmm!',
     "I'm so sleepy. Zzzzzzzz.": "I'm so sleepy. Snore... snore...",

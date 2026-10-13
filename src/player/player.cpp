@@ -65,6 +65,7 @@ namespace
         RequestKind kind = RequestKind::None;
         const EffectInfo *effect = nullptr;
         char words[kTextSize] = {};
+        bool fromTop = false; // StartShow: from the first block, not where it was paused
     };
 
     // What may cut short whatever is playing, besides a new request (which cuts short anything)
@@ -171,6 +172,7 @@ namespace
         pending.kind = kind;
         pending.effect = effect;
         strlcpy(pending.words, words ? words : "", sizeof pending.words);
+        pending.fromTop = false;
         hasPending.store(true);
     }
 
@@ -307,9 +309,10 @@ namespace
         passStarting = true;
     }
 
-    void enterShow()
+    void enterShow(bool fromTop)
     {
-        rewindShow();
+        if (fromTop)
+            rewindShow(); // otherwise it carries on where it was paused
         // Always tell the page: buttonsTimedOut() may already have switched the mode under the lock
         setStatus(Mode::Show, nullptr, nullptr, kNoBlock, true);
     }
@@ -359,6 +362,9 @@ namespace
         engine.setQuiet(true);
         runGuarded(CutBy::Announcement, [&] { playBlock(engine, block); });
         engine.setQuiet(false);
+        // Cut short by a button press (the show pauses): this block plays again when the show resumes
+        if (hasPending.load())
+            nextBlock = index;
     }
 
     // --- Buttons mode ---
@@ -445,8 +451,8 @@ namespace
             setStatus(Mode::Buttons, nullptr, nullptr, kNoBlock);
             break;
         case RequestKind::StartShow:
-            LOG("PLAYER", "Starting the show");
-            enterShow();
+            LOG("PLAYER", "%s", request.fromTop ? "Starting the show from the top" : "Resuming the show");
+            enterShow(request.fromTop);
             break;
         case RequestKind::None:
             break;
@@ -470,7 +476,7 @@ namespace
         if (mode == Mode::Buttons && buttonsTimedOut())
         {
             LOG("PLAYER", "All quiet: back to the show");
-            enterShow();
+            enterShow(false);
         }
 
         if (mode == Mode::Show)
@@ -770,12 +776,13 @@ namespace player
             pressed(RequestKind::Words, nullptr, cleaned);
     }
 
-    void startShow()
+    void startShow(bool fromTop)
     {
         Locked locked;
-        if (headingLocked() == Mode::Show)
-            return; // already showing: don't start it again from the top
+        if (headingLocked() == Mode::Show && !fromTop)
+            return; // already showing: carry on
         setPendingLocked(RequestKind::StartShow, nullptr, nullptr);
+        pending.fromTop = fromTop;
     }
 
     void enterButtons()
