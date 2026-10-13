@@ -696,7 +696,7 @@ namespace
     // The channel of the strongest network around (most likely the home WiFi), or 0 if the scan finds
     // none. A brand-new pumpkin starts its setup WiFi there, so the setup page's WiFi check rarely has to
     // move it to another channel (which drops phones off it for a moment). Network task only.
-    int32_t busiestChannel()
+    int32_t strongestNetworksChannel()
     {
         Lock lock(scanMutex);
         const int16_t found = startScan(nullptr, kScanMsPerChannel) ? waitForScan() : WIFI_SCAN_FAILED;
@@ -914,7 +914,7 @@ namespace
     // It goes straight to the access point the page's scan saw (see JoinHint), so the radio doesn't have
     // to scan every channel while the setup WiFi is on. The radio has one channel: joining a router on
     // another channel moves the setup WiFi there too, so phones may drop off it for a moment and rejoin
-    // (a brand-new pumpkin starts its setup WiFi on the busiest channel to make that rare). The result is
+    // (a brand-new pumpkin starts its setup WiFi on the strongest network's channel to make that rare). The result is
     // kept for kWifiTestKeepMs so they can still ask how it went.
     //
     // Joined (even before the router hands out an address): Passed. Refused with an authentication error,
@@ -1113,7 +1113,7 @@ namespace
         if (savedSsid.isEmpty())
         {
             LOG("WIFI", "No home WiFi saved yet");
-            channel = busiestChannel();
+            channel = strongestNetworksChannel();
         }
         else
         {

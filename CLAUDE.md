@@ -79,8 +79,8 @@ If several builds run at once, give each its own `PLATFORMIO_BUILD_DIR`.
   and only saves one that joined, or one the router didn't answer about in time ("unsure": the page offers
   Save anyway); skipped on home WiFi, where a check would drop the connection. Joins (`startJoin()`) go
   straight to the access point a scan found, allow WPA3's newer handshake, run at 160 MHz and allow 30 s;
-  every step is logged with its timing. A brand-new pumpkin starts its setup WiFi on the busiest channel,
-  so a check rarely moves it. The country is fixed to GB, channels 1-13.
+  every step is logged with its timing. A brand-new pumpkin starts its setup WiFi on the strongest network's
+  channel (most likely the home WiFi's), so a check rarely moves it and drops phones. The country is fixed to GB, channels 1-13.
 - **Saving batteries:** the CPU runs at 80 MHz (`kCpuMhz`), the mouth LED is dimmed with LEDC PWM
   (`kMouthDutyPercent`), and with the `wifiSaver` setting on (the default) the network task switches the
   WiFi off (`network::Mode::Off`, status LED off; the show carries on without a word) once nobody has used
