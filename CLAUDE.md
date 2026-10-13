@@ -100,8 +100,9 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
   channel (most likely the home WiFi's), so a check rarely moves it and drops phones. The country is fixed to GB, channels 1-13.
 - **Saving batteries:** the CPU runs at 80 MHz (`kCpuMhz`), the mouth LED is dimmed with LEDC PWM
   (`kMouthDutyPercent`), and with the `wifiSaver` setting on (the default) the network task switches the
-  WiFi off (`network::Mode::Off`, status LED off; the show carries on without a word) once nobody has used
-  the pumpkin for `kWifiIdleOffMs`.
+  pumpkin's own WiFi (setup or doorstep) off (`network::Mode::Off`, status LED off; the show carries on
+  without a word) once nobody has used it for `kWifiIdleOffMs`. On the home WiFi it stays joined (modem
+  sleep), so the page always works when someone comes back.
   Using it means a web request or an open event stream (the web server calls `network::noteActivity()`
   from its first handler and the SSE keep-alive, not per handler) or a phone on the setup WiFi. The
   decision is `wifi_saver::timeToSwitchOff()` (portable, unit-tested). Only a restart brings WiFi back: a

@@ -22,7 +22,8 @@ const Pumpkin = (() => {
     try {
       response = await fetch(path, init);
     } catch (e) {
-      const error = new Error("Can't reach the pumpkin. Is this phone on the same WiFi as it?");
+      const error = new Error("Can't reach the pumpkin. Is this phone on the same WiFi as it? Still stuck? " +
+        "Switch the pumpkin off and on (or press BOOT on its board), wait 20 seconds and try again.");
       error.unreachable = true; // no reply at all (it may still have done it)
       throw error;
     } finally {

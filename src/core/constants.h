@@ -42,10 +42,11 @@ constexpr uint32_t kBootUnlockMs = PumpkinTime::Minutes(5);
 // at trick-or-treaters all night. A short BOOT press shows them again.
 constexpr int kSetupMessageRepeats = 1;
 
-// Saving batteries. With the "save batteries" setting on (the default), the WiFi switches off after this
-// long with nobody using the pumpkin: no page or API request, no page open listening for news, and no
-// phone on the setup WiFi. The setup WiFi can't doze between messages as home WiFi does, so it draws
-// several times more. A short BOOT press, or switching off and on, brings the WiFi back.
+// Saving batteries. With the "save batteries" setting on (the default), the pumpkin's own WiFi (setup, or
+// the doorstep fallback) switches off after this long with nobody using it: no page or API request, no page
+// open listening for news, and no phone on it. It can't doze between messages as the home WiFi does, so it
+// draws several times more. On the home WiFi the pumpkin stays joined (dozing), so the page always works.
+// A short BOOT press, or switching off and on, brings the WiFi back.
 constexpr uint32_t kWifiIdleOffMs = PumpkinTime::Minutes(10);
 
 // Processor speed. 80 MHz is the slowest that keeps WiFi (and USB serial) working, and draws a few mA
@@ -76,7 +77,7 @@ constexpr const char *kDefaultPumpkinName = "Spooky Pumpkin";
 constexpr uint8_t kDefaultBrightness = 2; // 0-15. Low is plenty in the dark, and kind to batteries.
 constexpr uint8_t kDefaultEyeGap = 8;     // as on the original pumpkin
 constexpr bool kDefaultMouthLed = true;
-constexpr bool kDefaultWifiSaver = true;  // switch the WiFi off when nobody's using it (kWifiIdleOffMs)
+constexpr bool kDefaultWifiSaver = true;  // switch its own WiFi off when nobody's using it (kWifiIdleOffMs)
 
 // Limits (the web pages and tools/mock_server.py read these too)
 constexpr uint8_t kChipMaxBrightness = 15; // the MAX7219's top setting
