@@ -16,7 +16,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <sys/stat.h>
-#include <memory>
 #include <string>
 
 #include "core/constants.h"
@@ -88,25 +87,17 @@ namespace show_store
                 return false;
             }
 
-            std::unique_ptr<char[]> text(new (std::nothrow) char[size + 1]);
-            if (!text)
-            {
-                LOG("SHOW", "Not enough memory to read the saved show: playing the original show");
-                return false;
-            }
+            // Parsed straight from the file: no buffer the size of the show (up to 32 KB in one piece, which a
+            // fragmented heap may not have after hours on WiFi)
             File file = LittleFS.open(kShowPath, "r");
-            const size_t got = file ? file.read(reinterpret_cast<uint8_t *>(text.get()), size) : 0;
-            file.close();
-            if (got != static_cast<size_t>(size))
+            if (!file)
             {
                 LOG("SHOW", "Couldn't read the saved show: playing the original show");
                 return false;
             }
-            text[size] = '\0';
-
             JsonDocument doc;
-            const DeserializationError parseError = deserializeJson(doc, text.get(), size);
-            text.reset();
+            const DeserializationError parseError = deserializeJson(doc, file);
+            file.close();
             if (parseError || !doc["blocks"].is<JsonArray>())
             {
                 LOG("SHOW", "The saved show is damaged (%s): playing the original show",
@@ -199,7 +190,14 @@ namespace show_store
         // A board that's never had a filesystem here (a new one is erased before flashing) won't mount,
         // so LittleFS formats the partition and tries again. That takes a second or two, once.
         const uint32_t started = millis();
-        mounted = LittleFS.begin(true, kMountPoint, kMaxOpenFiles, kPartitionLabel);
+        mounted = LittleFS.begin(false, kMountPoint, kMaxOpenFiles, kPartitionLabel);
+        if (!mounted)
+        {
+            mounted = LittleFS.begin(true, kMountPoint, kMaxOpenFiles, kPartitionLabel);
+            // LittleFS.format() leaves the idle task under the task watchdog, unlike every other boot:
+            // put that back, so a first boot and the rest behave the same
+            disableCore0WDT();
+        }
         const uint32_t tookMs = millis() - started;
         if (!mounted)
         {
