@@ -5,6 +5,7 @@
 #include "web/web_utils.h"
 
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include "core/firmware.h"
 #include "core/logging.h"
@@ -152,7 +153,15 @@ namespace web
             error = String("The ") + what + " should be text";
             return false;
         }
-        String text = field.as<String>();
+        // Reject a NUL inside the text ("\u0000" in the JSON): stored as a C string it would cut the rest off.
+        // (Not String::indexOf('\0'), which finds the terminator at the end of every string.)
+        const JsonString raw = field.as<JsonString>();
+        if (memchr(raw.c_str(), '\0', raw.size()) != nullptr)
+        {
+            error = String("The ") + what + " has a strange character in it";
+            return false;
+        }
+        String text = raw.c_str();
         if (text.length() < minLength)
         {
             error = minLength <= 1 ? String("Please fill in the ") + what
@@ -162,11 +171,6 @@ namespace web
         if (text.length() > maxLength)
         {
             error = String("The ") + what + " is too long (up to " + maxLength + " characters)";
-            return false;
-        }
-        if (text.indexOf('\0') >= 0)
-        {
-            error = String("The ") + what + " has a strange character in it";
             return false;
         }
         value = text;
