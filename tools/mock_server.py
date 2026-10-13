@@ -927,9 +927,11 @@ class Handler(BaseHTTPRequestHandler):
         return {"type": "words", "text": text}
 
     def api_post_show(self, query):
-        # The firmware's order: readBlocks() reads every block's shape, then checkShow() counts them and
-        # checks each one
-        blocks = self.json_body(MAX_SHOW_BODY).get("blocks")
+        # The firmware's order: the BOOT gate on the doorstep, then readBlocks() reads every block's shape,
+        # then checkShow() counts them and checks each one
+        body = self.json_body(MAX_SHOW_BODY)
+        self.doorstep_gate()
+        blocks = body.get("blocks")
         if not isinstance(blocks, list):
             raise ApiError(400, "The show should be a list of blocks")
         read = [self.read_block(block, number) for number, block in enumerate(blocks, 1)]
@@ -944,6 +946,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_reset_show(self, query):
         self.json_body()
+        self.doorstep_gate()
         blocks = [dict(b) for b in self.pumpkin.default_show]
         self.pumpkin.save_show(blocks, True)
         print("  (back to the original show)")
@@ -989,9 +992,15 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, f"The {what} should be from 0 to {top}")
         return value
 
+    def doorstep_gate(self):
+        """Settings and show changes need a BOOT press while strangers may be on the setup WiFi"""
+        if self.pumpkin.strangers_may_be_connected() and not self.pumpkin.boot_unlocked():
+            raise boot_needed()
+
     def api_post_settings(self, query):
-        # Same order as the firmware: the request's shape, then settings::save()
+        # Same order as the firmware: the BOOT gate on the doorstep, the request's shape, then settings::save()
         body = self.json_body()
+        self.doorstep_gate()
         pumpkin = self.pumpkin
         new_name = self.read_new_name(body)
         brightness = self.check_int(body, "brightness", "brightness", MAX_BRIGHTNESS)

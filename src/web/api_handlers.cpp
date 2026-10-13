@@ -184,6 +184,11 @@ namespace web
         // POST /api/settings: any of {"name","brightness","mouthLed","eyeGap","wifiSaver"}
         void handlePostSettings(AsyncWebServerRequest *request, JsonDocument &body)
         {
+            // On the doorstep anyone on the setup WiFi could rename it or switch things off for the night
+            if (strangersMayBeConnected() && !requireBootPress(request))
+            {
+                return;
+            }
             Settings updated = settings::get();
             const String oldName = updated.pumpkinName;
             String error;

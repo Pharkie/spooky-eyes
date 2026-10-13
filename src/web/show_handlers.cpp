@@ -120,6 +120,11 @@ namespace web
         // POST /api/show {"blocks":[...]}: save it, and play it from now on
         void handleSaveShow(AsyncWebServerRequest *request, JsonDocument &body)
         {
+            // On the doorstep anyone on the setup WiFi could replace the family's show
+            if (strangersMayBeConnected() && !requireBootPress(request))
+            {
+                return;
+            }
             Show show;
             String error;
             if (!readBlocks(body, show, error))
@@ -141,6 +146,10 @@ namespace web
         // POST /api/show/reset: forget the saved show, back to the original
         void handleResetShow(AsyncWebServerRequest *request, JsonDocument &)
         {
+            if (strangersMayBeConnected() && !requireBootPress(request))
+            {
+                return;
+            }
             show_store::reset();
             bool isDefault = false;
             const Show show = show_store::load(isDefault);
