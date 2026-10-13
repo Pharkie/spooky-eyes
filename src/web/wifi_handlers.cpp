@@ -72,6 +72,8 @@ namespace web
                 return "passed";
             case network::WifiTestStatus::Failed:
                 return "failed";
+            case network::WifiTestStatus::Unsure:
+                return "unsure";
             case network::WifiTestStatus::Idle:
                 break;
             }
@@ -83,9 +85,10 @@ namespace web
         //   202 {"testing":true}   started: ask GET /api/wifi/test for the result
         //   200 {"skipped":true,"reason":"..."}   not on the setup WiFi (on home WiFi, say), where a
         //       check would drop the pumpkin's connection: the page saves without one
-        //   409 a check is already running, 400 bad WiFi name or password,
-        //   403 on the doorstep without a BOOT press (as for saving)
-        // Nothing is saved and the password is never sent back.
+        //   409 a check is already running, 400 bad WiFi name or password (or pumpkin's name, with
+        //   "field":"name"), 403 on the doorstep without a BOOT press (as for saving)
+        // The pumpkin's name ("name", optional) is only checked here, so a bad one is said before the wait,
+        // not after. Nothing is saved and the password is never sent back.
         void handleTestStart(AsyncWebServerRequest *request, JsonDocument &body)
         {
             String ssid;
@@ -96,6 +99,17 @@ namespace web
                 !settings::checkWifi(ssid, password, error))
             {
                 sendError(request, 400, error);
+                return;
+            }
+            String name;
+            // (Any length here, as for saving: settings::checkName() says if it's too long)
+            if (!readText(body, "name", "pumpkin's name", 0, kMaxJsonBodyBytes, false, name, error) ||
+                (!name.isEmpty() && !settings::checkName(name, error)))
+            {
+                JsonDocument doc;
+                doc["error"] = error;
+                doc["field"] = "name"; // so the page can put the cursor there
+                sendJson(request, 400, doc);
                 return;
             }
             if (!network::isSetupAP())

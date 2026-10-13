@@ -67,7 +67,7 @@
     <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
     <p id="error" class="error" role="alert"></p>
     <button type="submit" id="save" class="btn wide">Check and save</button>
-    <p class="hint center" id="check-hint" hidden>The pumpkin tries your WiFi first (about 10 seconds), then restarts to join it.</p>
+    <p class="hint center" id="check-hint" hidden>The pumpkin tries your WiFi first (up to 30 seconds), then restarts to join it.</p>
   </form>
   <p class="center" id="play-link" style="margin-top:28px">
     <a href="/?play=1" class="btn secondary">🎃 No home WiFi? Just play with the pumpkin</a>
@@ -231,10 +231,11 @@
   const chosenSsid = () => (selected ? selected.ssid : ssidInput.value.trim());
   const hasPassed = (ssid, pass) => !!passed && passed.ssid === ssid && passed.password === pass;
 
-  // On the home WiFi there's no check (the pumpkin answers "skipped"), so it just saves
+  // On the home WiFi there's no check (the pumpkin answers "skipped"), so it just saves. After a check
+  // the router didn't answer in time, the same details can be saved anyway.
   function updateSaveButton() {
     const checked = !onSetupWifi || hasPassed(chosenSsid(), password.value);
-    saveButton.textContent = checked ? 'Save and restart' : 'Check and save';
+    saveButton.textContent = !checked ? 'Check and save' : passed && passed.unsure ? 'Save anyway' : 'Save and restart';
   }
 
   // The line under the password: kind 'ok', 'error', or none; spinning adds a spinner
@@ -268,7 +269,7 @@
     else updateSaveButton();
   }
 
-  // Ask how the check is going until it's done: {status:'passed'|'failed', rssi, reason}, or
+  // Ask how the check is going until it's done: {status:'passed'|'failed'|'unsure', rssi, reason}, or
   // {status:'lost', reason} if the pumpkin stopped answering. Joining the home WiFi can move the
   // pumpkin's radio to the router's channel, and phones may drop off its WiFi for a moment, so failed
   // requests are put up with for a while.
@@ -284,7 +285,7 @@
         failingSince = 0;
         if (data.status === 'running') {
           showCheck('Checking ' + ssid + '…', '', true);
-        } else if ((data.status === 'passed' || data.status === 'failed') && data.ssid === ssid) {
+        } else if (['passed', 'failed', 'unsure'].includes(data.status) && data.ssid === ssid) {
           return data;
         } else {
           return { status: 'lost', reason: 'The check didn’t finish. Please try again.' };
@@ -301,23 +302,35 @@
             ' again, then try once more.' };
         }
       }
-      if (Date.now() - start > 60000) return { status: 'lost', reason: 'The check took too long. Please try again.' };
+      if (Date.now() - start > 90000) return { status: 'lost', reason: 'The check took too long. Please try again.' };
     }
   }
 
-  async function check(ssid, pass) {
+  async function check(ssid, pass, name) {
     showCheck(''); // last time's answer no longer applies
-    let reply;
+    let reply = {};
     try {
-      reply = await post('/api/wifi/test', { ssid, password: pass });
+      reply = await post('/api/wifi/test', { ssid, password: pass, name });
     } catch (e) {
-      showError(errorEl, e); // e.g. press BOOT first, or a password that's too short
-      return false;
+      // No reply (it may have got lost as the radio changed channel), or a check already running (an
+      // earlier tap's): either way a check may be under way, so ask how it's going
+      if (!e.unreachable && e.status !== 409) {
+        showError(errorEl, e); // e.g. press BOOT first, a password that's too short, or a bad name
+        if (e.field === 'name') nameInput.focus();
+        return false;
+      }
     }
     if (reply.skipped) return true; // on the home WiFi: no check
     saveButton.textContent = 'Checking…';
-    showCheck('Checking ' + ssid + '… (about 10 seconds)', '', true);
+    showCheck('Checking ' + ssid + '… (up to 30 seconds)', '', true);
     const result = await waitForCheck(ssid);
+    if (result.status === 'unsure') {
+      // The router didn't answer in time: no verdict on the password, so let them save it anyway
+      passed = { ssid, password: pass, unsure: true };
+      showCheck(result.reason, 'error');
+      updateSaveButton();
+      return false;
+    }
     if (result.status !== 'passed') {
       showCheck(result.reason, 'error');
       if (result.status === 'failed') password.focus(); // everything typed stays, to put right
@@ -349,8 +362,16 @@
       window.scrollTo(0, 0);
       return true;
     } catch (e) {
+      if (e.unreachable) {
+        // The reply got lost, but the pumpkin may have saved it and be restarting already
+        showMessage(errorEl, 'No reply from the pumpkin. It may be restarting to join ' + ssid + ': watch its eyes. ' +
+          'They scroll its address if it joined, or "Join WiFi" if it didn’t (then join ' + (setupSsid || 'its WiFi') +
+          ' and try again).', 'error');
+        return false;
+      }
       // A pass still counts (e.g. after "press BOOT"), so the next tap saves without checking again
       showError(errorEl, e);
+      if (e.field === 'name') nameInput.focus();
       return false;
     }
   }
@@ -377,7 +398,7 @@
     showMessage(errorEl, '');
     if (!hasPassed(ssid, pass)) {
       setBusy(onSetupWifi ? 'Checking…' : 'Saving…');
-      const ok = await check(ssid, pass);
+      const ok = await check(ssid, pass, name);
       if (!ok) { setBusy(''); return; }
     }
     setBusy('Saving…');

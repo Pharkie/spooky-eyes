@@ -5,6 +5,7 @@
 // (kWifiIdleOffMs); a short BOOT press brings it back.
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <atomic>
 #include <esp_system.h>
 #include "core/constants.h"
@@ -62,10 +63,41 @@ static void tellHowToConnect(bool now)
 }
 
 // Tired batteries sag during WiFi's current bursts and brown the board out, so it would restart over and
-// over. If that's why it last restarted, run the eyes without WiFi until it's switched off and on again.
+// over. But one brownout can also be a knock to the battery box or a bouncing switch, so only two in a row
+// (without kBrownoutForgetMs of running in between) mean "no WiFi until switched off and on". The count
+// lives in NVS: it has to survive the brownout.
+static constexpr const char *kPowerNamespace = "power";
+static constexpr uint32_t kBrownoutForgetMs = PumpkinTime::Minutes(2);
+static bool brownoutsToForget = false;
+
 static bool batteriesTooWeakForWifi()
 {
-    return esp_reset_reason() == ESP_RST_BROWNOUT;
+    Preferences power;
+    if (!power.begin(kPowerNamespace, false))
+        return esp_reset_reason() == ESP_RST_BROWNOUT; // no NVS: as before
+    const uint8_t before = power.getUChar("brownouts", 0);
+    const uint8_t count = esp_reset_reason() == ESP_RST_BROWNOUT ? before + 1 : 0;
+    if (count != before)
+        power.putUChar("brownouts", count);
+    power.end();
+    brownoutsToForget = count > 0;
+    if (count == 1)
+        LOG("BOOT", "Restarted by a brownout: trying WiFi anyway (a second one in a row turns it off)");
+    return count >= 2;
+}
+
+// Running fine for a while since a brownout: it was a one-off
+static void forgetBrownouts()
+{
+    if (!brownoutsToForget || millis() < kBrownoutForgetMs)
+        return;
+    brownoutsToForget = false;
+    Preferences power;
+    if (power.begin(kPowerNamespace, false))
+    {
+        power.putUChar("brownouts", 0);
+        power.end();
+    }
 }
 
 void setup()
@@ -85,10 +117,22 @@ void setup()
     show_store::begin(); // the saved show, which the player loads
     player::begin();     // eyes show a picture straight away; loop() starts the show
 
+    // A short press on the BOOT button shows how to reach it again, or brings the WiFi back if it's off
+    // (to save batteries, or after brownouts): a restart joins the home WiFi or starts the setup WiFi
+    // afresh. Runs on the network task, so set it before that starts.
+    boot_button::onShortPress(
+        []
+        {
+            if (network::mode() == network::Mode::Off)
+                firmware::restart("BOOT pressed: WiFi back on");
+            tellHowToConnect(true);
+        });
+
     if (batteriesTooWeakForWifi())
     {
-        LOG("BOOT", "Restarted by a brownout: no WiFi until the batteries are changed");
+        LOG("BOOT", "Two brownouts in a row: no WiFi until the batteries are changed (or BOOT is pressed)");
         player::setShowMessage(" New batteries please ");
+        network::beginOffline(); // the BOOT button still works
         return;
     }
 
@@ -100,16 +144,6 @@ void setup()
             wifiReady = true;
             tellHowToConnect(true);
         });
-    // A short press on the BOOT button shows how to reach it again, or brings the WiFi back if it was
-    // switched off to save batteries (a restart joins the home WiFi or starts the setup WiFi afresh)
-    boot_button::onShortPress(
-        []
-        {
-            if (network::mode() == network::Mode::Off)
-                firmware::restart("BOOT pressed: WiFi back on");
-            tellHowToConnect(true);
-        });
-
     network::begin(); // quick: WiFi joins in the background
     web::begin();     // after network::begin(), which starts the network stack the server needs
 }
@@ -117,5 +151,6 @@ void setup()
 void loop()
 {
     player::loop();
-    firmware::checkTrial(); // the network task does this too, but it doesn't run after a brownout
+    firmware::checkTrial(); // the network task does this too
+    forgetBrownouts();
 }

@@ -342,4 +342,10 @@ namespace settings
         String kept = password; // the check empties the password when there's no WiFi name
         return ::checkWifi(ssid, kept, error);
     }
+
+    bool checkName(const String &name, String &error)
+    {
+        String tidied = name; // the check tidies it
+        return ::checkName(tidied, error);
+    }
 }

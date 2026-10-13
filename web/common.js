@@ -22,7 +22,9 @@ const Pumpkin = (() => {
     try {
       response = await fetch(path, init);
     } catch (e) {
-      throw new Error("Can't reach the pumpkin. Is this phone on the same WiFi as it?");
+      const error = new Error("Can't reach the pumpkin. Is this phone on the same WiFi as it?");
+      error.unreachable = true; // no reply at all (it may still have done it)
+      throw error;
     } finally {
       clearTimeout(timer);
     }
@@ -32,10 +34,12 @@ const Pumpkin = (() => {
     return data;
   }
 
-  // An Error for a refused request ({"error":"...","needsBoot":true} from the pumpkin)
+  // An Error for a refused request ({"error":"...","needsBoot":true,"field":"name"} from the pumpkin)
   function replyError(status, data) {
     const error = new Error((data && data.error) || 'The pumpkin said no (' + status + ')');
+    error.status = status;
     error.needsBoot = !!(data && data.needsBoot);
+    error.field = (data && data.field) || '';
     return error;
   }
   const get = (path, options) => request(path, options);
