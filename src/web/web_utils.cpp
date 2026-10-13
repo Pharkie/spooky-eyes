@@ -135,6 +135,16 @@ namespace web
         sendJson(request, code, doc);
     }
 
+    bool hasNul(JsonVariantConst field)
+    {
+        if (!field.is<const char *>())
+        {
+            return false;
+        }
+        const JsonString raw = field.as<JsonString>();
+        return memchr(raw.c_str(), '\0', raw.size()) != nullptr;
+    }
+
     bool readText(JsonDocument &body, const char *key, const char *what, size_t minLength, size_t maxLength,
                   bool required, String &value, String &error)
     {
@@ -155,22 +165,22 @@ namespace web
         }
         // Reject a NUL inside the text ("\u0000" in the JSON): stored as a C string it would cut the rest off.
         // (Not String::indexOf('\0'), which finds the terminator at the end of every string.)
-        const JsonString raw = field.as<JsonString>();
-        if (memchr(raw.c_str(), '\0', raw.size()) != nullptr)
+        if (hasNul(field))
         {
-            error = String("The ") + what + " has a strange character in it";
+            error = String("There's a strange character in the ") + what;
             return false;
         }
-        String text = raw.c_str();
+        // Worded to read well whether `what` is one thing ("WiFi name") or several ("words")
+        String text = field.as<const char *>();
         if (text.length() < minLength)
         {
             error = minLength <= 1 ? String("Please fill in the ") + what
-                                   : String("The ") + what + " needs at least " + minLength + " characters";
+                                   : String("Please use at least ") + minLength + " characters for the " + what;
             return false;
         }
         if (text.length() > maxLength)
         {
-            error = String("The ") + what + " is too long (up to " + maxLength + " characters)";
+            error = String("Too long: the ") + what + " can have up to " + maxLength + " characters";
             return false;
         }
         value = text;

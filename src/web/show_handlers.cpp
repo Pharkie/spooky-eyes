@@ -65,11 +65,17 @@ namespace web
                 number++;
                 const String where = "Block " + String(number) + ": ";
                 const char *type = item["type"] | "";
+                // A NUL ("\u0000") would cut the text short when it's copied, as in readText()
                 if (strcmp(type, kTypeEffect) == 0)
                 {
                     if (!item["id"].is<const char *>())
                     {
                         error = where + "which effect?";
+                        return false;
+                    }
+                    if (hasNul(item["id"]))
+                    {
+                        error = where + "there's a strange character in the effect's name";
                         return false;
                     }
                     show.push_back({ShowBlock::Kind::Effect, item["id"].as<const char *>()});
@@ -79,6 +85,11 @@ namespace web
                     if (!item["text"].is<const char *>())
                     {
                         error = where + "the words should be text";
+                        return false;
+                    }
+                    if (hasNul(item["text"]))
+                    {
+                        error = where + "there's a strange character in the words";
                         return false;
                     }
                     show.push_back({ShowBlock::Kind::Words, item["text"].as<const char *>()});

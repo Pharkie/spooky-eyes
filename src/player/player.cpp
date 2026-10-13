@@ -12,6 +12,7 @@
 
 #include "player/player.h"
 
+#include <ArduinoJson.h>
 #include <atomic>
 #include <cstring>
 #include <exception>
@@ -20,12 +21,14 @@
 #include <utility>
 #include "core/constants.h"
 #include "core/logging.h"
+#include "core/network.h"
 #include "core/settings.h"
 #include "core/show_store.h"
 #include "core/text.h"
 #include "display/sprites.h"
 #include "effects/registry.h"
 #include "effects/show.h"
+#include "hardware/boot_button.h"
 #include "hardware/max7219_eyes.h"
 #include "hardware/mouth_led.h"
 #include "player/device_engine.h"
@@ -477,6 +480,9 @@ namespace
     }
 
     // --- USB serial commands, for testing without WiFi ---
+    //
+    // status and fs answer in one line, "STATUS {json}" and "FS {json}", for tools/pumpkin_serial.py.
+    // Nothing here ever prints a WiFi password.
 
     void printHelp()
     {
@@ -487,7 +493,72 @@ namespace
         Serial.println("  show          start the show (from the top)");
         Serial.println("  buttons       pause the show for button presses (back to the show after 2 minutes idle)");
         Serial.println("  name <name>   rename the pumpkin, e.g. name Jack's Pumpkin (restart to rename its WiFi)");
+        Serial.println("  status        one line: STATUS {WiFi, address, player, memory, uptime, version}");
+        Serial.println("  unlock        the same as a short BOOT press (unlocks updates and WiFi changes for 5 minutes)");
+        Serial.println("  fs            one line: FS {storage used and free, whether a show is saved}");
         Serial.println("  help          this list");
+    }
+
+    const char *networkModeName(network::Mode mode)
+    {
+        // The same names as /api/status (api_handlers.cpp)
+        switch (mode)
+        {
+        case network::Mode::Connecting:
+            return "connecting";
+        case network::Mode::Connected:
+            return "connected";
+        case network::Mode::SetupAP:
+            return "setup";
+        case network::Mode::Disconnected:
+            return "disconnected";
+        case network::Mode::Off:
+            return "off";
+        }
+        return "unknown";
+    }
+
+    // Print "<tag> {json}" in one write, so other tasks' log lines can't land in the middle of it
+    void printJsonLine(const char *tag, const JsonDocument &doc)
+    {
+        String json;
+        serializeJson(doc, json);
+        Serial.printf("%s %s\n", tag, json.c_str());
+    }
+
+    void printStatus()
+    {
+        const player::Status playing = player::status();
+        JsonDocument doc;
+        doc["version"] = FIRMWARE_VERSION;
+        doc["uptime"] = millis() / 1000;
+        doc["freeHeap"] = ESP.getFreeHeap();
+        doc["minFreeHeap"] = ESP.getMinFreeHeap();
+        doc["network"] = networkModeName(network::mode());
+        doc["ip"] = network::ipAddress();
+        doc["hostname"] = network::mdnsHostname();
+        doc["hasSavedWifi"] = network::hasSavedWifi();
+        doc["setupReason"] = network::setupReason();
+        doc["homeWifiOutOfReach"] = network::homeWifiOutOfReach();
+        doc["unlocked"] = boot_button::unlocked();
+        doc["name"] = settings::get().pumpkinName;
+        doc["player"] = playing.mode == Mode::Buttons ? "buttons" : "show";
+        doc["effectId"] = playing.effectId;
+        doc["block"] = playing.block;
+        printJsonLine("STATUS", doc);
+    }
+
+    void printStorage()
+    {
+        show_store::StorageInfo info;
+        const bool mounted = show_store::storageInfo(info);
+        JsonDocument doc;
+        doc["mounted"] = mounted;
+        doc["usedBytes"] = info.usedBytes;
+        doc["totalBytes"] = info.totalBytes;
+        doc["showSaved"] = info.showSaved;
+        doc["showBytes"] = info.showBytes;
+        printJsonLine("FS", doc);
     }
 
     void listEffects()
@@ -566,6 +637,22 @@ namespace
             LOG("SERIAL", "OK, buttons mode (back to the show after %u minutes with no presses)",
                 static_cast<unsigned>(kButtonsIdleTimeoutMs / PumpkinTime::Minutes(1)));
             player::enterButtons();
+        }
+        else if (strcmp(line, "status") == 0)
+        {
+            printStatus();
+        }
+        else if (strcmp(line, "fs") == 0)
+        {
+            printStorage();
+        }
+        else if (strcmp(line, "unlock") == 0)
+        {
+            // The network task presses it (and logs "[BUTTON] Short press (from serial)...") in a moment
+            if (boot_button::pressFromSerial())
+                LOG("SERIAL", "OK, a short BOOT press");
+            else
+                LOG("SERIAL", "The BOOT button isn't being watched (no WiFi since a brownout restart?)");
         }
         else if (*line)
         {

@@ -37,9 +37,14 @@ namespace web
 
     // --- Input checks (from Scribe Evolution's validation.cpp) ---
 
-    // A text field from a JSON body. Fails if it's missing (when required), not a string, or its
-    // length in bytes is outside minLength..maxLength. Missing and not required leaves value alone.
-    // error says why, in words a parent understands.
+    // True if this JSON string has a NUL inside it ("\u0000"): kept as a C string, it would quietly cut
+    // the rest off, so readText() and the show's blocks turn it away. False for anything but a string.
+    bool hasNul(JsonVariantConst field);
+
+    // A text field from a JSON body. Fails if it's missing (when required), not a string, has a NUL in
+    // it, or its length in bytes is outside minLength..maxLength. Missing and not required leaves value
+    // alone. error says why, in words a parent understands (`what` may be singular or plural: "WiFi
+    // name", "words").
     bool readText(JsonDocument &body, const char *key, const char *what, size_t minLength, size_t maxLength,
                   bool required, String &value, String &error);
 

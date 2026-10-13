@@ -71,7 +71,43 @@ The web pages in `web/` are compiled into the firmware, so there's no separate f
 firmware update updates the pages too.
 
 Over USB the board also takes simple serial commands: `list`, `play creeper`, `say Hello`, `show`,
-`name Jack's Pumpkin`, `help`.
+`name Jack's Pumpkin`, `status`, `unlock` (a short BOOT press), `fs`, `help`.
+
+### Testing
+
+```
+pio test -e native                                   # the effects, frame by frame
+python3 tools/api_check.py --mock                    # the web API cases on the mock, in every WiFi mode
+python3 tools/api_check.py --board http://pumpkin.local             # the same cases on a real board
+python3 tools/api_check.py --board http://pumpkin.local --compare   # board and mock side by side
+```
+
+The pages are mostly tried out against the mock server, so the mock must answer exactly as the firmware
+does. `api_check` sends both the same 150 or so requests from [test/api/cases.py](test/api/cases.py),
+nasty ones included (emoji, accents, curly quotes, NUL, `%"\`, lengths at and one past every limit), and
+fails on any wrong status code or JSON shape; a different error message is a warning. On a board it notes
+the settings and saved show first and puts them back afterwards, and it never restarts the board or saves
+or forgets WiFi unless told to (`--allow-restart`, `--allow-wifi-save`, `--allow-forget`). For a board on
+its own setup WiFi, join "Spooky Pumpkin" and use `--board http://192.168.4.1`. Don't press BOOT in the 5
+minutes before a board run (`--serial` presses it over USB for the few cases that need it).
+
+With a board on USB (these need pyserial, which PlatformIO's Python has:
+`/Library/Frameworks/Python.framework/Versions/3.11/bin/python3`):
+
+```
+python3 tools/pumpkin_serial.py status               # WiFi mode, address, player, memory, uptime, version
+python3 tools/pumpkin_serial.py unlock               # the same as a short BOOT press
+python3 tools/pumpkin_serial.py fs                   # storage used, and whether a show is saved
+python3 tools/pumpkin_serial.py monitor --reset      # the log, timestamped, from the start
+python3 tools/flash_check.py release/spooky-pumpkin-eyes-<version>-full.bin
+```
+
+`flash_check` erases and flashes a board as for posting, then reads its first boot and prints PASS or FAIL
+for each line it should log (version, fresh settings, storage, effects, setup WiFi, web server) and for
+no crash, brownout or restart. `--log-file boot.log` checks a saved log instead.
+
+What needs real phones and routers is in
+[docs/testing/pre-posting-checklist.md](docs/testing/pre-posting-checklist.md).
 
 ### Making a release
 
@@ -98,6 +134,8 @@ owner names it on the setup page (or later in Settings). Nothing to track per pe
    `pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32c3 write_flash -e 0x0 ...`; or Chrome and
    Espressif's [web flasher](https://espressif.github.io/esptool-js/): Erase Flash, then program at 0x0.)
    If esptool can't connect, hold BOOT while plugging in the USB cable, then press RST after flashing.
+   `python3 tools/flash_check.py release/spooky-pumpkin-eyes-<version>-full.bin` does this step and checks
+   the board's first boot (see Testing).
 2. Switch it on with the eyes attached and check they scroll "Join WiFi: Spooky Pumpkin ...".
 3. Print the guide, [docs/instructions/2026-wifi-upgrade.pdf](docs/instructions/2026-wifi-upgrade.pdf),
    once per pumpkin.
@@ -116,8 +154,9 @@ and `tools/make_instructions.sh "Jack's Pumpkin"` makes a matching guide. Not ne
 | `src/core/` | Settings (saved in flash), WiFi and captive portal (from Scribe Evolution), constants |
 | `src/web/` | Web server and JSON API |
 | `web/` | The pages: buttons, setup, settings |
-| `test/` | Golden tests: the C++ effects frame-for-frame against the MicroPython originals |
+| `test/` | Golden tests: the C++ effects frame-for-frame against the MicroPython originals; `test/api/`: the web API cases |
 | `docs/instructions/` | The printed one-page guide for the 2026 WiFi upgrade |
+| `docs/testing/` | The checks before posting that need phones and routers |
 | `legacy/pico-micropython/` | The 2023-24 MicroPython version for the Raspberry Pi Pico, and its Mac tools |
 
 [CLAUDE.md](CLAUDE.md) explains how the pieces fit together, including how to add an effect (write the
