@@ -59,9 +59,9 @@
   .abs { position: absolute; }
 
   /* ---------- Header: the 2024 title artwork, then this year's subtitle ---------- */
-  .header-art { position: absolute; left: 62.6mm; top: 39.3mm; width: 84mm; } /* just under the frame's tassel */
+  .header-art { position: absolute; left: 62.6mm; top: 43.6mm; width: 84mm; } /* clear of the frame's tassel (ends 41 mm down) */
   .subtitle {
-    position: absolute; left: 30mm; width: 151mm; top: 66.9mm;
+    position: absolute; left: 30mm; width: 151mm; top: 72.8mm; /* clear of the Y's tail */
     text-align: center;
     font-family: var(--display);
     font-size: 13.5pt;
@@ -103,26 +103,25 @@
   .addr { font-weight: 700; white-space: nowrap; }
   .nowrap { white-space: nowrap; }
 
-  .top { left: 35mm; top: 74mm; width: 146mm; }
+  .top { left: 35mm; top: 80.2mm; width: 146mm; }
   /* Bottom: text runs beside the 2024 raven (part of the frame artwork) and the sign-off above its head */
-  .bottom { left: 27mm; top: 175mm; width: 160mm; } /* below the left branch's brushes (they end 166 mm down) */
-  .keep-clear-head { float: right; width: 29mm; height: 14mm; } /* beside the raven's head, down to its beak */
+  .bottom { left: 27mm; top: 181mm; width: 160mm; } /* below the left branch's brushes (they end 166 mm down) */
+  .keep-clear-head { float: right; width: 29mm; height: 5mm; } /* above the raven's head, which starts 186 mm down */
   .keep-clear-raven { float: right; clear: right; width: 48.6mm; height: 76mm; }
 
   #diagram { display: block; width: 146mm; height: 53.4mm; margin-top: .6mm; overflow: visible; }
   .diagram-notes { margin: .4mm 0 1.8mm; font-size: 9pt; line-height: 1.15; }
 
-  /* ---------- The pumpkin's WiFi at a glance: above the raven's head ---------- */
+  /* ---------- The pumpkin's WiFi at a glance: narrow enough to sit beside the raven ---------- */
   .wifi-card {
-    display: flex; align-items: center; gap: 3.5mm; width: max-content;
-    margin: 0 0 3mm 7.2mm; padding: 1.5mm 4mm;
+    width: max-content;
+    margin: 0 0 3mm 7.2mm; padding: 1.6mm 3.6mm;
     border: .5mm solid var(--ink); border-radius: 4mm;
     background: rgba(255, 255, 255, .45);
   }
-  .wifi-card .icon { width: 7mm; height: 7mm; }
-  .wifi-card dl { display: grid; grid-template-columns: repeat(4, auto); gap: .6mm 2.5mm; margin: 0; align-items: baseline; }
-  .wifi-card dt { font-family: var(--hand); font-size: 11pt; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
-  .wifi-card dd { margin: 0 3mm 0 0; font-weight: 700; font-size: 11pt; line-height: 1.15; }
+  .wifi-card dl { display: grid; grid-template-columns: repeat(4, auto); gap: .6mm 2.2mm; margin: 0; align-items: baseline; }
+  .wifi-card dt { font-family: var(--hand); font-size: 10.5pt; letter-spacing: .03em; text-transform: uppercase; line-height: 1; }
+  .wifi-card dd { margin: 0 2.6mm 0 0; font-weight: 700; font-size: 10.5pt; line-height: 1.15; }
   .wifi-card dd:nth-of-type(even) { margin-right: 0; }
 
   /* ---------- Small print ---------- */
@@ -178,7 +177,6 @@
     <div class="keep-clear-head"></div>
     <div class="keep-clear-raven"></div>
     <div class="wifi-card">
-      <svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg>
       <dl>
         <dt>Join</dt><dd>Spooky Pumpkin</dd><dt>Setup page</dt><dd>192.168.4.1</dd>
         <dt>Password</dt><dd>spookyeyes</dd><dt>On your WiFi</dt><dd>http://pumpkin.local</dd>
@@ -195,12 +193,10 @@
     <div class="faq">
       <p><b>Setup page won’t open?</b> Forget Spooky Pumpkin in your phone’s WiFi settings, switch Spooky Eyes
         off and on, then join again (switching mobile data off can help).</p>
-      <p><b>Page won’t open later?</b> After 10 minutes unused, Spooky Eyes switches WiFi off to save batteries:
-        press BOOT, or switch off and on.</p>
+      <p><b>Page won’t open later?</b> WiFi sleeps after 10 unused minutes: switch Spooky Eyes off and on.</p>
       <p><b>On the doorstep?</b> Out of reach of your WiFi for 3 minutes, Spooky Eyes brings back the Spooky
         Pumpkin WiFi: join and open 192.168.4.1. Back in range, Spooky Eyes rejoins your WiFi by itself.</p>
-      <p><b>BOOT button</b> (on the board): a quick press repeats the address or WiFi details; hold for
-        5 seconds to forget your home WiFi.</p>
+      <p><b>BOOT button</b> (on the board): press to repeat the address; hold 5 seconds to forget your home WiFi.</p>
     </div>
   </section>
 
@@ -523,7 +519,8 @@ function checkLayout() {
     `diagram ${mmTop(document.getElementById("diagram")).toFixed(1)}-${mmDown(document.getElementById("diagram")).toFixed(1)}, ` +
     `step 3 ends ${topEnd.toFixed(1)}, step 4 starts ${bottomStart.toFixed(1)}, small print ends ${bottomEnd.toFixed(1)}`;
   if (topEnd > bottomStart + 0.3) problems.push(`step 3 runs ${(topEnd - bottomStart - 0.3).toFixed(1)} mm into step 4`);
-  if (mmDown(document.querySelector(".wifi-card")) > 189) problems.push("the WiFi box runs into the raven's beak");
+  const card = document.querySelector(".wifi-card").getBoundingClientRect();
+  if ((card.right - page.left) * 25.4 / 96 > 138.4) problems.push("the WiFi box runs into the raven");
   if (bottomEnd > 260) problems.push(`the small print runs ${(bottomEnd - 260).toFixed(1)} mm too close to the frame`);
 
   // Diagram labels: at least 7 pt, inside the drawing, clear of each other and of the wires (units: mm)
