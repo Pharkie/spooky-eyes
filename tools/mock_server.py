@@ -24,8 +24,9 @@ mode ends kButtonsIdleTimeoutMs after the last press or heartbeat (MOCK_IDLE_SEC
 saved show lives in memory and starts as the default show from src/effects/show.cpp.
 
 The setup page's WiFi check (POST then GET /api/wifi/test) takes WIFI_TEST_SECONDS, then: "That password
-didn't work" if the password is empty (for a WiFi that needs one) or has "wrong" in it, "Can't find ..." if
-the WiFi isn't in the fake scan list, otherwise it passes. On home WiFi it's skipped, as on the board.
+didn't work" if the password is empty (for a WiFi that needs one) or has "wrong" in it, "unsure" (the router
+didn't answer in time: the page offers Save anyway) if it has "slow" in it, "Can't find ..." if the WiFi
+isn't in the fake scan list, otherwise it passes. On home WiFi it's skipped, as on the board.
 MOCK_WIFI_DROP_SECONDS=8 pretends the phone drops off the setup WiFi for that long when a check starts
 (the radio changing channel): API requests get no answer meanwhile.
 
@@ -75,7 +76,7 @@ MAX_UPLOAD = 2 * 1024 * 1024  # bigger than an app slot
 EFFECT_SECONDS = 4
 BOOT_SECONDS = 5              # how long a pretend restart keeps the pumpkin away
 BOOT_PRESS_MESSAGE = "Press the small BOOT button on the pumpkin's board, then try again"  # web_utils.h
-WIFI_TEST_SECONDS = 3         # a pretend WiFi check takes this long (up to about 12 s on the board)
+WIFI_TEST_SECONDS = 3         # a pretend WiFi check takes this long (up to about 30 s on the board)
 WIFI_TEST_KEEP_SECONDS = 60   # network.cpp kWifiTestKeepMs: a finished check is kept this long
 # Pretend the phone drops off the setup WiFi for this long when a check starts (0 = it doesn't)
 WIFI_DROP_SECONDS = float(os.environ.get("MOCK_WIFI_DROP_SECONDS") or 0)
@@ -633,7 +634,11 @@ class Pumpkin:
             if not seen:
                 outcome = ("failed", 0, f"Can't find {ssid}: is it a 2.4 GHz network, and in range?")
             elif seen[0]["secure"] and (not password or "wrong" in password.lower()):
-                outcome = ("failed", 0, "That password didn't work")
+                outcome = ("failed", 0, "That password didn't work. Check it (capital letters too), or if the "
+                                        "signal is weak, move the pumpkin closer to the router.")
+            elif "slow" in (password or "").lower():
+                outcome = ("unsure", 0, f"{ssid} didn't answer in time, so the pumpkin couldn't tell whether the "
+                                        "password works. Save it anyway, and the pumpkin will try it when it restarts.")
             else:
                 outcome = ("passed", max(n["rssi"] for n in seen) + random.randint(-3, 3), "")
             self.wifi_test = {"ssid": ssid, "started": time.time(), "status": "running", "rssi": 0, "reason": "",
@@ -1061,8 +1066,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_wifi_test_start(self, query):
         # Same order as the firmware: the request, then home WiFi (skipped), the BOOT gate, a check running
-        ssid, password = self.check_wifi(self.json_body())
+        body = self.json_body()
+        ssid, password = self.check_wifi(body)
         self.check_wifi_password(password)
+        # The pumpkin's name, if sent, is checked now (wifi_handlers.cpp), so a bad one is said before the wait
+        name = self.read_new_name(body)
+        if name:
+            try:
+                self.check_name(name)
+            except ApiError as e:
+                raise ApiError(e.status, str(e), field="name")
         pumpkin = self.pumpkin
         if pumpkin.network_mode() != "setup":
             self.send_json(200, {"skipped": True, "reason": "The pumpkin is on its home WiFi, and checking "
