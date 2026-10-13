@@ -69,7 +69,7 @@ namespace
         {"roll", "Roll eyes", "🙄", EffectGroup::Eyes, "Whatever!", rollEyes, true},
         {"lookdown", "Look down", "👇", EffectGroup::Eyes, "What's down there?", lookDown, true},
         {"grow", "Grow eyes", "🔍", EffectGroup::Eyes, "Whoa!", growEyes, true},
-        {"angry", "Angry", "😠", EffectGroup::Eyes, "Grrrr! I'm really cross!", angryEyes, true},
+        {"angry", "Angry", "😠", EffectGroup::Eyes, "Gurrr! I'm really cross!", angryEyes, true},
         {"sleepy", "Sleepy", "😴", EffectGroup::Eyes, "I'm so sleepy. Snore... snore...", sleepyEyes, true},
         {"crosseyed", "Cross-eyed", "🤪", EffectGroup::Eyes, "Ooh, I'm going cross-eyed!", crossEyed, true},
         // Games

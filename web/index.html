@@ -273,8 +273,60 @@ setTimeout(function () {
     voicePicker.hidden = false;
   }
 
+  // A hiss ("Shhhhhhh!", the creeper's and the TNT's fuse): phone voices clip it to a quick "sh" or stutter
+  // it, so the phone makes a real fizz instead, until the next words (the "Boom!") or HISS_MAX_MS
+  const HISS_WORD = /^\s*s*h+[!.]*\s*$|^\s*s{3,}[!.]*\s*$/i;
+  const HISS_MAX_MS = 4000;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audio = null;
+  let hiss = null; // {source, gain} while one plays
+
+  function stopHiss() {
+    if (!hiss) return;
+    const { source, gain } = hiss;
+    hiss = null;
+    const now = audio.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setTargetAtTime(0, now, 0.03);
+    source.stop(now + 0.2);
+  }
+
+  function playHiss() {
+    if (!audio) return;
+    stopHiss();
+    // Two seconds of white noise, looped, through a filter that leaves the "sss" part, getting louder as the
+    // fuse burns down
+    const rate = audio.sampleRate;
+    const buffer = audio.createBuffer(1, rate * 2, rate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const source = audio.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const filter = audio.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 4500;
+    filter.Q.value = 0.7;
+    const gain = audio.createGain();
+    const now = audio.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.15);
+    gain.gain.linearRampToValueAtTime(0.5, now + HISS_MAX_MS / 1000);
+    source.connect(filter).connect(gain).connect(audio.destination);
+    source.start(now);
+    source.stop(now + HISS_MAX_MS / 1000);
+    hiss = { source, gain };
+    source.onended = () => { if (hiss && hiss.source === source) hiss = null; };
+  }
+
   function speak(text) {
     if (!speech || !talk.checked || !text) return;
+    stopHiss(); // the next words (the "Boom!") end it
+    if (HISS_WORD.test(text) && audio) {
+      speech.cancel();
+      playHiss();
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(text);
     const voice = voices.find((v) => v.voiceURI === voicePicker.value);
     if (voice) {
@@ -296,6 +348,13 @@ setTimeout(function () {
     const hush = new SpeechSynthesisUtterance(' ');
     hush.volume = 0;
     speech.speak(hush);
+    // Sound effects (the hiss) need the same first tap
+    if (AudioCtx) {
+      try {
+        audio = new AudioCtx();
+        if (audio.resume) audio.resume();
+      } catch (e) { audio = null; }
+    }
     ['touchend', 'click', 'keydown'].forEach((type) => document.removeEventListener(type, unlockSpeech, true));
   }
 
@@ -307,7 +366,7 @@ setTimeout(function () {
     ['touchend', 'click', 'keydown'].forEach((type) => document.addEventListener(type, unlockSpeech, true));
     talk.addEventListener('change', () => {
       store.set('talk', talk.checked ? 'on' : 'off');
-      if (!talk.checked) speech.cancel();
+      if (!talk.checked) { speech.cancel(); stopHiss(); }
     });
     voicePicker.addEventListener('change', () => {
       store.set('voice', voicePicker.value);

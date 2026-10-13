@@ -407,7 +407,12 @@ SPOKEN = {
     'Hrrmm?': 'Hurrmm?',
     'Hrrm! Hrrm!': 'Hurrmm! Hurrmm!',
     "I'm so sleepy. Zzzzzzzz.": "I'm so sleepy. Snore... snore...",
+    "Grrrr! I'm really cross!": "Gurrr! I'm really cross!",
 }
+
+# Effects changed on purpose, so no longer compared with the old pumpkin (the smoke tests still play them).
+# emerald: the villager picks what to give for the emerald (the old one always gave a diamond)
+NOT_COMPARED = {'emerald'}
 
 
 def button_phrases():
@@ -430,7 +435,9 @@ def capture_all():
 
     effects = read_button_effects()
     phrases = button_phrases()
-    jobs = list(effects) + [('surprise', surprise_code(effects))]
+    # (The surprise show is still built from every old effect, as the old page built it)
+    jobs = [(fx_id, code) for fx_id, code in effects if fx_id not in NOT_COMPARED]
+    jobs += [('surprise', surprise_code(effects))]
     jobs += [(fx_id, code) for fx_id, code, _ in EXTRA]
 
     results = {}
@@ -501,7 +508,9 @@ def main_cli():
     results = capture_all()
     files = {fx_id + '.txt': golden_text(fx_id, code, events) for fx_id, (code, events) in results.items()}
     files['index.txt'] = ('# Golden recordings, one id per line (test/golden/<id>.txt). Written by '
-                          'tools/capture_python_frames.py.\n' + ''.join(i + '\n' for i in results))
+                          'tools/capture_python_frames.py.\n' + ''.join(i + '\n' for i in results) +
+                          '# Old effects changed on purpose, so not compared (no file), but still in the old surprise '
+                          'show:\n' + ''.join('~' + i + '\n' for i in sorted(NOT_COMPARED)))
     files['fonts.txt'] = fonts_text()
     files['phrases.txt'] = phrases_text()
 
