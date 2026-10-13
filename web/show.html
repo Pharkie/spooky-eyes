@@ -48,6 +48,18 @@
   </div>
 </div>
 </main>
+<script>
+// If the page's own script never arrives (the pumpkin restarted mid-load, or the WiFi blinked), say so rather
+// than sitting on "Waking up..." for ever
+setTimeout(function () {
+  if (typeof Pumpkin !== 'undefined') return; // (a top-level const, so not window.Pumpkin)
+  var note = document.createElement('p');
+  note.className = 'notice problem';
+  note.setAttribute('role', 'alert');
+  note.textContent = 'The page didn\u2019t load properly. Reload it to try again.';
+  document.body.insertBefore(note, document.body.firstChild);
+}, 8000);
+</script>
 <script src="/common.js"></script>
 <script>
 'use strict';
