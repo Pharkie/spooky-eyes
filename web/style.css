@@ -241,7 +241,7 @@ input[type=file] { font: inherit; font-size: 16px; color: var(--muted); max-widt
 }
 .tool:active:not(:disabled) { background: var(--line); }
 .tool:disabled { opacity: .3; cursor: default; }
-.tool.del { color: var(--red); }
+.tool.del { color: var(--text); border-color: #ff5a5a; } /* a bin in a red outline: delete */
 .tool:focus-visible, .tile:focus-visible, .btn:focus-visible, .grip:focus-visible, .acc-btn:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
 .add-row { display: flex; gap: 10px; margin: 4px 0 0; }
 .add-row .btn { flex: 1 1 0; min-width: 0; }
