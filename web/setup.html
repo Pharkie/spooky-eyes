@@ -124,9 +124,9 @@
   function tidyNetworks(raw) {
     const best = new Map();
     for (const net of raw) {
-      const ssid = (net.ssid || '').trim();
-      if (!ssid) continue;
-      if (!best.has(ssid) || net.rssi > best.get(ssid).rssi) best.set(ssid, Object.assign({}, net, { ssid }));
+      const ssid = net.ssid || ''; // exactly as the router sends it: a space at either end is part of the name
+      if (!ssid.trim()) continue;
+      if (!best.has(ssid) || net.rssi > best.get(ssid).rssi) best.set(ssid, Object.assign({}, net));
     }
     return [...best.values()].sort((a, b) => (b.rssi - a.rssi) || a.ssid.localeCompare(b.ssid));
   }

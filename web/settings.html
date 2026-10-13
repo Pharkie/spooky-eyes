@@ -85,8 +85,9 @@
 
   // ---- Pumpkin settings ----
 
-  function fillSettings(s) {
-    $('name').value = s.name;
+  // withName false: leave the name box alone (someone may be halfway through typing a new name)
+  function fillSettings(s, withName = true) {
+    if (withName) $('name').value = s.name;
     for (const key of ['brightness', 'eyeGap']) {
       $(key).value = s[key];
       $(key + '-value').textContent = s[key];
@@ -99,7 +100,7 @@
     showMessage(messageEl, 'Saving…');
     try {
       const reply = await post('/api/settings', changes);
-      fillSettings(reply.settings);
+      fillSettings(reply.settings, 'name' in changes);
       showName(reply.settings.name);
       showMessage(messageEl, 'Saved ✓', 'ok');
       return reply;
@@ -157,8 +158,25 @@
     showWifi(status);
   }
 
-  $('forget').addEventListener('click', async () => {
-    if (!confirm('Forget the home WiFi? The pumpkin will restart and make its own WiFi again, ready to be set up.')) return;
+  // No confirm() (captive-portal browsers don't always show pop-ups): the first tap asks, the second does it
+  function tapTwice(button, armedLabel, messageEl, question, action) {
+    const label = button.textContent;
+    let timer = 0;
+    const disarm = () => { clearTimeout(timer); timer = 0; button.textContent = label; };
+    button.addEventListener('click', () => {
+      if (!timer) {
+        timer = setTimeout(() => { disarm(); showMessage(messageEl, ''); }, 6000);
+        button.textContent = armedLabel;
+        showMessage(messageEl, question);
+        return;
+      }
+      disarm();
+      action();
+    });
+  }
+
+  tapTwice($('forget'), 'Tap again to forget WiFi', $('wifi-msg'),
+    'The pumpkin will restart and make its own WiFi again, ready to be set up.', async () => {
     try {
       const reply = await post('/api/wifi/forget');
       showMessage($('wifi-msg'), reply.message, 'ok');
@@ -188,9 +206,8 @@
       showError(messageEl, e);
     }
   }
-  $('restart').addEventListener('click', () => {
-    if (confirm('Restart the pumpkin?')) restart($('restart-msg'));
-  });
+  tapTwice($('restart'), 'Tap again to restart', $('restart-msg'), 'It’ll be back in about 20 seconds.',
+    () => restart($('restart-msg')));
 
   // ---- Firmware update (XMLHttpRequest, because fetch can't report upload progress) ----
 

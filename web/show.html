@@ -80,7 +80,9 @@
   let savedOnce = false;     // this page has saved something (so "Saved ✓" means something)
   let resetting = false;
 
-  const dirty = () => JSON.stringify(blocks) !== saved;
+  // The pumpkin trims spaces off the ends of words, so those alone don't need saving
+  const asSaved = (list) => JSON.stringify(list.map((b) => (b.type === 'words' ? { type: 'words', text: b.text.trim() } : b)));
+  const dirty = () => asSaved(blocks) !== saved;
   const emptyWords = () => blocks.some((b) => b.type === 'words' && !b.text.trim());
   const copy = (list) => list.map((b) => (b.type === 'words' ? { type: 'words', text: b.text } : { type: 'effect', id: b.id }));
 
@@ -452,8 +454,10 @@
     if (tidied.length !== blocks.length) return;
     tidied.forEach((block, i) => {
       if (block.type !== 'words' || blocks[i].type !== 'words' || block.text === blocks[i].text) return;
-      blocks[i].text = block.text;
       const input = list.children[i] && list.children[i].querySelector('.words-input');
+      // Mid-sentence ("Happy |"): the pumpkin trimmed the space, but the box keeps it for the next word
+      if (input && document.activeElement === input && block.text === blocks[i].text.trim()) return;
+      blocks[i].text = block.text;
       if (input) replaceKeepingCaret(input, block.text);
     });
   }
