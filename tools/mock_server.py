@@ -138,8 +138,9 @@ MAX_EYE_GAP = constant("kMaxEyeGap")
 MAX_SSID_BYTES = constant("kMaxSsidBytes")
 MIN_WIFI_PASSWORD = constant("kMinWifiPasswordLength")
 MAX_WIFI_PASSWORD = constant("kMaxWifiPasswordLength")  # 64 only as hex digits
-MAX_HOSTNAME = constant("kMaxHostnameLength")
+SETUP_SSID = constant("kSetupApName")
 SETUP_PASSWORD = constant("kSetupApPassword")
+HOSTNAME = constant("kHostname")
 DEFAULT_NAME = constant("kDefaultPumpkinName")
 BOOT_UNLOCK_SECONDS = constant("kBootUnlockMs") / 1000
 RESTART_DELAY_SECONDS = constant("kRestartDelayMs") / 1000
@@ -166,6 +167,8 @@ EFFECT_ENTRY = re.compile(
 # A block of the default show in show.cpp: {ShowBlock::Kind::Effect, "creeper"} or {ShowBlock::Kind::Words, "..."}
 SHOW_ENTRY = re.compile(r"\{\s*(?:ShowBlock::)?Kind::(Effect|Words)\s*,\s*" + C_STRING + r"\s*\}")
 GROUP_NAME = re.compile(r'case\s+EffectGroup::(\w+)\s*:\s*return\s+"([^"]*)"')
+# groupTitle()'s Minecraft heading, as built without local/credits.h (the "by" credit)
+MINECRAFT_TITLE = re.compile(r'#else\s+#define MINECRAFT_TITLE\s+"([^"]*)"')
 
 
 def c_unescape(text):
@@ -195,6 +198,15 @@ def load_effects():
     if not effects:
         sys.exit(f"Couldn't read the effects table in {REGISTRY.relative_to(ROOT)} (has its layout changed?)")
     return effects
+
+
+def load_group_titles():
+    """groupTitle(): section headings that differ from the group's name."""
+    match = MINECRAFT_TITLE.search(REGISTRY.read_text(encoding="utf-8"))
+    return {"Minecraft": match.group(1)} if match else {}
+
+
+GROUP_TITLES = load_group_titles()
 
 
 def load_default_show(by_id):
@@ -257,31 +269,6 @@ def plain(text, drop_other=True):
     return "".join(out).strip()
 
 
-def hostname_for(name):
-    """text::hostname(): "Jack's Pumpkin" -> "jacks-pumpkin"."""
-    host = ""
-    gap = False
-    for ch in plain(name):
-        if ch == "'":
-            continue
-        ch = ch.lower()
-        if not ("a" <= ch <= "z" or "0" <= ch <= "9"):
-            gap = True
-            continue
-        needed = 2 if gap and host else 1
-        if len(host) + needed > MAX_HOSTNAME:
-            break
-        host += ("-" if needed == 2 else "") + ch
-        gap = False
-    return host or "pumpkin"
-
-
-def ap_name_for(name):
-    """network::apNameFor(): the setup WiFi's name for a pumpkin's name."""
-    name = name.strip().encode("utf-8")[:MAX_SSID_BYTES].decode("utf-8", "ignore").strip()
-    return name or DEFAULT_NAME
-
-
 def valid_wifi_password(password):
     """text::validWifiPassword(): empty, 8-63 characters, or 64 hex digits."""
     if not password:
@@ -314,7 +301,6 @@ class Pumpkin:
         self.version = FIRMWARE["FIRMWARE_VERSION"] + "-mock"
         self.started = time.time()
         self.name = "Jack's Pumpkin"  # saved (named already, except in setup mode)
-        self.running_name = self.name  # what the setup WiFi and web address use until a restart
         self.brightness = 2
         self.eye_gap = 8
         self.mouth_led = True
@@ -352,7 +338,7 @@ class Pumpkin:
             if mode == "setup":
                 # A fresh board, as posted: no WiFi and not named yet
                 self.wifi_ssid, self.wifi_password = "", ""
-                self.name = self.running_name = DEFAULT_NAME
+                self.name = DEFAULT_NAME
             elif not self.wifi_ssid:
                 self.wifi_ssid, self.wifi_password = "Haunted House 2.4G", ""
 
@@ -407,9 +393,9 @@ class Pumpkin:
                 "hasSavedWifi": bool(self.wifi_ssid),
                 "homeSsid": self.wifi_ssid,
                 "ip": "192.168.1.23" if home else "" if self.mode == "off" else "192.168.4.1",
-                "hostname": hostname_for(self.running_name) if home else "",
+                "hostname": HOSTNAME if home else "",
                 "rssi": -58 if home else 0,
-                "setupSsid": ap_name_for(self.running_name),
+                "setupSsid": SETUP_SSID,
                 "setupReason": self.setup_reason(),
                 "homeWifiOutOfReach": self.out_of_reach(),
                 "wifiNeedsBoot": self.strangers_may_be_connected(),
@@ -423,7 +409,6 @@ class Pumpkin:
             "mouthLed": self.mouth_led,
             "eyeGap": self.eye_gap,
             "wifiSaver": self.wifi_saver,
-            "hostname": hostname_for(self.name),
         }
 
     # --- Server-sent events ---
@@ -578,7 +563,6 @@ class Pumpkin:
             self.down_until = time.time() + BOOT_SECONDS
             self.started = self.down_until
             self.player_mode = "buttons"  # so start_show() below says "show mode"
-            self.running_name = self.name
             self.boot_pressed_at = None
             self.update_finished = False
             self.wifi_test = None
@@ -777,7 +761,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_effects(self, query):
         effects = [{k: e[k] for k in ("id", "label", "emoji", "group", "inShow")} for e in self.pumpkin.effects]
-        self.send_json(200, {"effects": effects})
+        self.send_json(200, {"effects": effects, "groupTitles": GROUP_TITLES})
 
     def api_status(self, query):
         self.send_json(200, self.pumpkin.status())
@@ -894,8 +878,6 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, "Please give the pumpkin a name")
         if len(name) > MAX_NAME:
             raise ApiError(400, f"That name is too long (up to {MAX_NAME} characters)")
-        if not any(c.isalnum() for c in name):
-            raise ApiError(400, "The name needs at least one letter or number")
         return name
 
     @staticmethod
@@ -930,13 +912,8 @@ class Handler(BaseHTTPRequestHandler):
         if saver is not None and not isinstance(saver, bool):
             raise ApiError(400, "The save batteries setting should be on or off")
         with pumpkin.lock:
-            # The name also names the setup WiFi, so a stranger on the doorstep mustn't change it
-            renaming = new_name is not None and plain(new_name) != pumpkin.name
-            if renaming and pumpkin.strangers_may_be_connected() and not pumpkin.boot_unlocked():
-                raise boot_needed()
-            name = self.check_name(new_name) if new_name is not None else pumpkin.name
-            renamed = name != pumpkin.name
-            pumpkin.name = name
+            if new_name is not None:
+                pumpkin.name = self.check_name(new_name)
             if brightness is not None:
                 pumpkin.brightness = brightness
             if eye_gap is not None:
@@ -947,16 +924,7 @@ class Handler(BaseHTTPRequestHandler):
                 pumpkin.wifi_saver = saver
                 print(f"  (save batteries {'on: the board switches WiFi off after ' + str(WIFI_IDLE_OFF_MINUTES) + ' minutes without requests' if saver else 'off'})")
             settings = pumpkin.settings()
-        reply = {"ok": True, "restartNeeded": renamed, "message": "Saved", "settings": settings}
-        if renamed:
-            address, setup_ssid = f"http://{hostname_for(name)}.local", ap_name_for(name)
-            reply.update(address=address, setupSsid=setup_ssid,
-                         message=f"Saved. After a restart, the pumpkin's web address will be {address} "
-                                 f"and its setup WiFi will be called \"{setup_ssid}\".")
-        self.send_json(200, reply)
-
-    def api_hostname(self, query):
-        self.send_json(200, {"hostname": hostname_for(query.get("name", [""])[0])})
+        self.send_json(200, {"ok": True, "message": "Saved", "settings": settings})
 
     def api_restart(self, query):
         self.json_body()
@@ -1036,10 +1004,9 @@ class Handler(BaseHTTPRequestHandler):
             self.check_wifi_password(password)
             pumpkin.name = name
             pumpkin.wifi_ssid, pumpkin.wifi_password = ssid, password
-        host = hostname_for(name)
         self.send_json(200, {
-            "ok": True, "ssid": ssid, "name": name, "hostname": host, "address": f"http://{host}.local",
-            "setupSsid": ap_name_for(name), "message": f"Saved. The pumpkin is restarting and joining {ssid}.",
+            "ok": True, "ssid": ssid, "name": name, "address": f"http://{HOSTNAME}.local",
+            "setupSsid": SETUP_SSID, "message": f"Saved. The pumpkin is restarting and joining {ssid}.",
         })
         # Longer than usual: the phone shows the "what next" page until the setup WiFi goes
         pumpkin.restart_soon(WIFI_SAVED_RESTART_DELAY_SECONDS, "home")
@@ -1051,10 +1018,9 @@ class Handler(BaseHTTPRequestHandler):
             if pumpkin.strangers_may_be_connected() and not pumpkin.boot_unlocked():
                 raise boot_needed()
             pumpkin.wifi_ssid, pumpkin.wifi_password = "", ""
-            setup_ssid = ap_name_for(pumpkin.name)  # the current name, even before a restart
         self.send_json(200, {
-            "ok": True, "setupSsid": setup_ssid,
-            "message": f"Done. The pumpkin is restarting and will make its own WiFi called \"{setup_ssid}\" "
+            "ok": True, "setupSsid": SETUP_SSID,
+            "message": f"Done. The pumpkin is restarting and will make its own WiFi called \"{SETUP_SSID}\" "
                        f"(password: {SETUP_PASSWORD}). Join it to choose a new home WiFi.",
         })
         pumpkin.restart_soon(RESTART_DELAY_SECONDS, "setup")
@@ -1129,7 +1095,6 @@ API = {
     ("GET", "/api/effects"): Handler.api_effects,
     ("GET", "/api/status"): Handler.api_status,
     ("GET", "/api/settings"): Handler.api_get_settings,
-    ("GET", "/api/hostname"): Handler.api_hostname,
     ("GET", "/api/wifi/scan"): Handler.api_wifi_scan,
     ("GET", "/api/wifi/test"): Handler.api_wifi_test_result,
     ("GET", "/events"): Handler.api_events,

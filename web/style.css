@@ -109,6 +109,7 @@ h2 { font-size: 18px; color: var(--muted); margin: 22px 0 8px; font-weight: 600;
 }
 .acc-btn .e { font-size: 28px; line-height: 1; }
 .acc-name { flex: 1; }
+.acc-aside { display: block; font-size: 14px; font-weight: 600; color: var(--muted); }
 .acc-count {
   min-width: 34px; padding: 2px 8px; border-radius: 12px; text-align: center; font-size: 15px;
   background: var(--tile, var(--orange)); color: var(--on-tile, var(--on-orange));

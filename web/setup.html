@@ -35,7 +35,7 @@
     <div class="card">
       <h2><label for="name">1. Name your pumpkin</label></h2>
       <input id="name" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="e.g. Jack's Pumpkin">
-      <p class="hint">It scrolls across the eyes and makes the web address: <b id="address">http://spooky-pumpkin.local</b></p>
+      <p class="hint">It scrolls across the eyes.</p>
     </div>
 
     <div class="card">
@@ -109,25 +109,14 @@
   let passed = null;       // {ssid, password} that the pumpkin joined, so saving needs no second check
   let busy = false;        // checking or saving
 
-  // ---- Name and web address ----
+  // ---- Name ----
 
   let currentName = ''; // what it's called now: a blank box keeps it
   function chosenName() {
     return straightQuotes(nameInput.value).trim() || currentName;
   }
 
-  let hostnameTimer = 0;
-  function updateAddress() {
-    clearTimeout(hostnameTimer);
-    hostnameTimer = setTimeout(async () => {
-      try {
-        const name = chosenName();
-        const data = await get('/api/hostname?name=' + encodeURIComponent(name));
-        $('address').textContent = 'http://' + (data.hostname || '…') + '.local';
-      } catch (e) { /* keep the old hint */ }
-    }, 300);
-  }
-  nameInput.addEventListener('input', () => { nameTouched = true; updateAddress(); });
+  nameInput.addEventListener('input', () => { nameTouched = true; });
 
   // ---- WiFi list (Scribe Evolution's setup page, without Alpine) ----
 
@@ -421,7 +410,6 @@
       currentName = status.name;
       // A brand-new pumpkin: leave the box empty so the placeholder invites a name
       if (!nameTouched) nameInput.value = status.name === status.defaultName ? '' : status.name;
-      updateAddress();
       savedSsid = status.homeSsid || '';
       onSetupWifi = status.mode === 'setup';
       setupSsid = status.setupSsid || '';
@@ -450,7 +438,6 @@
         reason.hidden = false;
         $('intro').hidden = true;
       }
-      updateAddress();
     } catch (e) {
       showError(errorEl, e);
     }

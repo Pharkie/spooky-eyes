@@ -174,17 +174,14 @@ namespace web
 
             // save() tidies the name, so read back what it kept
             const Settings saved = settings::get();
-            const String hostname = settings::hostnameFor(saved.pumpkinName);
             LOG("WEB", "Saved home WiFi \"%s\"; restarting to join it", saved.wifiSsid.c_str());
 
             JsonDocument doc;
             doc["ok"] = true;
             doc["ssid"] = saved.wifiSsid;
             doc["name"] = saved.pumpkinName;
-            doc["hostname"] = hostname;
-            doc["address"] = "http://" + hostname + ".local";
-            // The setup WiFi is named after the pumpkin, so a rename changes it too
-            doc["setupSsid"] = network::apNameFor(saved.pumpkinName);
+            doc["address"] = String("http://") + kHostname + ".local";
+            doc["setupSsid"] = network::apSsid();
             doc["message"] = "Saved. The pumpkin is restarting and joining " + saved.wifiSsid + ".";
             sendJson(request, 200, doc);
             // Longer than usual: the phone shows the "what next" page until the setup WiFi goes
@@ -199,8 +196,7 @@ namespace web
                 return;
             }
             settings::forgetWifi();
-            // Named after the current name: a rename that's waiting for a restart counts
-            const String setupSsid = network::apNameFor(settings::get().pumpkinName);
+            const String setupSsid = network::apSsid();
             LOG("WEB", "Forgot the home WiFi; restarting into setup mode");
 
             JsonDocument doc;

@@ -592,7 +592,7 @@
       const [effectList, show] = await Promise.all([get('/api/effects'), get('/api/show')]);
       for (const fx of effectList.effects) effects.set(fx.id, fx);
       // Not the effects that never end (the surprise show)
-      effectAccordion($('effects'), effectList.effects.filter((fx) => fx.inShow !== false), { headingTag: 'h3', storeKey: 'showSection' });
+      effectAccordion($('effects'), effectList.effects.filter((fx) => fx.inShow !== false), { headingTag: 'h3', storeKey: 'showSection', titles: effectList.groupTitles });
       limits = show.limits;
       isDefault = show.isDefault;
       setSaved(show.blocks);

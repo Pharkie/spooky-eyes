@@ -534,8 +534,7 @@ namespace
             if (settings::save(updated, error))
             {
                 player::settingsChanged();
-                LOG("SERIAL", "OK, it's now \"%s\" (web address %s.local). Restart to rename its WiFi.",
-                    settings::get().pumpkinName.c_str(), settings::hostnameFor(settings::get().pumpkinName).c_str());
+                LOG("SERIAL", "OK, it's now \"%s\"", settings::get().pumpkinName.c_str());
             }
             else
             {

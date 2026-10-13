@@ -9,7 +9,8 @@
 // - begin() returns at once and the joining happens at the start of the network task (connectAtStart()),
 //   so the show starts the moment the pumpkin is switched on. Scribe connected in setup(), before
 //   anything else ran. The mode listener hears how it went.
-// - the setup WiFi is named after the pumpkin, and so is the web address ("jacks-pumpkin.local")
+// - fixed names for the setup WiFi and the web address ("Spooky Pumpkin", pumpkin.local), where Scribe
+//   makes them from the device's name: a house has one pumpkin, and the guide can print them
 // - the transmit power is turned down for the SuperMini's tiny antenna (kTxPower)
 // - the look for the home WiFi is an active scan for its name, so a hidden network is found too
 // - in setup mode the WiFi driver's own auto-reconnect is switched off, so the radio stays on the setup
@@ -75,7 +76,7 @@ namespace
     constexpr uint32_t kPageScanKeepMs = PumpkinTime::Seconds(10); // hand the same results out again
     constexpr size_t kMaxFoundNetworks = 30;
 
-    constexpr int kMdnsNameAttempts = 3; // jacks-pumpkin, jacks-pumpkin-2, jacks-pumpkin-3
+    constexpr int kMdnsNameAttempts = 3; // pumpkin, pumpkin-2, pumpkin-3
     constexpr uint8_t kMdnsPingCount = 2;
     constexpr int kSetupApAttempts = 3;
     constexpr uint32_t kSetupApRetryMs = 500;
@@ -142,8 +143,6 @@ namespace
     // Set by begin() before it starts the network task, then only read (from any task)
     String savedSsid;
     String savedPassword;
-    String setupApName;
-    String wantedHostname;
 
     // Can change after boot (the doorstep fallback), so read and written under textMutex
     SemaphoreHandle_t textMutex = nullptr;
@@ -513,14 +512,14 @@ namespace
 
         for (int attempt = 1; attempt <= kSetupApAttempts; attempt++)
         {
-            if (setWifiMode(WIFI_AP_STA) && WiFi.softAP(setupApName.c_str(), kSetupApPassword))
+            if (setWifiMode(WIFI_AP_STA) && WiFi.softAP(kSetupApName, kSetupApPassword))
             {
                 const IPAddress ip = WiFi.softAPIP();
                 // Captive portal: every name a phone looks up points at us, so its sign-in page opens ours
                 if (!captive_dns::start(ip))
                     LOG("WIFI", "Captive portal DNS didn't start");
                 currentMode = Mode::SetupAP;
-                LOG("WIFI", "Setup WiFi \"%s\" is on (password \"%s\"), page at http://%s", setupApName.c_str(),
+                LOG("WIFI", "Setup WiFi \"%s\" is on (password \"%s\"), page at http://%s", kSetupApName,
                     kSetupApPassword, ip.toString().c_str());
                 return true;
             }
@@ -535,7 +534,7 @@ namespace
     {
         for (int attempt = 1; attempt <= kMdnsNameAttempts; attempt++)
         {
-            const String candidate = (attempt == 1) ? wantedHostname : wantedHostname + "-" + String(attempt);
+            const String candidate = (attempt == 1) ? String(kHostname) : String(kHostname) + "-" + String(attempt);
             const String fqdn = candidate + ".local";
 
             // Does anything already answer to this name? (The lookup goes over mDNS. A free name takes
@@ -551,7 +550,7 @@ namespace
 
             if (MDNS.begin(candidate.c_str()))
             {
-                MDNS.setInstanceName(setupApName); // the pumpkin's name, shown by Bonjour browsers
+                MDNS.setInstanceName(settings::get().pumpkinName); // shown by Bonjour browsers
                 MDNS.addService("http", "tcp", kWebServerPort);
                 setRegisteredMdnsName(candidate);
                 LOG("MDNS", "Web address http://%s", fqdn.c_str());
@@ -968,8 +967,6 @@ namespace network
         const Settings s = settings::get();
         savedSsid = s.wifiSsid;
         savedPassword = s.wifiPassword;
-        setupApName = apNameFor(s.pumpkinName);
-        wantedHostname = settings::hostnameFor(s.pumpkinName);
         retryRestartsSoFar = takeRetryCount();
         lastActivityMs = millis(); // switching on counts as using it: the idle time starts now
 
@@ -982,7 +979,7 @@ namespace network
         WiFi.persistent(false);
         // Name shown in the router's list of devices. Applied when the station starts, so this must
         // also come before WiFi.mode().
-        WiFi.setHostname(wantedHostname.c_str());
+        WiFi.setHostname(kHostname);
         // Homes with mesh or extra access points: check every channel and join the strongest signal
         // (Scribe took the first match). This matters more at reduced transmit power.
         WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
@@ -1040,7 +1037,7 @@ namespace network
 
     String apSsid()
     {
-        return setupApName;
+        return kSetupApName;
     }
 
     String homeSsid()
@@ -1058,19 +1055,6 @@ namespace network
     {
         const Reason why = reason;
         return currentMode == Mode::SetupAP && !savedSsid.isEmpty() && (why == Reason::NotFound || why == Reason::Lost);
-    }
-
-    // The setup WiFi is named after the pumpkin. WiFi names are 32 bytes at most.
-    String apNameFor(const String &pumpkinName)
-    {
-        String name = pumpkinName;
-        name.trim();
-        if (name.length() > kMaxSsidBytes)
-        {
-            name.remove(kMaxSsidBytes);
-            name.trim();
-        }
-        return name.isEmpty() ? String(kDefaultPumpkinName) : name;
     }
 
     int rssi()

@@ -33,7 +33,7 @@ static String howToConnect()
     if (ip.isEmpty())
         return " No WiFi ";
     const String host = network::mdnsHostname();
-    // http:// in front, or phone browsers search for "jacks-pumpkin.local" instead of opening it
+    // http:// in front, or phone browsers search for "pumpkin.local" instead of opening it
     return " " + (host.length() ? "http://" + host + ".local  or  " + ip : "http://" + ip) + " ";
 }
 
@@ -44,10 +44,9 @@ static void tellHowToConnect(bool now)
 {
     if (network::mode() == network::Mode::Off)
     {
-        // Nobody was using it, so the WiFi is off to save batteries: say so once, and stop the setup
-        // instructions (there's no WiFi to join now)
+        // Nobody was using it, so the WiFi is off to save batteries: stop the setup instructions (there's
+        // no WiFi to join now) and let the show play on without a word about it
         player::setShowMessage("");
-        player::announce(" WiFi off to save batteries ");
     }
     else if (network::isSetupAP())
     {

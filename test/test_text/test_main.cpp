@@ -186,102 +186,6 @@ static void test_plain_buffer_size()
     FAIL_IF_ANY(plainBufferProblems());
 }
 
-// ---- text::hostname() ----
-
-static void test_hostname_names()
-{
-    FAIL_IF_ANY(checkAll("hostname", text::hostname,
-                       {
-                           {"Ghost's Pumpkin", "ghosts-pumpkin"},
-                           {"Sam & Alex's Pumpkin", "sam-alexs-pumpkin"},
-                           {"Jo Bloggs's Pumpkin", "jo-bloggss-pumpkin"},
-                           {"Ruby's Pumpkin", "rubys-pumpkin"},
-                           {"Ghost\xe2\x80\x99s Pumpkin", "ghosts-pumpkin"}, // curly apostrophe
-                           {"Spooky Pumpkin", "spooky-pumpkin"},
-                           {"PUMPKIN No. 2", "pumpkin-no-2"},
-                           {"--Ghost--", "ghost"},
-                           {"Ghost  &  Ghoul", "ghost-ghoul"},
-                           {"Trick\xe2\x80\x94or\xe2\x80\x93Treat", "trick-or-treat"},
-                           {"\xf0\x9f\x8e\x83 Ghost's Pumpkin \xf0\x9f\x8e\x83", "ghosts-pumpkin"},
-                           {"Zo\xc3\xab's Pumpkin", "zoes-pumpkin"},      // accent folded, not a gap
-                           {"Gro\xc3\x9f Pumpkin", "gross-pumpkin"},      // ß -> ss
-                       }));
-}
-
-// Nothing usable left: "pumpkin"
-static void test_hostname_fallback()
-{
-    FAIL_IF_ANY(checkAll("hostname", text::hostname,
-                       {
-                           {"!!!", "pumpkin"},
-                           {"", "pumpkin"},
-                           {"   ", "pumpkin"},
-                           {"''", "pumpkin"},
-                           {"\xf0\x9f\x8e\x83\xf0\x9f\x91\xbb", "pumpkin"},
-                       }));
-}
-
-// At most kMaxHostnameLength (32) characters, and no hyphen left at the end after cutting
-static void test_hostname_long_names()
-{
-    FAIL_IF_ANY(checkAll("hostname", text::hostname,
-                       {
-                           // Cut at 32 it would end "pumpkin-"
-                           {"The Most Amazing Spooky Pumpkin In Town", "the-most-amazing-spooky-pumpkin"},
-                           {"abcdefghijklmnopqrstuvwxyz0123456789", "abcdefghijklmnopqrstuvwxyz012345"},
-                           {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-                       }));
-}
-
-// Small buffers: cut short (still no hyphen at the end), always NUL-terminated, never written past
-static std::string hostnameBufferProblems()
-{
-    std::string failures;
-    failures += check("hostname", text::hostname, "Ghost's Pumpkin", 8, "ghosts"); // not "ghosts-"
-    failures += check("hostname", text::hostname, "Ghost's Pumpkin", 6, "ghost");
-    failures += check("hostname", text::hostname, "Ghost's Pumpkin", 15, "ghosts-pumpkin");
-    failures += check("hostname", text::hostname, "Ghost's Pumpkin", 1, "");
-    failures += check("hostname", text::hostname, "Ghost's Pumpkin", 0, "");
-
-    // The fallback in a small buffer: some of "pumpkin", safely
-    char buffer[16];
-    std::memset(buffer, 'Z', sizeof(buffer));
-    text::hostname("!!!", buffer, 4);
-    if (!std::memchr(buffer, '\0', 4) || buffer[4] != 'Z' || std::strncmp(buffer, "pumpkin", std::strlen(buffer)) != 0)
-        failures += " hostname(\"!!!\", size 4) gave \"" + shown(std::string(buffer, 4)) + "\";";
-    return failures;
-}
-
-static void test_hostname_buffer_size()
-{
-    FAIL_IF_ANY(hostnameBufferProblems());
-}
-
-// Whatever goes in, what comes out is a usable web address name
-static std::string hostnameUsableProblems()
-{
-    std::string failures;
-    for (const char *name : {"Ghost's Pumpkin", "-", "a-", "-a", "a--b", "\xe2\x80\x94\xe2\x80\x94", "\xc3\xa9t\xc3\xa9",
-                             "\t\n", "x\xff", "A B C D E F G H I J K L M N O P Q R S T U V W X Y Z", "9 Lives"})
-    {
-        char out[64];
-        text::hostname(name, out, sizeof(out));
-        const size_t length = std::strlen(out);
-        bool ok = length > 0 && length <= kMaxHostnameLength && out[0] != '-' && out[length - 1] != '-' &&
-                  !std::strstr(out, "--");
-        for (const char *c = out; *c; c++)
-            ok = ok && ((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '-');
-        if (!ok)
-            failures += " hostname(\"" + shown(name) + "\") gave \"" + shown(out) + "\";";
-    }
-    return failures;
-}
-
-static void test_hostname_always_usable()
-{
-    FAIL_IF_ANY(hostnameUsableProblems());
-}
-
 // ---- text::validWifiPassword() ----
 
 static std::string wifiPasswordProblems()
@@ -327,11 +231,6 @@ int main()
     RUN_TEST(test_plain_drops_other_characters);
     RUN_TEST(test_plain_spaces);
     RUN_TEST(test_plain_buffer_size);
-    RUN_TEST(test_hostname_names);
-    RUN_TEST(test_hostname_fallback);
-    RUN_TEST(test_hostname_long_names);
-    RUN_TEST(test_hostname_buffer_size);
-    RUN_TEST(test_hostname_always_usable);
     RUN_TEST(test_wifi_password);
     return UNITY_END();
 }

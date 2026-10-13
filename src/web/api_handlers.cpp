@@ -46,7 +46,6 @@ namespace web
             target["mouthLed"] = current.mouthLed;
             target["eyeGap"] = current.eyeGap;
             target["wifiSaver"] = current.wifiSaver;
-            target["hostname"] = settings::hostnameFor(current.pumpkinName);
         }
 
         // GET /api/effects: the buttons, in registry order
@@ -56,6 +55,7 @@ namespace web
             const EffectInfo *effects = allEffects(count);
             JsonDocument doc;
             JsonArray list = doc["effects"].to<JsonArray>();
+            JsonObject titles = doc["groupTitles"].to<JsonObject>(); // group -> section heading
             for (size_t i = 0; i < count; i++)
             {
                 JsonObject item = list.add<JsonObject>();
@@ -64,6 +64,7 @@ namespace web
                 item["emoji"] = effects[i].emoji;
                 item["group"] = groupName(effects[i].group);
                 item["inShow"] = canBeInShow(effects[i]); // whether the show creator offers it
+                titles[groupName(effects[i].group)] = groupTitle(effects[i].group);
             }
             sendJson(request, 200, doc);
         }
@@ -158,7 +159,7 @@ namespace web
             doc["setupSsid"] = network::apSsid();
             doc["setupReason"] = network::setupReason(); // always says why in setup mode with home WiFi saved
             doc["homeWifiOutOfReach"] = network::homeWifiOutOfReach(); // e.g. carried out to the doorstep
-            doc["wifiNeedsBoot"] = strangersMayBeConnected(); // WiFi and name changes need a BOOT press
+            doc["wifiNeedsBoot"] = strangersMayBeConnected(); // WiFi changes need a BOOT press
             addPlayerStatus(doc["player"].to<JsonObject>());
             sendJson(request, 200, doc);
         }
@@ -226,13 +227,6 @@ namespace web
                 updated.wifiSaver = saver.as<bool>();
             }
 
-            // The name also names the setup WiFi, so a stranger on the doorstep mustn't change it
-            const bool renaming = plainText(updated.pumpkinName) != oldName;
-            if (renaming && strangersMayBeConnected() && !requireBootPress(request))
-            {
-                return;
-            }
-
             if (!settings::save(updated, error))
             {
                 sendError(request, 400, error);
@@ -242,38 +236,14 @@ namespace web
 
             // save() tidies the name, so read back what it kept
             const Settings saved = settings::get();
-            const bool renamed = saved.pumpkinName != oldName;
-            JsonDocument doc;
-            doc["ok"] = true;
-            doc["restartNeeded"] = renamed;
-            if (renamed)
+            if (saved.pumpkinName != oldName)
             {
-                const String address = "http://" + settings::hostnameFor(saved.pumpkinName) + ".local";
-                const String setupSsid = network::apNameFor(saved.pumpkinName);
-                doc["address"] = address;     // the web address after the restart
-                doc["setupSsid"] = setupSsid; // the setup WiFi's name after the restart
-                doc["message"] = "Saved. After a restart, the pumpkin's web address will be " + address +
-                                 " and its setup WiFi will be called \"" + setupSsid + "\".";
                 LOG("WEB", "Renamed to \"%s\"", saved.pumpkinName.c_str());
             }
-            else
-            {
-                doc["message"] = "Saved";
-            }
-            addSettings(doc["settings"].to<JsonObject>(), saved);
-            sendJson(request, 200, doc);
-        }
-
-        // GET /api/hostname?name=Jack's Pumpkin -> {"hostname":"jacks-pumpkin"}, for the setup page's hint
-        void handleHostname(AsyncWebServerRequest *request)
-        {
-            String name = request->hasParam("name") ? request->getParam("name")->value() : String();
-            if (name.length() > kMaxNameLength * kUtf8BytesPerChar)
-            {
-                name = name.substring(0, kMaxNameLength * kUtf8BytesPerChar);
-            }
             JsonDocument doc;
-            doc["hostname"] = settings::hostnameFor(plainText(name));
+            doc["ok"] = true;
+            doc["message"] = "Saved";
+            addSettings(doc["settings"].to<JsonObject>(), saved);
             sendJson(request, 200, doc);
         }
 
@@ -306,7 +276,6 @@ namespace web
         server.on("/api/effects", HTTP_GET, handleEffects);
         server.on("/api/status", HTTP_GET, handleStatus);
         server.on("/api/settings", HTTP_GET, handleGetSettings);
-        server.on("/api/hostname", HTTP_GET, handleHostname);
         onJsonPost(server, "/api/play", handlePlay);
         onJsonPost(server, "/api/words", handleWords);
         onJsonPost(server, "/api/mode", handleMode);

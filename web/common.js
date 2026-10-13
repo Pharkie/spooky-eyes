@@ -151,8 +151,8 @@ const Pumpkin = (() => {
   // accordion: one section open at a time, the last one opened remembered under storeKey (the first
   // section to begin with). Each header shows the section's first emoji, its name and how many effects
   // it has; each section has its colour (the g-minecraft etc. classes in style.css). Each tile is a
-  // <button data-id="creeper">: clicks are up to the page.
-  function effectAccordion(box, effects, { headingTag = 'h2', storeKey = 'section' } = {}) {
+  // <button data-id="creeper">: clicks are up to the page. titles: group -> heading (GET /api/effects).
+  function effectAccordion(box, effects, { headingTag = 'h2', storeKey = 'section', titles = {} } = {}) {
     const groups = new Map(); // section name -> effects
     for (const fx of effects) {
       if (!groups.has(fx.group)) groups.set(fx.group, []);
@@ -174,7 +174,16 @@ const Pumpkin = (() => {
       header.innerHTML = '<span class="e" aria-hidden="true"></span><span class="acc-name"></span> ' +
         '<span class="acc-count"></span><span class="chev" aria-hidden="true">▾</span>';
       header.querySelector('.e').textContent = list[0].emoji;
-      header.querySelector('.acc-name').textContent = group;
+      // "Minecraft (Eyes Edition)": the bit in brackets goes smaller, on a line of its own
+      const [, title, aside] = /^(.*?)(?:\s*(\(.*\)))?$/.exec(titles[group] || group);
+      const name = header.querySelector('.acc-name');
+      name.textContent = title;
+      if (aside) {
+        const small = document.createElement('small');
+        small.className = 'acc-aside';
+        small.textContent = aside;
+        name.append(' ', small);
+      }
       header.querySelector('.acc-count').innerHTML = list.length + '<span class="sr-only"> effects</span>';
       heading.appendChild(header);
       const grid = document.createElement('div');

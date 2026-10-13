@@ -10,7 +10,7 @@
 
 namespace web
 {
-    // effects, play, words, mode, status, settings, hostname, restart (api_handlers.cpp)
+    // effects, play, words, mode, status, settings, restart (api_handlers.cpp)
     void registerApiRoutes(AsyncWebServer &server);
 
     // show (GET and POST), show/reset: the show creator (show_handlers.cpp)

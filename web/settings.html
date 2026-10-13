@@ -24,8 +24,7 @@
       <input id="name" autocomplete="off" autocapitalize="words" spellcheck="false">
       <button class="btn" type="submit">Save</button>
     </div>
-    <p id="name-msg" class="hint" role="status">It scrolls in the show, and names the pumpkin’s WiFi and web address.</p>
-    <button id="name-restart" class="btn small secondary" type="button" hidden>Restart now</button>
+    <p id="name-msg" class="hint" role="status">It scrolls across the eyes.</p>
   </form>
   <div class="field">
     <label class="label" for="brightness">Eye brightness <output id="brightness-value"></output></label>
@@ -83,8 +82,6 @@
 'use strict';
 (() => {
   const { $, get, post, replyError, loadStatus, setupReason, showName, waitForRestart, signalWords, formatUptime, straightQuotes, showMessage, showError } = Pumpkin;
-  let lastStatus = null; // the newest /api/status
-  let renamed = null;    // a rename waiting for a restart: {address, setupSsid}
 
   // ---- Pumpkin settings ----
 
@@ -104,8 +101,7 @@
       const reply = await post('/api/settings', changes);
       fillSettings(reply.settings);
       showName(reply.settings.name);
-      if (reply.restartNeeded) renamed = { address: reply.address, setupSsid: reply.setupSsid };
-      showMessage(messageEl, reply.restartNeeded ? reply.message : 'Saved ✓', 'ok');
+      showMessage(messageEl, 'Saved ✓', 'ok');
       return reply;
     } catch (e) {
       showError(messageEl, e);
@@ -126,8 +122,7 @@
     event.preventDefault();
     const name = straightQuotes($('name').value).trim();
     if (!name) { showMessage($('name-msg'), 'Please give the pumpkin a name.', 'error'); return; }
-    const reply = await saveSettings({ name }, $('name-msg'));
-    $('name-restart').hidden = !(reply && reply.restartNeeded);
+    await saveSettings({ name }, $('name-msg'));
   });
 
   // ---- WiFi ----
@@ -156,7 +151,6 @@
   }
 
   function showStatus(status) {
-    lastStatus = status;
     $('version').textContent = status.version;
     $('uptime').textContent = formatUptime(status.uptime);
     $('heap').textContent = Math.round(status.freeHeap / 1024) + ' KB';
@@ -185,46 +179,9 @@
     }
   }
 
-  // "http://new-name.local (or http://192.168.1.23)" as a link, after some words
-  function showNewAddress(messageEl, before, status) {
-    showMessage(messageEl, before, 'ok');
-    const link = document.createElement('a');
-    link.href = renamed.address;
-    link.textContent = renamed.address;
-    const ip = status && status.mode === 'connected' && status.ip ? ' (or http://' + status.ip + ')' : '';
-    messageEl.append(link, ip + '.');
-  }
-
-  // After a rename the old web address and setup WiFi name stop working, so say what to use instead
-  function restartAfterRename(messageEl, reply) {
-    const before = lastStatus || {};
-    if (before.mode === 'setup') {
-      // This phone is on the setup WiFi, which comes back with the new name
-      showMessage(messageEl, 'The pumpkin is restarting. Its own WiFi will be called “' + renamed.setupSsid +
-        '”: join that, then open http://' + before.ip, 'ok');
-      return;
-    }
-    if (/\.local$/i.test(location.hostname) && location.hostname.toLowerCase() !== new URL(renamed.address).hostname) {
-      // This page came from the old name, which won't answer after the restart
-      showNewAddress(messageEl, 'The pumpkin is restarting with its new name. In about 20 seconds, open ', before);
-      return;
-    }
-    showMessage(messageEl, reply.message);
-    waitForRestart((status) => {
-      if (!status) { restarted(messageEl, null); return; }
-      showStatus(status);
-      showNewAddress(messageEl, 'The pumpkin is back. Its new address is ', status);
-      renamed = null; // done: the new name is in use
-    });
-  }
-
   async function restart(messageEl) {
     try {
       const reply = await post('/api/restart');
-      if (renamed) {
-        restartAfterRename(messageEl, reply);
-        return;
-      }
       showMessage(messageEl, reply.message);
       waitForRestart((status) => restarted(messageEl, status));
     } catch (e) {
@@ -234,7 +191,6 @@
   $('restart').addEventListener('click', () => {
     if (confirm('Restart the pumpkin?')) restart($('restart-msg'));
   });
-  $('name-restart').addEventListener('click', () => restart($('name-msg')));
 
   // ---- Firmware update (XMLHttpRequest, because fetch can't report upload progress) ----
 

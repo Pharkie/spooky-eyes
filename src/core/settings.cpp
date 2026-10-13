@@ -96,21 +96,8 @@ namespace
         return false;
     }
 
-    bool hasLetterOrDigit(const String &text)
-    {
-        for (size_t i = 0; i < text.length(); i++)
-        {
-            const char c = text[i];
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
-                return true;
-        }
-        return false;
-    }
-
     // Tidies the name (phones' curly quotes made plain, trimmed) and checks it. Emoji and accents are
-    // turned away rather than quietly dropped: the name becomes the setup WiFi's name, so it should be
-    // what the family typed. It needs a letter or digit, or the web address would just be the
-    // fallback "pumpkin.local", which doesn't match the name.
+    // turned away rather than quietly dropped, so the eyes scroll what the family typed.
     bool checkName(String &name, String &error)
     {
         if (hasUnshowable(name))
@@ -127,11 +114,6 @@ namespace
         if (tidy.length() > kMaxNameLength)
         {
             error = "That name is too long (up to " + String(kMaxNameLength) + " characters)";
-            return false;
-        }
-        if (!hasLetterOrDigit(tidy))
-        {
-            error = "The name needs at least one letter or number";
             return false;
         }
         name = tidy;
@@ -359,12 +341,5 @@ namespace settings
     {
         String kept = password; // the check empties the password when there's no WiFi name
         return ::checkWifi(ssid, kept, error);
-    }
-
-    String hostnameFor(const String &pumpkinName)
-    {
-        char host[kMaxHostnameLength + 1];
-        text::hostname(pumpkinName.c_str(), host, sizeof(host));
-        return String(host);
     }
 }

@@ -34,8 +34,4 @@ namespace settings
 
     // Clear the home WiFi name and password (the pumpkin goes back to setup mode after a restart)
     void forgetWifi();
-
-    // Web address name made from the pumpkin's name, e.g. "Jack's Pumpkin" -> "jacks-pumpkin"
-    // (text::hostname() as a String)
-    String hostnameFor(const String &pumpkinName);
 }

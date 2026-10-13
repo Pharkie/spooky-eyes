@@ -14,7 +14,6 @@
 namespace
 {
     constexpr uint32_t kBroken = 0xFFFFFFFF; // not a valid UTF-8 character
-    constexpr const char *kFallbackHostname = "pumpkin";
 
     // Read one UTF-8 character from p. Sets `used` to the bytes it took: just 1 for a byte that doesn't
     // start a valid sequence (the bytes after it are then read on their own).
@@ -176,13 +175,6 @@ namespace
         }
     }
 
-    // ' itself, or anything plain() turns into one
-    bool isApostrophe(uint32_t code)
-    {
-        char plain[3];
-        return code != kBroken && plainFor(code, plain) == 1 && plain[0] == '\'';
-    }
-
     bool isHexDigit(char c)
     {
         return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
@@ -216,66 +208,6 @@ namespace text
         }
         while (length > 0 && out[length - 1] == ' ')
             length--; // trailing spaces
-        out[length] = '\0';
-        return length;
-    }
-
-    size_t hostname(const char *name, char *out, size_t outSize)
-    {
-        if (out == nullptr || outSize == 0)
-            return 0;
-        size_t limit = outSize - 1;
-        if (limit > kMaxHostnameLength)
-            limit = kMaxHostnameLength;
-
-        size_t length = 0;
-        bool gap = false; // something other than a letter or digit since the last one kept
-        const unsigned char *p = reinterpret_cast<const unsigned char *>(name != nullptr ? name : "");
-        while (*p != 0)
-        {
-            size_t used;
-            const uint32_t code = nextCharacter(p, used);
-            p += used;
-            if (isApostrophe(code))
-                continue; // "Jack's" and "Jack’s" -> "jacks"
-            char piece[3];
-            const size_t pieceLength = code == kBroken ? 0 : plainFor(code, piece); // "Zoë" -> "Zoe"
-            if (pieceLength == 0)
-                gap = true;
-            bool full = false;
-            for (size_t i = 0; i < pieceLength && !full; i++)
-            {
-                char c = piece[i];
-                if (c >= 'A' && c <= 'Z')
-                    c = static_cast<char>(c - 'A' + 'a');
-                if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')))
-                {
-                    gap = true;
-                    continue;
-                }
-                // Hyphens only go between kept characters, so there's never one at either end
-                const size_t needed = (gap && length > 0) ? 2 : 1;
-                if (length + needed > limit)
-                {
-                    full = true;
-                    break;
-                }
-                if (needed == 2)
-                    out[length++] = '-';
-                out[length++] = c;
-                gap = false;
-            }
-            if (full)
-                break;
-        }
-
-        if (length == 0)
-        {
-            length = strlen(kFallbackHostname);
-            if (length > limit)
-                length = limit;
-            memcpy(out, kFallbackHostname, length);
-        }
         out[length] = '\0';
         return length;
     }
