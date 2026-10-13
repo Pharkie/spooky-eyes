@@ -40,9 +40,9 @@ namespace player
     // block short (the show then carries on from the next block), but waits for a chosen effect to finish.
     void announce(const String &message);
 
-    // A message scrolled at the start of every pass of the show ("" = none), for durationMs (0 = until
-    // changed). Used in setup mode to tell people which WiFi to join.
-    void setShowMessage(const String &message, uint32_t durationMs = 0);
+    // A message scrolled at the start of the next `passes` passes of the show ("" = none; passes < 0 =
+    // every pass until changed). Used in setup mode to tell people which WiFi to join.
+    void setShowMessage(const String &message, int passes = -1);
 
     // Settings changed (brightness, mouth LED, name): apply them
     void settingsChanged();

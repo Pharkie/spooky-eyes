@@ -35,10 +35,10 @@ constexpr uint32_t kForgetWifiHoldMs = PumpkinTime::Seconds(5);
 // could be on the setup WiFi) for this long. Proves someone has the pumpkin in their hands.
 constexpr uint32_t kBootUnlockMs = PumpkinTime::Minutes(5);
 
-// The setup instructions scroll in every show pass for this long after switch-on, then stop (so they
-// don't scroll the password at trick-or-treaters all night), or sooner if the WiFi switches off to save
-// batteries. A short BOOT press shows them again.
-constexpr uint32_t kSetupMessageMs = PumpkinTime::Minutes(15);
+// The setup instructions scroll once when the setup WiFi starts, then at the start of this many more
+// show passes, and then the show plays on by itself: WiFi is optional, and the password shouldn't scroll
+// at trick-or-treaters all night. A short BOOT press shows them again.
+constexpr int kSetupMessageRepeats = 1;
 
 // Saving batteries. With the "save batteries" setting on (the default), the WiFi switches off after this
 // long with nobody using the pumpkin: no page or API request, no page open listening for news, and no

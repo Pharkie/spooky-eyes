@@ -37,9 +37,9 @@ static String howToConnect()
     return " " + (host.length() ? "http://" + host + ".local  or  " + ip : "http://" + ip) + " ";
 }
 
-// Tell people on the eyes. Setup instructions repeat at the start of every show pass for a while (then
-// stop, so they don't scroll the password at trick-or-treaters all night); the web address scrolls once.
-// `now` also scrolls the setup instructions straight away, rather than at the next show pass.
+// Tell people on the eyes. The setup instructions scroll now (if `now`) and at the start of the next show
+// pass (kSetupMessageRepeats), then the show plays on by itself: WiFi is optional. The web address
+// scrolls once.
 static void tellHowToConnect(bool now)
 {
     if (network::mode() == network::Mode::Off)
@@ -50,7 +50,7 @@ static void tellHowToConnect(bool now)
     }
     else if (network::isSetupAP())
     {
-        player::setShowMessage(howToConnect(), kSetupMessageMs);
+        player::setShowMessage(howToConnect(), kSetupMessageRepeats);
         if (now)
             player::announce(howToConnect());
     }
