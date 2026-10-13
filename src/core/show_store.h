@@ -22,4 +22,15 @@ namespace show_store
 
     // Forget the saved show: back to the default
     void reset();
+
+    // For the serial "fs" command: the filesystem's size and use in bytes, and whether a show is saved.
+    // False (and zeros) if it isn't mounted.
+    struct StorageInfo
+    {
+        size_t usedBytes;
+        size_t totalBytes;
+        bool showSaved;
+        long showBytes; // the saved show's file size, -1 if there isn't one
+    };
+    bool storageInfo(StorageInfo &info);
 }

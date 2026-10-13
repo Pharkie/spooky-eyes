@@ -13,6 +13,7 @@
                                                   checked
     PUMPKIN_MODE=setup python3 tools/mock_server.py   the same, from the environment
     python3 tools/mock_server.py --port 9000
+    python3 tools/mock_server.py --port 0         any free port (it prints which: tools/api_check.py uses this)
 
 Flip the mode while it runs by adding ?mode=home, ?mode=setup, ?mode=lost, ?mode=wrong or ?mode=off to any
 address, e.g. http://localhost:8080/settings?mode=lost or curl 'http://localhost:8080/api/status?mode=setup'.
@@ -38,6 +39,10 @@ firmware has (src/web/*.cpp): buttons from src/effects/registry.cpp, limits, tim
 WiFi password from src/core/constants.h, server-sent events ("say" with each effect's phrase, "status"
 as it plays), the show creator's show, a WiFi scan and check, settings, restarts and firmware uploads. Like the
 firmware, every POST needs the "X-Pumpkin: 1" header. Python standard library only.
+
+Its replies (status codes, JSON shapes and error messages) should match the firmware's exactly:
+tools/api_check.py checks both against the same cases (test/api/cases.py), and --compare runs them on a
+board and here side by side. Lengths are counted in UTF-8 bytes, as the firmware does.
 """
 
 import argparse
@@ -63,6 +68,9 @@ CONSTANTS = ROOT / "src" / "core" / "constants.h"
 
 MAX_JSON_BODY = 1024          # web_utils.h kMaxJsonBodyBytes
 MAX_SHOW_BODY = 16 * 1024     # web_utils.h kMaxShowBodyBytes (POST /api/show)
+MAX_EFFECT_ID = 32            # api_handlers.cpp kMaxEffectIdLength (bytes)
+UTF8_BYTES_PER_CHAR = 4       # api_handlers.cpp kUtf8BytesPerChar: the words' raw cap is this x kMaxWordsLength
+LONGEST_ID_SHOWN = 32         # show.cpp checkBlock() kLongestIdShown: an unknown id is echoed up to this many bytes
 MAX_UPLOAD = 2 * 1024 * 1024  # bigger than an app slot
 EFFECT_SECONDS = 4
 BOOT_SECONDS = 5              # how long a pretend restart keeps the pumpkin away
@@ -269,13 +277,29 @@ def plain(text, drop_other=True):
     return "".join(out).strip()
 
 
+def utf8_size(text):
+    """Length in UTF-8 bytes, as the firmware counts (String::length(), strlen()). Bytes that weren't valid
+    UTF-8 in the request come back as they arrived (see json_body())."""
+    try:
+        return len(text.encode("utf-8", "surrogateescape"))
+    except UnicodeEncodeError:  # a lone surrogate from a \ud800 escape
+        return len(text.encode("utf-8", "surrogatepass"))
+
+
+def has_unshowable(text):
+    """settings.cpp hasUnshowable(): would text::plain() drop any character (emoji, ×, zero-width
+    spaces...)? Each character is checked on its own between two plain ones, so trimming can't hide one."""
+    return any(len(plain("|" + c + "|")) <= 2 for c in text)
+
+
 def valid_wifi_password(password):
-    """text::validWifiPassword(): empty, 8-63 characters, or 64 hex digits."""
-    if not password:
+    """text::validWifiPassword(): empty, 8-63 bytes, or 64 hex digits."""
+    size = utf8_size(password)
+    if size == 0:
         return True
-    if MIN_WIFI_PASSWORD <= len(password) < MAX_WIFI_PASSWORD:
+    if MIN_WIFI_PASSWORD <= size < MAX_WIFI_PASSWORD:
         return True
-    return len(password) == MAX_WIFI_PASSWORD and re.fullmatch(r"[0-9a-fA-F]+", password) is not None
+    return size == MAX_WIFI_PASSWORD and re.fullmatch(r"[0-9a-fA-F]+", password) is not None
 
 
 class ApiError(Exception):
@@ -283,6 +307,27 @@ class ApiError(Exception):
         super().__init__(message)
         self.status = status
         self.extra = extra
+
+
+def read_text(body, key, what, min_length, max_length, required):
+    """web::readText() (web_utils.cpp): a text field from a JSON body, same checks and messages. Lengths are
+    in UTF-8 bytes. Returns the text, or None if it's missing (or null) and not required."""
+    value = body.get(key)
+    if value is None:
+        if required:
+            raise ApiError(400, f"Please fill in the {what}")
+        return None
+    if not isinstance(value, str):
+        raise ApiError(400, f"The {what} should be text")
+    if "\0" in value:
+        raise ApiError(400, f"There's a strange character in the {what}")
+    size = utf8_size(value)
+    if size < min_length:
+        raise ApiError(400, f"Please fill in the {what}" if min_length <= 1 else
+                       f"Please use at least {min_length} characters for the {what}")
+    if size > max_length:
+        raise ApiError(400, f"Too long: the {what} can have up to {max_length} characters")
+    return value
 
 
 def boot_needed():
@@ -660,13 +705,26 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(413, "That's too much to send")
         return self.rfile.read(length) if length else b""
 
+    def drain(self):
+        """Read and drop the body of a request that's refused before its handler runs"""
+        length = int(self.headers.get("Content-Length") or 0)
+        if 0 < length <= MAX_UPLOAD:
+            self.rfile.read(length)
+
     def json_body(self, limit=MAX_JSON_BODY):
+        """web::onJsonPost(): the body as a JSON object ({} if there's none), or a 400 as the firmware gives"""
         raw = self.read_body(limit)
         if not raw:
             return {}
+        content_type = self.headers.get("Content-Type", "")
+        if content_type.startswith(("application/x-www-form-urlencoded", "multipart/form-data")):
+            # The web server library reads form bodies itself, so the handler never sees them
+            raise ApiError(400, "The pumpkin couldn't read that request (it expects JSON)")
         try:
-            body = json.loads(raw.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+            # ArduinoJson doesn't check UTF-8: bytes that aren't valid UTF-8 go through as they are (and
+            # text::plain() drops them later). surrogateescape keeps them, and plain() drops them too.
+            body = json.loads(raw.decode("utf-8", "surrogateescape"))
+        except ValueError:
             raise ApiError(400, "That request didn't make sense (bad JSON)")
         if not isinstance(body, dict):
             raise ApiError(400, "That request didn't make sense (bad JSON)")
@@ -690,6 +748,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.route("POST")
 
+    # Not used by the pages, but the firmware answers them: 404 (JSON for /api/ paths), as for any other
+    # address it doesn't have
+    def do_PUT(self):
+        self.route("PUT")
+
+    def do_DELETE(self):
+        self.route("DELETE")
+
+    def do_PATCH(self):
+        self.route("PATCH")
+
+    def send_not_found_page(self):
+        body = b'<!doctype html><p style="font:20px system-ui">Nothing here. <a href="/">Back to the pumpkin</a></p>'
+        self.send_response(HTTPStatus.NOT_FOUND)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def route(self, method):
         url = urlsplit(self.path)
         query = parse_qs(url.query)
@@ -701,8 +778,9 @@ class Handler(BaseHTTPRequestHandler):
             pumpkin.press_boot(query["boot"][0] != "0")
         path = url.path
 
-        # Captive portal, as in setup mode on the board
+        # Captive portal, as in setup mode on the board (any method)
         if pumpkin.network_mode() == "setup" and (path in PROBE_PATHS or not self.our_host()):
+            self.drain()
             self.redirect(self.portal_url())
             return
 
@@ -712,7 +790,7 @@ class Handler(BaseHTTPRequestHandler):
                 pumpkin.press_boot()
                 self.send_json(200, {"ok": True, "message": f"BOOT pressed: unlocked for {int(BOOT_UNLOCK_SECONDS)} s"})
                 return
-            if path.startswith("/api/") or path == "/events":
+            if path.startswith("/api/") or (path == "/events" and method == "GET"):
                 if pumpkin.phone_off_setup_wifi():
                     self.close_connection = True  # no answer, as if the phone had left the setup WiFi
                     return
@@ -720,19 +798,25 @@ class Handler(BaseHTTPRequestHandler):
                     if path == "/events":
                         self.close_connection = True  # like a board that's off: the browser retries
                         return
+                    self.drain()
                     raise ApiError(503, "Restarting")
-                if method == "POST" and self.headers.get("X-Pumpkin") != "1":
-                    self.read_body(MAX_UPLOAD)
-                    raise ApiError(403, "Missing X-Pumpkin header")
+                # As on the board: an address it doesn't have is a 404 before anything else is checked,
+                # then every POST needs the header
                 handler = API.get((method, path))
                 if handler is None:
+                    self.drain()
                     raise ApiError(404, f"There's no {method} {path}")
+                if method == "POST" and self.headers.get("X-Pumpkin") != "1":
+                    self.drain()
+                    raise ApiError(403, "Missing X-Pumpkin header")
                 handler(self, query)
                 return
             if method == "GET":
                 self.serve_page(path, query)
                 return
-            raise ApiError(404, "Not found")
+            # Any other method on a page's address (in setup mode too: only GETs are sent to the portal)
+            self.drain()
+            self.send_not_found_page()
         except ApiError as e:
             self.send_json(e.status, dict({"error": str(e)}, **e.extra))
         except (BrokenPipeError, ConnectionResetError):
@@ -750,12 +834,7 @@ class Handler(BaseHTTPRequestHandler):
         elif self.pumpkin.network_mode() == "setup":
             self.redirect(self.portal_url())
         else:
-            body = b'<!doctype html><p style="font:20px system-ui">Nothing here. <a href="/">Back to the pumpkin</a></p>'
-            self.send_response(HTTPStatus.NOT_FOUND)
-            self.send_header("Content-Type", "text/html")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self.send_not_found_page()
 
     # --- API (same paths, bodies and replies as src/web/*.cpp) ---
 
@@ -767,9 +846,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, self.pumpkin.status())
 
     def api_play(self, query):
-        effect_id = self.json_body().get("id")
-        if not isinstance(effect_id, str) or not effect_id:
-            raise ApiError(400, "Please fill in the effect")
+        effect_id = read_text(self.json_body(), "id", "effect", 1, MAX_EFFECT_ID, True)
         effect = self.pumpkin.by_id.get(effect_id)
         if effect is None:
             raise ApiError(404, "The pumpkin doesn't know an effect called " + effect_id)
@@ -777,9 +854,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, {"ok": True})
 
     def api_words(self, query):
-        words = self.json_body().get("words")
-        if not isinstance(words, str) or not words:
-            raise ApiError(400, "Please fill in the words")
+        # Up to 4 bytes a letter before tidying (emoji), then up to MAX_WORDS letters after
+        words = read_text(self.json_body(), "words", "words", 1, MAX_WORDS * UTF8_BYTES_PER_CHAR, True)
         words = plain(words)
         if not words:
             raise ApiError(400, "Type some words first (the eyes can show letters, numbers and symbols)")
@@ -810,41 +886,58 @@ class Handler(BaseHTTPRequestHandler):
         reply["limits"] = {"maxBlocks": MAX_SHOW_BLOCKS, "maxWordsLength": MAX_WORDS}
         self.send_json(200, reply)
 
-    def check_block(self, block, number):
-        """show_handlers.cpp readBlocks() then checkBlock() (same messages): the block tidied, or an
-        ApiError naming it (1-based)"""
+    @staticmethod
+    def read_block(block, number):
+        """show_handlers.cpp readBlocks(), for one block (same messages): (kind, value) or an ApiError
+        naming the block (1-based). Only the shape: check_block() checks the rest."""
         def fail(reason):
             return ApiError(400, f"Block {number}: {reason}")
         kind = block.get("type") if isinstance(block, dict) else None
         if kind == "effect":
             effect_id = block.get("id")
-            if not isinstance(effect_id, str) or not effect_id:
+            if not isinstance(effect_id, str):
                 raise fail("which effect?")
-            effect = self.pumpkin.by_id.get(effect_id)
-            if effect is None:
-                raise fail(f'no effect called "{effect_id[:24]}"')
-            if not effect["inShow"]:
-                raise fail(effect["label"] + " never ends, so it can't go in a show")
-            return {"type": "effect", "id": effect_id}
+            if "\0" in effect_id:
+                raise fail("there's a strange character in the effect's name")
+            return kind, effect_id
         if kind == "words":
             text = block.get("text")
             if not isinstance(text, str):
                 raise fail("the words should be text")
-            text = plain(text)[:MAX_WORDS].strip()
-            if not text:
-                raise fail("no words to scroll (the eyes can't show emoji)")
-            return {"type": "words", "text": text}
+            if "\0" in text:
+                raise fail("there's a strange character in the words")
+            return kind, text
         raise fail("should be an effect or some words")
 
+    def check_block(self, kind, value, number):
+        """show.cpp checkBlock() (same messages): the block tidied, or an ApiError naming it (1-based)"""
+        def fail(reason):
+            return ApiError(400, f"Block {number}: {reason}")
+        if kind == "effect":
+            effect = self.pumpkin.by_id.get(value)
+            if effect is None:
+                shown = value.encode("utf-8", "surrogateescape")[:LONGEST_ID_SHOWN].decode("utf-8", "ignore")
+                raise fail(f'no effect called "{shown}"')
+            if not effect["inShow"]:
+                raise fail(effect["label"] + " never ends, so it can't go in a show")
+            return {"type": "effect", "id": value}
+        text = plain(value)[:MAX_WORDS].strip()
+        if not text:
+            raise fail("no words to scroll (the eyes can't show emoji)")
+        return {"type": "words", "text": text}
+
     def api_post_show(self, query):
+        # The firmware's order: readBlocks() reads every block's shape, then checkShow() counts them and
+        # checks each one
         blocks = self.json_body(MAX_SHOW_BODY).get("blocks")
         if not isinstance(blocks, list):
             raise ApiError(400, "The show should be a list of blocks")
-        if not blocks:
+        read = [self.read_block(block, number) for number, block in enumerate(blocks, 1)]
+        if not read:
             raise ApiError(400, "The show needs at least one block")
-        if len(blocks) > MAX_SHOW_BLOCKS:
+        if len(read) > MAX_SHOW_BLOCKS:
             raise ApiError(400, f"That show is too long (up to {MAX_SHOW_BLOCKS} blocks)")
-        tidied = [self.check_block(block, number) for number, block in enumerate(blocks, 1)]
+        tidied = [self.check_block(kind, value, number) for number, (kind, value) in enumerate(read, 1)]
         self.pumpkin.save_show(tidied, False)
         print(f"  (show saved: {len(tidied)} blocks)")
         self.send_json(200, {"ok": True, "blocks": tidied})
@@ -868,10 +961,8 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def check_name(name):
-        """settings::save()'s name rules, roughly. Returns the tidied name."""
-        if not isinstance(name, str):
-            raise ApiError(400, "The pumpkin's name should be text")
-        if any(ord(c) > 126 for c in plain(name, drop_other=False)):
+        """settings.cpp checkName() (same messages). Returns the tidied name."""
+        if has_unshowable(name):
             raise ApiError(400, "Please use letters, numbers and punctuation in the name (the eyes can't show emoji)")
         name = plain(name)
         if not name:
@@ -881,28 +972,28 @@ class Handler(BaseHTTPRequestHandler):
         return name
 
     @staticmethod
+    def read_new_name(body):
+        """api_handlers.cpp readNewName(): an optional name, only checked as text here (check_name() tidies it)"""
+        return read_text(body, "name", "pumpkin's name", 0, MAX_JSON_BODY, False)
+
+    @staticmethod
     def check_int(body, key, what, top):
+        """web::readInt() (same messages). ArduinoJson's is<int>() is false for numbers that don't fit a
+        32-bit int, so those aren't whole numbers either."""
         value = body.get(key)
         if value is None:
             return None
-        if not isinstance(value, int) or isinstance(value, bool):
+        if not isinstance(value, int) or isinstance(value, bool) or not -2**31 <= value < 2**31:
             raise ApiError(400, f"The {what} should be a whole number")
         if not 0 <= value <= top:
             raise ApiError(400, f"The {what} should be from 0 to {top}")
         return value
 
-    @staticmethod
-    def check_text(body, key, what):
-        value = body.get(key)
-        if value is not None and not isinstance(value, str):
-            raise ApiError(400, f"The {what} should be text")
-        return value
-
     def api_post_settings(self, query):
-        # Same order as the firmware: the request's shape, then the BOOT gate, then settings::save()
+        # Same order as the firmware: the request's shape, then settings::save()
         body = self.json_body()
         pumpkin = self.pumpkin
-        new_name = self.check_text(body, "name", "pumpkin's name")
+        new_name = self.read_new_name(body)
         brightness = self.check_int(body, "brightness", "brightness", MAX_BRIGHTNESS)
         eye_gap = self.check_int(body, "eyeGap", "gap between the eyes", MAX_EYE_GAP)
         mouth = body.get("mouthLed")
@@ -954,23 +1045,18 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def check_wifi(body):
-        """The WiFi name and password from a request, checked as wifi_handlers.cpp and settings::checkWifi()
-        do (same messages)"""
-        ssid = Handler.check_text(body, "ssid", "WiFi name")
-        password = Handler.check_text(body, "password", "WiFi password") or ""
-        if not ssid:
-            raise ApiError(400, "Please fill in the WiFi name")
-        if len(ssid.encode("utf-8")) > MAX_SSID_BYTES:
-            raise ApiError(400, f"The WiFi name is too long (up to {MAX_SSID_BYTES} characters)")
-        if len(password) > MAX_WIFI_PASSWORD:
-            raise ApiError(400, f"The WiFi password is too long (up to {MAX_WIFI_PASSWORD} characters)")
+        """The WiFi name and password from a request, read as wifi_handlers.cpp does (same messages; lengths
+        in bytes). No password = an open network."""
+        ssid = read_text(body, "ssid", "WiFi name", 1, MAX_SSID_BYTES, True)
+        password = read_text(body, "password", "WiFi password", 0, MAX_WIFI_PASSWORD, False) or ""
         return ssid, password
 
     @staticmethod
     def check_wifi_password(password):
+        """settings.cpp checkWifi()'s password rule (same messages)"""
         if not valid_wifi_password(password):
             raise ApiError(400, f"WiFi passwords have at least {MIN_WIFI_PASSWORD} characters (leave it empty if "
-                                "the WiFi has no password)" if len(password) < MIN_WIFI_PASSWORD else
+                                "the WiFi has no password)" if utf8_size(password) < MIN_WIFI_PASSWORD else
                                 f"That WiFi password is too long ({MAX_WIFI_PASSWORD - 1} characters at most)")
 
     def api_wifi_test_start(self, query):
@@ -995,7 +1081,7 @@ class Handler(BaseHTTPRequestHandler):
         # Same order as the firmware: the request's shape, then the BOOT gate, then settings::save()
         body = self.json_body()
         ssid, password = self.check_wifi(body)
-        new_name = self.check_text(body, "name", "pumpkin's name")
+        new_name = self.read_new_name(body)
         pumpkin = self.pumpkin
         with pumpkin.lock:
             if pumpkin.strangers_may_be_connected() and not pumpkin.boot_unlocked():
@@ -1126,7 +1212,9 @@ def main():
     except OSError as e:
         sys.exit(f"Can't use port {args.port} ({e.strerror}). Something else may be using it: try --port 8081")
     server.daemon_threads = True
-    print(f"Pretend pumpkin ({args.mode} mode, {len(Handler.pumpkin.effects)} effects) on http://localhost:{args.port}")
+    # server_port: the one it got, if --port 0 asked for any free port (tools/api_check.py reads this line)
+    print(f"Pretend pumpkin ({args.mode} mode, {len(Handler.pumpkin.effects)} effects) on "
+          f"http://localhost:{server.server_port}", flush=True)
     print("Add ?mode=home|setup|lost|wrong|off to any address to switch, ?boot=1 to press BOOT. Ctrl-C to stop.")
     try:
         server.serve_forever()

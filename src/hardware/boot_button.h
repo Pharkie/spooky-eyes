@@ -18,4 +18,10 @@ namespace boot_button
     // True if there was a short press in the last kBootUnlockMs (safe to call from any task). The web
     // server asks this before risky actions, so only someone holding the pumpkin can do them.
     bool unlocked();
+
+    // Act as if the button had been pressed briefly: the serial "unlock" command, for testing with the
+    // board plugged in (a USB cable proves someone has the pumpkin in their hands, as the button does).
+    // The network task carries it out at its next update(), exactly like a real press. Safe from any
+    // task. False if nothing is watching the button (no WiFi after a brownout restart).
+    bool pressFromSerial();
 }
