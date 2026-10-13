@@ -5,12 +5,15 @@
 
 #include "web/api_handlers.h"
 
+#include <vector>
+
 #include "core/constants.h"
 #include "core/logging.h"
 #include "core/network.h"
 #include "core/settings.h"
 #include "effects/registry.h"
 #include "effects/show.h"
+#include "effects/timing.h"
 #include "player/player.h"
 #include "web/web_utils.h"
 
@@ -48,11 +51,42 @@ namespace web
             target["wifiSaver"] = current.wifiSaver;
         }
 
+        // How long each effect takes, and the words' timing (wordsMs = base + perChar x letters), for the show
+        // page's "about how long". Worked out by playing them silently (timing.h): a fraction of a second
+        // for all of them, so only again when a setting that changes it does.
+        struct Timings
+        {
+            uint8_t eyeGap = 0xFF;
+            String name;
+            std::vector<uint32_t> effectMs;
+            uint32_t wordsBaseMs = 0;
+            uint32_t wordsPerCharMs = 0;
+        };
+
+        const Timings &timings(const EffectInfo *effects, size_t count)
+        {
+            static Timings cached; // only the web server's task uses it
+            const Settings current = settings::get();
+            if (cached.eyeGap == current.eyeGap && cached.name == current.pumpkinName && cached.effectMs.size() == count)
+                return cached;
+            const TimingSettings with{current.eyeGap, current.pumpkinName.c_str()};
+            cached.effectMs.resize(count);
+            for (size_t i = 0; i < count; i++)
+                cached.effectMs[i] = effectMs(effects[i], with);
+            constexpr size_t kSampleLetters = 10;
+            cached.wordsBaseMs = wordsMs("", with);
+            cached.wordsPerCharMs = (wordsMs("Boo boo bo", with) - cached.wordsBaseMs) / kSampleLetters;
+            cached.eyeGap = current.eyeGap;
+            cached.name = current.pumpkinName;
+            return cached;
+        }
+
         // GET /api/effects: the buttons, in registry order
         void handleEffects(AsyncWebServerRequest *request)
         {
             size_t count = 0;
             const EffectInfo *effects = allEffects(count);
+            const Timings &times = timings(effects, count);
             JsonDocument doc;
             JsonArray list = doc["effects"].to<JsonArray>();
             JsonObject titles = doc["groupTitles"].to<JsonObject>(); // group -> section heading
@@ -64,8 +98,12 @@ namespace web
                 item["emoji"] = effects[i].emoji;
                 item["group"] = groupName(effects[i].group);
                 item["inShow"] = canBeInShow(effects[i]); // whether the show creator offers it
+                item["ms"] = times.effectMs[i];             // how long it lasts (0: never ends)
                 titles[groupName(effects[i].group)] = groupTitle(effects[i].group);
             }
+            JsonObject words = doc["wordsMs"].to<JsonObject>(); // scrolling words takes base + perChar x letters
+            words["base"] = times.wordsBaseMs;
+            words["perChar"] = times.wordsPerCharMs;
             sendJson(request, 200, doc);
         }
 

@@ -39,6 +39,7 @@
 #include "effects/effects.h"
 #include "effects/primitives.h"
 #include "effects/registry.h"
+#include "effects/timing.h"
 #include "effects/show.h"
 
 void setUp()
@@ -1183,6 +1184,39 @@ static void test_fruit_machine_results()
     }
 }
 
+// The show page's "about how long": every effect that can go in a show takes a sensible time, the surprise
+// show (never ends) none, and longer words take longer
+static void test_timings()
+{
+    static std::string failure;
+    failure.clear();
+    const TimingSettings settings{8, "Jack's Pumpkin"};
+    size_t count = 0;
+    const EffectInfo *effects = allEffects(count);
+    uint32_t longest = 0;
+    for (size_t i = 0; i < count; i++)
+    {
+        const uint32_t ms = effectMs(effects[i], settings);
+        if (!canBeInShow(effects[i]))
+        {
+            if (ms != 0)
+                failure += std::string(" ") + effects[i].id + " never ends, so should be 0;";
+            continue;
+        }
+        if (ms < 1000 || ms > 60000)
+            failure += std::string(" ") + effects[i].id + ": " + std::to_string(ms) + " ms;";
+        longest = ms > longest ? ms : longest;
+    }
+    const uint32_t shortWords = wordsMs("Boo", settings);
+    const uint32_t longWords = wordsMs("Happy Halloween everybody", settings);
+    if (!(shortWords > 0 && longWords > shortWords))
+        failure += " words: " + std::to_string(shortWords) + " and " + std::to_string(longWords) + " ms;";
+    std::printf("      timings: longest effect %u ms, \"Boo\" %u ms, 25 letters %u ms\n",
+                static_cast<unsigned>(longest), static_cast<unsigned>(shortWords), static_cast<unsigned>(longWords));
+    if (!failure.empty())
+        TEST_FAIL_MESSAGE(failure.c_str());
+}
+
 int main()
 {
     gGoldenDir = findGoldenDir();
@@ -1203,6 +1237,7 @@ int main()
     RUN_TEST(test_fruit_machine_odds);
     RUN_TEST(test_fruit_machine_reels_land);
     RUN_TEST(test_fruit_machine_results);
+    RUN_TEST(test_timings);
 
     std::vector<std::string> ids;
     if (gGoldenDir.empty() || !readLines(gGoldenDir + "index.txt", ids) || ids.empty())

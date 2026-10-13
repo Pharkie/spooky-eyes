@@ -844,8 +844,12 @@ class Handler(BaseHTTPRequestHandler):
     # --- API (same paths, bodies and replies as src/web/*.cpp) ---
 
     def api_effects(self, query):
-        effects = [{k: e[k] for k in ("id", "label", "emoji", "group", "inShow")} for e in self.pumpkin.effects]
-        self.send_json(200, {"effects": effects, "groupTitles": GROUP_TITLES})
+        # "ms": the board plays each effect silently to time it (src/effects/timing.cpp); the mock can't, so
+        # it says 7 s for each (0 for one that never ends) and a rough rate for scrolled words
+        effects = [dict({k: e[k] for k in ("id", "label", "emoji", "group", "inShow")}, ms=7000 if e["inShow"] else 0)
+                   for e in self.pumpkin.effects]
+        self.send_json(200, {"effects": effects, "groupTitles": GROUP_TITLES,
+                             "wordsMs": {"base": 2600, "perChar": 280}})
 
     def api_status(self, query):
         self.send_json(200, self.pumpkin.status())

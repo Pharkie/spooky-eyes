@@ -12,7 +12,7 @@
 <main class="narrow">
 <header class="top">
   <a class="icon-link" href="/?play=1" aria-label="Back to the buttons" title="Back to the buttons">←</a>
-  <h1>✏️ The show</h1>
+  <h1>✏️ Set up the show</h1>
   <a class="icon-link" href="/settings" aria-label="Settings" title="Settings">⚙️</a>
 </header>
 <p class="center muted">🎃 <span data-name>Spooky Pumpkin</span></p>
@@ -186,12 +186,31 @@ setTimeout(function () {
     return li;
   }
 
+  // "25 of 60 (~90s)": how long one pass of the show takes, from each effect's own timing (the pumpkin
+  // works it out) and the words' length
+  let wordsTiming = { base: 2600, perChar: 280 }; // until the pumpkin says
+  function showCount() {
+    let ms = 0;
+    for (const block of blocks) {
+      if (block.type === 'words') ms += wordsTiming.base + wordsTiming.perChar * block.text.trim().length;
+      else ms += (effects.get(block.id) || {}).ms || 0;
+    }
+    let about = '';
+    const s = Math.round(ms / 1000);
+    if (s > 0 && s < 100) about = ' (~' + Math.max(5, Math.round(s / 5) * 5) + 's)';
+    else if (s >= 100) {
+      const halves = Math.round(s / 30);
+      about = ' (~' + Math.floor(halves / 2) + (halves % 2 ? '½' : '') + ' min)';
+    }
+    $('count').textContent = blocks.length + ' of ' + limits.maxBlocks + about;
+  }
+
   function render() {
     list.textContent = '';
     blocks.forEach((block, index) => list.appendChild(blockItem(block, index)));
     $('empty').hidden = blocks.length > 0;
     const full = blocks.length >= limits.maxBlocks;
-    $('count').textContent = blocks.length + ' of ' + limits.maxBlocks;
+    showCount();
     addWords.disabled = addEffect.disabled = full;
     $('full').hidden = !full;
     $('full').textContent = 'That’s the most a show can have (' + limits.maxBlocks + ' blocks).';
@@ -299,6 +318,7 @@ setTimeout(function () {
   list.addEventListener('input', (event) => {
     const li = event.target.closest('li');
     blocks[Number(li.dataset.index)].text = event.target.value;
+    showCount();
     li.querySelector('.words-hint').hidden = !!event.target.value.trim();
     changed('', false, TYPING_DELAY);
   });
@@ -607,6 +627,7 @@ setTimeout(function () {
     try {
       const [effectList, show] = await Promise.all([get('/api/effects'), get('/api/show')]);
       for (const fx of effectList.effects) effects.set(fx.id, fx);
+      if (effectList.wordsMs) wordsTiming = effectList.wordsMs;
       // Not the effects that never end (the surprise show)
       effectAccordion($('effects'), effectList.effects.filter((fx) => fx.inShow !== false), { headingTag: 'h3', storeKey: 'showSection', titles: effectList.groupTitles });
       limits = show.limits;
