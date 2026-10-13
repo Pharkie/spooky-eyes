@@ -139,6 +139,7 @@ namespace
     std::atomic<uint8_t> refusalCount{0};         // ditto: goes up with each failed join (wraps round)
     std::atomic<network::ModeListener> modeListener{nullptr};
     std::atomic<uint32_t> lastActivityMs{0};      // millis() when someone last used the pumpkin
+    uint8_t phonesOnSetupWifi = 0;                // last count logged (network task only)
 
     // Set by begin() before it starts the network task, then only read (from any task)
     String savedSsid;
@@ -835,8 +836,17 @@ namespace
         if (now - lastSaverCheckMs < kSaverCheckMs)
             return;
         lastSaverCheckMs = now;
-        if (role == Role::Setup && WiFi.softAPgetStationNum() > 0)
-            lastActivityMs = now;
+        if (role == Role::Setup)
+        {
+            const uint8_t phones = WiFi.softAPgetStationNum();
+            if (phones != phonesOnSetupWifi)
+            {
+                LOG("WIFI", "Phones on the setup WiFi: %u", static_cast<unsigned>(phones)); // for setup trouble
+                phonesOnSetupWifi = phones;
+            }
+            if (phones > 0)
+                lastActivityMs = now;
+        }
         // lastActivityMs is read after now, so a request noted meanwhile can't look 49 days old
         if (wifi_saver::timeToSwitchOff(settings::get().wifiSaver, radioBusy(), now, lastActivityMs.load(),
                                         kWifiIdleOffMs))

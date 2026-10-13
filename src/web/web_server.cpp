@@ -298,7 +298,11 @@ namespace web
 
             void handleRequest(AsyncWebServerRequest *request) override
             {
-                request->redirect(portalUrl());
+                const String target = portalUrl();
+                if (isProbePath(request->url())) // the phone's "is there internet?" check: worth a line in the log
+                    LOG("WEB", "Sign-in check http://%s%s -> %s", request->host().c_str(), request->url().c_str(),
+                        target.c_str());
+                request->redirect(target);
             }
         };
 
