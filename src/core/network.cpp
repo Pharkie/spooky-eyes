@@ -1250,7 +1250,7 @@ namespace network
         // (Scribe took the first match). This matters more at reduced transmit power.
         WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
         WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-        WiFi.onEvent(onWifiEvent, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+        WiFi.onEvent(onWifiEvent); // every event: it logs each step of a join
         // Start the radio here, not in the task: the first WiFi.mode() also starts the network stack
         // (lwIP), and web::begin() crashes without it. Station mode either way: if the setup WiFi is
         // needed, startSetupAP() adds it, name and password included.
