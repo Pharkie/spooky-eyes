@@ -38,6 +38,11 @@ namespace network
     // and before web::begin() (the web server needs the network stack, which this starts).
     void begin();
 
+    // Instead of begin(), after a brownout: no WiFi at all (the batteries can't take its current), but the
+    // network task still runs the BOOT button and the firmware trial. mode() says Off, so a short BOOT
+    // press restarts (main.cpp), which tries the WiFi again.
+    void beginOffline();
+
     Mode mode();
     bool isSetupAP();
 
@@ -73,6 +78,7 @@ namespace network
         int32_t rssi;
         bool secure;
         uint8_t channel;
+        uint8_t bssid[6]; // the access point's address, so joining it can skip the driver's own scan
     };
 
     enum class ScanStatus : uint8_t
@@ -94,7 +100,8 @@ namespace network
         Idle,    // no check lately
         Running, // asked for or under way: ask again in a moment
         Passed,  // joined it: rssi says how strong
-        Failed,  // couldn't: reason says why, in words for the family
+        Failed,  // couldn't: reason says why, in words for the family (wrong password, not found)
+        Unsure,  // no answer either way (the router didn't reply in time): the page offers to save anyway
     };
 
     struct WifiTest
@@ -102,7 +109,7 @@ namespace network
         WifiTestStatus status;
         String ssid;   // the WiFi checked (never the password)
         int32_t rssi;  // signal in dBm when Passed, otherwise 0
-        String reason; // when Failed, e.g. "That password didn't work"
+        String reason; // when Failed or Unsure, e.g. "That password didn't work"
     };
 
     enum class WifiTestStart : uint8_t
@@ -113,7 +120,7 @@ namespace network
     };
 
     // Setup mode only: ask the network task to join this WiFi on the station side while the setup WiFi
-    // stays up, then leave it again. It takes up to about 12 s; ask wifiTest() how it went. Nothing is
+    // stays up, then leave it again. It takes up to about 30 s; ask wifiTest() how it went. Nothing is
     // saved, and the password is wiped from memory once the check starts. Safe from any task; never
     // waits for the check.
     WifiTestStart startWifiTest(const String &ssid, const String &password);

@@ -80,8 +80,8 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
 - **What the eyes say about WiFi** (`main.cpp`): in setup mode, "Join WiFi: <name>  Password: spookyeyes
   then open 192.168.4.1" once and again at the start of the next show pass, then the show plays on by
   itself (WiFi is optional); on home WiFi, "http://pumpkin.local
-  or <IP>" once. A short BOOT press repeats it. After a brownout restart it skips WiFi and asks for new
-  batteries.
+  or <IP>" once. A short BOOT press repeats it. After two brownout restarts in a row (one can be a knock
+  to the battery box) it skips WiFi and asks for new batteries; BOOT still restarts it to try again.
 - **WiFi** is ported from Scribe Evolution (`~/dev/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
   `src/core/network.cpp`): pre-scan, connect, AP+STA fallback with captive DNS, mDNS, reconnects, status LED.
   Unlike Scribe, the setup WiFi ("Spooky Pumpkin") and web address (`pumpkin.local`) are fixed, not made from
@@ -90,7 +90,11 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
   Arduino's, which ignores queries with EDNS records. Losing home WiFi for 3 minutes (carried out to the
   doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range. Before saving, the setup
   page has the network task try the WiFi on the station side (`network::startWifiTest()`, `/api/wifi/test`)
-  and only saves one that joined; skipped on home WiFi, where a check would drop the connection.
+  and only saves one that joined, or one the router didn't answer about in time ("unsure": the page offers
+  Save anyway); skipped on home WiFi, where a check would drop the connection. Joins (`startJoin()`) go
+  straight to the access point a scan found, allow WPA3's newer handshake, run at 160 MHz and allow 30 s;
+  every step is logged with its timing. A brand-new pumpkin starts its setup WiFi on the strongest network's
+  channel (most likely the home WiFi's), so a check rarely moves it and drops phones. The country is fixed to GB, channels 1-13.
 - **Saving batteries:** the CPU runs at 80 MHz (`kCpuMhz`), the mouth LED is dimmed with LEDC PWM
   (`kMouthDutyPercent`), and with the `wifiSaver` setting on (the default) the network task switches the
   WiFi off (`network::Mode::Off`, status LED off; the show carries on without a word) once nobody has used

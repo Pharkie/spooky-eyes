@@ -21,7 +21,9 @@ constexpr const char *kSetupApPassword = "spookyeyes";
 constexpr const char *kHostname = "pumpkin";
 
 // WiFi timings (from Scribe Evolution's network code)
-constexpr uint32_t kWifiConnectTimeoutMs = PumpkinTime::Seconds(15);
+// Joining can take 20 s or more: a mesh tries each of its access points in turn, and WPA3's handshake is
+// slow on this little chip
+constexpr uint32_t kWifiConnectTimeoutMs = PumpkinTime::Seconds(30);
 constexpr uint32_t kWifiReconnectIntervalMs = PumpkinTime::Seconds(5);
 
 // On home WiFi, after losing it for this long (carried out to the doorstep?), start the setup WiFi so

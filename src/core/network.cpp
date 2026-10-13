@@ -22,23 +22,32 @@
 // - in setup mode with home WiFi saved (it was out of range at boot, or lost later), look for it now
 //   and then, and restart to join it once it's back. At most kMaxRetryRestarts in a row. Not after a
 //   wrong password: that won't fix itself, so it waits for the family to type it again.
-// - every WiFi scan, the setup page's included, goes through scanMutex
+// - every WiFi scan, the setup page's included, goes through scanMutex, with the scan settings zeroed
+//   first (startScan(): arduino 2.0.17 leaves some uninitialised, e.g. how long to spend back on the
+//   setup WiFi's channel between channels)
+// - joins go straight to the access point a scan found (its channel and BSSID: no second, slower scan
+//   by the driver), allow WPA3's newer handshake, run the processor at full speed, allow 30 s (a mesh tries
+//   its access points one by one), and log every step (onWifiEvent())
 // - Scribe's handleTestWiFi() (check the password before saving it) runs here on the network task,
 //   under scanMutex, while the web server only asks and polls (runWifiTest())
 // - nobody has used the pumpkin for kWifiIdleOffMs: switch the WiFi off to save batteries, until a
 //   restart (saveBatteries())
+// - the country is set to GB, channels 1-13, so routers on 12 and 13 are found
+// - a brand-new pumpkin starts its setup WiFi on the channel of the strongest network around (most likely
+//   the home WiFi), so checking the home WiFi rarely moves it to another channel and drops phones
+// - no check that pumpkin.local is free (Scribe pinged each name first): a house has one pumpkin
 // - left out: printAPDetailsOnStartup() (the eyes scroll the address instead), MQTT, NTP, LogManager and
 //   the custom PCB's RGB status LED
 
 #include "core/network.h"
 
-#include <ESP32Ping.h>
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <algorithm>
 #include <atomic>
 #include <esp_attr.h>
 #include <esp_system.h>
+#include <esp_wifi.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -76,8 +85,6 @@ namespace
     constexpr uint32_t kPageScanKeepMs = PumpkinTime::Seconds(10); // hand the same results out again
     constexpr size_t kMaxFoundNetworks = 30;
 
-    constexpr int kMdnsNameAttempts = 3; // pumpkin, pumpkin-2, pumpkin-3
-    constexpr uint8_t kMdnsPingCount = 2;
     constexpr int kSetupApAttempts = 3;
     constexpr uint32_t kSetupApRetryMs = 500;
 
@@ -100,13 +107,22 @@ namespace
     // pumpkin on a doorstep at the edge of the WiFi doesn't keep interrupting its show.
     constexpr uint32_t kMaxRetryRestarts = 3;
 
-    // Checking a home WiFi for the setup page (runWifiTest()). A right password joins in 2-5 s; a wrong
-    // one is turned down after about 4 s, and the library tries once more if it's its first join.
-    constexpr uint32_t kWifiTestMaxMs = PumpkinTime::Seconds(12);
+    // Checking a home WiFi for the setup page (runWifiTest()). A right password usually joins in 3-10 s
+    // (with the setup WiFi on, the radio keeps going back to its channel), but a mesh or a WPA3 router can
+    // take 20 s or more: a check that saw neither a join nor a refusal in time is "unsure", not a failure.
+    // A wrong password is turned down after about 4 s, and the library tries once more if it's its first
+    // join.
+    constexpr uint32_t kWifiTestMaxMs = PumpkinTime::Seconds(30);
     // After a refusal, how long to wait for that one extra try before calling it a failure
     constexpr uint32_t kWifiTestSettleMs = PumpkinTime::Seconds(6);
+    // After leaving a WiFi, before its details are cleared out of the driver (which refuses mid-join)
+    constexpr uint32_t kLeaveSettleMs = 200;
     // A finished check is kept this long, for a phone that dropped off the setup WiFi meanwhile
     constexpr uint32_t kWifiTestKeepMs = PumpkinTime::Minutes(1);
+
+    // Processor speed while joining: the password maths (WPA2's key derivation, WPA3's handshake) is
+    // twice as quick as at kCpuMhz. The peripherals' clock stays 80 MHz either way.
+    constexpr uint32_t kJoinCpuMhz = 160;
 
     // How often to ask whether it's time to switch the WiFi off (saveBatteries())
     constexpr uint32_t kSaverCheckMs = PumpkinTime::Seconds(1);
@@ -119,6 +135,7 @@ namespace
         Setup,    // running the setup WiFi: answer DNS
         Broken,   // the setup WiFi wouldn't start
         Off,      // WiFi switched off to save batteries, until a restart
+        Offline,  // never started (beginOffline(), after a brownout): the housekeeping only
     };
 
     // Why it's in setup mode with home WiFi saved
@@ -172,7 +189,20 @@ namespace
     String testReason;
     uint32_t testFinishedMs = 0;
 
+    // Where a scan last saw a network. Joining there skips the driver's own scan of every channel, which
+    // is slow with the setup WiFi on (the radio keeps going back to its channel) and walks a mesh's access
+    // points one by one.
+    struct JoinHint
+    {
+        bool known = false;
+        int32_t channel = 0;
+        uint8_t bssid[6] = {};
+    };
+
+    std::atomic<uint32_t> joinStartedMs{0}; // when the latest join began, for the log's timings
+
     // Network task only (begin() sets retryRestartsSoFar before starting it)
+    JoinHint homeHint; // the home WiFi's strongest access point, from scanForHome()
     uint32_t retryRestartsSoFar = 0;
     uint32_t attemptStartMs = 0;
     uint32_t nextAttemptMs = 0;
@@ -252,17 +282,70 @@ namespace
                why == WIFI_REASON_HANDSHAKE_TIMEOUT;
     }
 
+    const char *authName(wifi_auth_mode_t mode)
+    {
+        switch (mode)
+        {
+        case WIFI_AUTH_OPEN:
+            return "open";
+        case WIFI_AUTH_WEP:
+            return "WEP";
+        case WIFI_AUTH_WPA_PSK:
+            return "WPA";
+        case WIFI_AUTH_WPA2_PSK:
+            return "WPA2";
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            return "WPA/WPA2";
+        case WIFI_AUTH_WPA3_PSK:
+            return "WPA3";
+        case WIFI_AUTH_WPA2_WPA3_PSK:
+            return "WPA2/WPA3";
+        default:
+            return "other";
+        }
+    }
+
+    const char *reasonText(uint8_t why); // below
+
+    unsigned long msSinceJoin()
+    {
+        return static_cast<unsigned long>(millis() - joinStartedMs.load());
+    }
+
+    // On the WiFi event task: count refusals for the joins, and log each step of a join with its timing
+    // (the only way to see why one is slow or fails)
     void onWifiEvent(arduino_event_t *event)
     {
-        const uint8_t why = event->event_info.wifi_sta_disconnected.reason;
-        if (why == WIFI_REASON_ASSOC_LEAVE)
-            return; // our own disconnect (WiFi.begin() and WiFi.reconnect() start with one)
-        lastDisconnectReason = why;
-        refusalCount++;
-        // A router can answer later tries with "not found" after turning down a wrong password, so the
-        // last reason alone can't be trusted: remember that it happened at all
-        if (isAuthFailure(why))
-            sawAuthFailure = true;
+        switch (event->event_id)
+        {
+        case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+        {
+            const auto &joined = event->event_info.wifi_sta_connected;
+            LOG("WIFI", "+%lu ms: joined %02x:%02x:%02x:%02x:%02x:%02x on channel %u (%s)", msSinceJoin(),
+                joined.bssid[0], joined.bssid[1], joined.bssid[2], joined.bssid[3], joined.bssid[4], joined.bssid[5],
+                static_cast<unsigned>(joined.channel), authName(joined.authmode));
+            break;
+        }
+        case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+            LOG("WIFI", "+%lu ms: got an address from the router", msSinceJoin());
+            break;
+        case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+        {
+            const uint8_t why = event->event_info.wifi_sta_disconnected.reason;
+            if (why == WIFI_REASON_ASSOC_LEAVE)
+                return; // our own disconnect (WiFi.begin() and WiFi.reconnect() start with one)
+            LOG("WIFI", "+%lu ms: turned away: %s (%u)", msSinceJoin(), reasonText(why), static_cast<unsigned>(why));
+            lastDisconnectReason = why;
+            refusalCount++;
+            // A router can answer later tries with "not found" after turning down a wrong password, so the
+            // last reason alone can't be trusted: remember that it happened at all
+            if (isAuthFailure(why))
+                sawAuthFailure = true;
+            break;
+        }
+        default:
+            break;
+        }
     }
 
     // Overwrite a String's characters before it's freed, so a password doesn't linger in the heap
@@ -300,6 +383,88 @@ namespace
         WiFi.waitStatusBits(startedBits, 1000);
         if (!WiFi.setTxPower(kTxPower))
             LOG("WIFI", "Couldn't turn the transmit power down");
+        return true;
+    }
+
+    // The processor at kJoinCpuMhz while one of these is in scope, then back to kCpuMhz
+    class FullSpeed
+    {
+    public:
+        FullSpeed() { setCpuFrequencyMhz(kJoinCpuMhz); }
+        ~FullSpeed() { setCpuFrequencyMhz(kCpuMhz); }
+        FullSpeed(const FullSpeed &) = delete;
+        FullSpeed &operator=(const FullSpeed &) = delete;
+    };
+
+    // Start joining a WiFi: straight to the access point a scan found, if there's a hint, otherwise the
+    // driver scans every channel first. WPA3 routers may use either way of deriving the password (some
+    // only take the newer, "H2E"; arduino leaves only the older one on). False if the driver wouldn't
+    // start, which the log says.
+    bool startJoin(const String &ssid, const String &password, const JoinHint &hint)
+    {
+        joinStartedMs = millis();
+        lastDisconnectReason = 0;
+        sawAuthFailure = false;
+        if (hint.known)
+            LOG("WIFI", "Joining on channel %ld", static_cast<long>(hint.channel));
+        // The scan method is read when the config is built, in begin()
+        WiFi.setScanMethod(hint.known ? WIFI_FAST_SCAN : WIFI_ALL_CHANNEL_SCAN);
+        const wl_status_t status = WiFi.begin(ssid.c_str(), password.c_str(), hint.known ? hint.channel : 0,
+                                              hint.known ? hint.bssid : nullptr, false);
+        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+        if (status == WL_CONNECT_FAILED)
+        {
+            LOG("WIFI", "The WiFi driver wouldn't take those details");
+            return false;
+        }
+        wifi_config_t config;
+        if (esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK)
+        {
+            config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+            esp_wifi_set_config(WIFI_IF_STA, &config);
+            memset(config.sta.password, 0, sizeof(config.sta.password));
+        }
+        const esp_err_t err = esp_wifi_connect();
+        if (err != ESP_OK)
+        {
+            LOG("WIFI", "Couldn't start joining: %s", esp_err_to_name(err));
+            return false;
+        }
+        return true;
+    }
+
+    // After a join: the router's country information can lift the transmit power again (see kTxPower)
+    void keepTxPowerDown()
+    {
+        if (!WiFi.setTxPower(kTxPower))
+            LOG("WIFI", "Couldn't turn the transmit power down");
+    }
+
+    // The library's scan bookkeeping, so a scan started here works with scanComplete(), SSID(i) and so on
+    struct ScanBits : WiFiGenericClass
+    {
+        using WiFiGenericClass::clearStatusBits;
+        using WiFiGenericClass::setStatusBits;
+    };
+
+    // Start a scan in the background (as WiFi.scanNetworks(true, ...) does, but with every setting given:
+    // arduino 2.0.17 leaves some of them uninitialised). Active scans ask each channel who's there;
+    // ssid limits it to one network (hidden ones included). With scanMutex held.
+    bool startScan(const char *ssid, uint32_t msPerChannel)
+    {
+        WiFi.scanDelete();
+        wifi_scan_config_t config = {};
+        config.ssid = reinterpret_cast<uint8_t *>(const_cast<char *>(ssid));
+        config.show_hidden = ssid != nullptr;
+        config.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+        config.scan_time.active.min = msPerChannel / 2;
+        config.scan_time.active.max = msPerChannel;
+        config.scan_time.passive = msPerChannel; // channels where asking isn't allowed
+        config.home_chan_dwell_time = 0;         // the driver's default between channels (30 ms)
+        if (esp_wifi_scan_start(&config, false) != ESP_OK)
+            return false;
+        ScanBits::clearStatusBits(WIFI_SCAN_DONE_BIT);
+        ScanBits::setStatusBits(WIFI_SCANNING_BIT);
         return true;
     }
 
@@ -356,8 +521,10 @@ namespace
             const String ssid = WiFi.SSID(i);
             if (ssid.isEmpty())
                 continue; // hidden network
-            const FoundNetwork here{ssid, WiFi.RSSI(i), WiFi.encryptionType(i) != WIFI_AUTH_OPEN,
-                                    static_cast<uint8_t>(WiFi.channel(i))};
+            FoundNetwork here{ssid, WiFi.RSSI(i), WiFi.encryptionType(i) != WIFI_AUTH_OPEN,
+                              static_cast<uint8_t>(WiFi.channel(i)), {}};
+            if (const uint8_t *bssid = WiFi.BSSID(i))
+                memcpy(here.bssid, bssid, sizeof(here.bssid));
             auto same = std::find_if(found.begin(), found.end(),
                                      [&](const FoundNetwork &entry) { return entry.ssid == ssid; });
             if (same == found.end())
@@ -412,16 +579,15 @@ namespace
     }
 
     // One look for the home WiFi: an active scan for its name, so it's found even if it's hidden.
-    // False if it isn't there, or the setup page's scan has the radio just now. Network task only.
+    // Notes its strongest access point in homeHint. False if it isn't there, or the setup page's scan has
+    // the radio just now. Network task only.
     bool scanForHome(int32_t &rssi)
     {
         Lock lock(scanMutex);
         collectPageScan(millis());
         if (pageScanRunning)
             return false;
-        int16_t found = WiFi.scanNetworks(true, true, false, kScanMsPerChannel, 0, savedSsid.c_str());
-        if (found == WIFI_SCAN_RUNNING)
-            found = waitForScan();
+        const int16_t found = startScan(savedSsid.c_str(), kScanMsPerChannel) ? waitForScan() : WIFI_SCAN_FAILED;
         bool seen = false;
         for (int16_t i = 0; i < found; i++)
         {
@@ -429,6 +595,10 @@ namespace
             {
                 seen = true;
                 rssi = WiFi.RSSI(i);
+                homeHint.known = true;
+                homeHint.channel = WiFi.channel(i);
+                if (const uint8_t *bssid = WiFi.BSSID(i))
+                    memcpy(homeHint.bssid, bssid, sizeof(homeHint.bssid));
             }
         }
         WiFi.scanDelete();
@@ -446,7 +616,8 @@ namespace
             const bool seen = scanForHome(rssi);
             if (seen)
             {
-                LOG("WIFI", "Found \"%s\" (signal %ld dBm)", savedSsid.c_str(), static_cast<long>(rssi));
+                LOG("WIFI", "Found \"%s\" (signal %ld dBm, channel %ld)", savedSsid.c_str(), static_cast<long>(rssi),
+                    static_cast<long>(homeHint.channel));
                 return true;
             }
         }
@@ -474,22 +645,38 @@ namespace
 
         LOG("WIFI", "Joining \"%s\" (up to %lu s)", savedSsid.c_str(),
             static_cast<unsigned long>(kWifiConnectTimeoutMs / 1000));
-        lastDisconnectReason = 0;
-        sawAuthFailure = false;
+        FullSpeed fast;
         WiFi.setAutoReconnect(true);
-        WiFi.begin(savedSsid.c_str(), savedPassword.c_str());
-        const uint32_t start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - start < kWifiConnectTimeoutMs)
+        JoinHint hint = homeHint;
+        bool started = startJoin(savedSsid, savedPassword, hint);
+        uint32_t start = millis();
+        while (started && WiFi.status() != WL_CONNECTED && millis() - start < kWifiConnectTimeoutMs)
+        {
             waitFor(kTaskPeriodMs);
+            // Not where the scan saw it (the router changed channel?): try again without the hint
+            if (hint.known && lastDisconnectReason == WIFI_REASON_NO_AP_FOUND && !sawAuthFailure)
+            {
+                LOG("WIFI", "Not on channel %ld after all: looking on every channel", static_cast<long>(hint.channel));
+                hint.known = false;
+                started = startJoin(savedSsid, savedPassword, hint);
+                start = millis();
+            }
+        }
 
         if (WiFi.status() != WL_CONNECTED)
         {
             const uint8_t why = lastDisconnectReason;
+            const bool noAddress = (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
             if (sawAuthFailure)
             {
                 LOG("WIFI", "Couldn't join \"%s\": %s, after it turned the password down (wrong password?)",
                     savedSsid.c_str(), reasonText(why));
                 setReason(Reason::WrongPassword, "Couldn't join \"" + savedSsid + "\" — wrong password?");
+            }
+            else if (noAddress)
+            {
+                LOG("WIFI", "Joined \"%s\", but the router gave no address", savedSsid.c_str());
+                setReason(Reason::JoinFailed, "Joined \"" + savedSsid + "\", but the router gave no address");
             }
             else
             {
@@ -499,12 +686,36 @@ namespace
             return false;
         }
 
-        LOG("WIFI", "Connected to \"%s\": IP %s, signal %d dBm", savedSsid.c_str(),
-            WiFi.localIP().toString().c_str(), static_cast<int>(WiFi.RSSI()));
+        keepTxPowerDown();
+        LOG("WIFI", "Connected to \"%s\" in %lu ms: IP %s, signal %d dBm, channel %d, transmit power %d (x0.25 dBm)",
+            savedSsid.c_str(), msSinceJoin(), WiFi.localIP().toString().c_str(), static_cast<int>(WiFi.RSSI()),
+            static_cast<int>(WiFi.channel()), static_cast<int>(WiFi.getTxPower()));
         return true;
     }
 
-    bool startSetupAP()
+    // The channel of the strongest network around (most likely the home WiFi), or 0 if the scan finds
+    // none. A brand-new pumpkin starts its setup WiFi there, so the setup page's WiFi check rarely has to
+    // move it to another channel (which drops phones off it for a moment). Network task only.
+    int32_t strongestNetworksChannel()
+    {
+        Lock lock(scanMutex);
+        const int16_t found = startScan(nullptr, kScanMsPerChannel) ? waitForScan() : WIFI_SCAN_FAILED;
+        int32_t channel = 0;
+        int32_t best = INT32_MIN;
+        for (int16_t i = 0; i < found; i++)
+        {
+            if (WiFi.RSSI(i) > best)
+            {
+                best = WiFi.RSSI(i);
+                channel = WiFi.channel(i);
+            }
+        }
+        WiFi.scanDelete();
+        return channel;
+    }
+
+    // channel 0: the driver's default (1)
+    bool startSetupAP(int32_t channel = 0)
     {
         // Stop the station side trying to join the home WiFi in the background: its channel hopping
         // would drop phones off the setup WiFi. AP+STA still lets the setup page scan for networks.
@@ -513,15 +724,15 @@ namespace
 
         for (int attempt = 1; attempt <= kSetupApAttempts; attempt++)
         {
-            if (setWifiMode(WIFI_AP_STA) && WiFi.softAP(kSetupApName, kSetupApPassword))
+            if (setWifiMode(WIFI_AP_STA) && WiFi.softAP(kSetupApName, kSetupApPassword, channel > 0 ? channel : 1))
             {
                 const IPAddress ip = WiFi.softAPIP();
                 // Captive portal: every name a phone looks up points at us, so its sign-in page opens ours
                 if (!captive_dns::start(ip))
                     LOG("WIFI", "Captive portal DNS didn't start");
                 currentMode = Mode::SetupAP;
-                LOG("WIFI", "Setup WiFi \"%s\" is on (password \"%s\"), page at http://%s", kSetupApName,
-                    kSetupApPassword, ip.toString().c_str());
+                LOG("WIFI", "Setup WiFi \"%s\" is on (password \"%s\", channel %d), page at http://%s", kSetupApName,
+                    kSetupApPassword, static_cast<int>(WiFi.channel()), ip.toString().c_str());
                 return true;
             }
             LOG("WIFI", "Setup WiFi didn't start (attempt %d of %d)", attempt, kSetupApAttempts);
@@ -531,36 +742,19 @@ namespace
         return false;
     }
 
+    // pumpkin.local (no check that the name's free first, as Scribe did: a house has one pumpkin, and the
+    // check could hold up the BOOT button for 15 s)
     void startMdns()
     {
-        for (int attempt = 1; attempt <= kMdnsNameAttempts; attempt++)
+        if (!MDNS.begin(kHostname))
         {
-            const String candidate = (attempt == 1) ? String(kHostname) : String(kHostname) + "-" + String(attempt);
-            const String fqdn = candidate + ".local";
-
-            // Does anything already answer to this name? (The lookup goes over mDNS. A free name takes
-            // about 7 s to time out. The library waits without a way to do the housekeeping meanwhile,
-            // so the BOOT button and the status LED pause until it's done.)
-            const bool taken = Ping.ping(fqdn.c_str(), kMdnsPingCount);
-            housekeeping();
-            if (taken)
-            {
-                LOG("MDNS", "%s is already taken", fqdn.c_str());
-                continue;
-            }
-
-            if (MDNS.begin(candidate.c_str()))
-            {
-                MDNS.setInstanceName(settings::get().pumpkinName); // shown by Bonjour browsers
-                MDNS.addService("http", "tcp", kWebServerPort);
-                setRegisteredMdnsName(candidate);
-                LOG("MDNS", "Web address http://%s", fqdn.c_str());
-                return;
-            }
-            MDNS.end(); // so the next name starts from scratch
-            LOG("MDNS", "Couldn't register %s", fqdn.c_str());
+            LOG("MDNS", "Couldn't register %s.local: use the IP address", kHostname);
+            return;
         }
-        LOG("MDNS", "No web name: use the IP address");
+        MDNS.setInstanceName(settings::get().pumpkinName); // shown by Bonjour browsers
+        MDNS.addService("http", "tcp", kWebServerPort);
+        setRegisteredMdnsName(kHostname);
+        LOG("MDNS", "Web address http://%s.local", kHostname);
     }
 
     void reportStack(const char *when)
@@ -587,7 +781,7 @@ namespace
         MDNS.end();
         setRegisteredMdnsName("");
         setReason(Reason::Lost, "Lost \"" + savedSsid + "\"");
-        if (startSetupAP())
+        if (startSetupAP(homeHint.known ? homeHint.channel : 0))
         {
             lastRecheckMs = millis();
             role = Role::Setup;
@@ -613,6 +807,7 @@ namespace
                 currentMode = Mode::Connected;
                 connectedSinceMs = now;
                 WiFi.setAutoReconnect(true);
+                keepTxPowerDown();
                 LOG("WIFI", "Back on \"%s\": IP %s", savedSsid.c_str(), WiFi.localIP().toString().c_str());
                 if (lostNoticeSent)
                 {
@@ -660,8 +855,7 @@ namespace
         if (static_cast<int32_t>(now - nextAttemptMs) >= 0)
         {
             LOG("WIFI", "Trying to rejoin \"%s\"", savedSsid.c_str());
-            if (!WiFi.reconnect())
-                WiFi.begin(savedSsid.c_str(), savedPassword.c_str());
+            startJoin(savedSsid, savedPassword, JoinHint{}); // every channel: the router may have moved
             currentMode = Mode::Connecting;
             attemptStartMs = now;
         }
@@ -672,8 +866,10 @@ namespace
     // no phone is on the setup WiFi: the scan takes the radio off its channel for about 2 s.
     void lookForHomeWifi(uint32_t now)
     {
-        if (savedSsid.isEmpty() || reason == Reason::WrongPassword)
-            return; // nothing to look for, or the password needs typing again
+        if (savedSsid.isEmpty())
+            return; // nothing to look for
+        // (After a refusal too: a weak signal, on the doorstep say, can look like a wrong password.
+        // kMaxRetryRestarts stops a really wrong one restarting the pumpkin all night.)
         if (retryRestartsSoFar >= kMaxRetryRestarts)
             return; // tried enough: stay in setup mode until switched off and on
         if (now - lastRecheckMs < kHomeRecheckMs)
@@ -699,11 +895,12 @@ namespace
         testRunning = false;
     }
 
-    // Words for the family when the check fails
+    // Words for the family when the check fails (the page shows them by the password box)
     String testFailureText(const String &ssid, bool authFailed, uint8_t why)
     {
         if (authFailed)
-            return "That password didn't work";
+            return "That password didn't work. Check it (capital letters too), or if the signal is weak, move the "
+                   "pumpkin closer to the router.";
         if (why == WIFI_REASON_NO_AP_FOUND)
             return "Can't find " + ssid + ": is it a 2.4 GHz network, and in range?";
         return "Couldn't join " + ssid + ". Check the password, or move the pumpkin closer to the router.";
@@ -714,9 +911,15 @@ namespace
     // only. Under scanMutex, so it never meets the page's scan or the look for the home WiFi (one radio
     // user at a time). The captive DNS and the housekeeping carry on while it waits.
     //
-    // The radio has one channel: joining a router on another channel moves the setup WiFi there too, so
-    // phones may drop off the setup WiFi for a moment and rejoin. The result is kept for kWifiTestKeepMs
-    // so they can still ask how it went.
+    // It goes straight to the access point the page's scan saw (see JoinHint), so the radio doesn't have
+    // to scan every channel while the setup WiFi is on. The radio has one channel: joining a router on
+    // another channel moves the setup WiFi there too, so phones may drop off it for a moment and rejoin
+    // (a brand-new pumpkin starts its setup WiFi on the strongest network's channel to make that rare). The result is
+    // kept for kWifiTestKeepMs so they can still ask how it went.
+    //
+    // Joined (even before the router hands out an address): Passed. Refused with an authentication error,
+    // or not found: Failed. Nothing heard either way in kWifiTestMaxMs: Unsure, and the page offers to save
+    // it anyway (the join after the restart, without the setup WiFi, is quicker).
     void runWifiTest()
     {
         {
@@ -739,19 +942,28 @@ namespace
             wipe(testPassword);
         }
 
+        JoinHint hint;
+        for (const FoundNetwork &net : pageScanResults)
+        {
+            if (net.ssid == ssid)
+            {
+                hint.known = true;
+                hint.channel = net.channel;
+                memcpy(hint.bssid, net.bssid, sizeof(hint.bssid));
+            }
+        }
+
         LOG("WIFI", "Checking \"%s\" for the setup page (up to %lu s)", ssid.c_str(),
             static_cast<unsigned long>(kWifiTestMaxMs / 1000));
-        lastDisconnectReason = 0;
-        sawAuthFailure = false;
+        FullSpeed fast;
         WiFi.setAutoReconnect(false); // off in setup mode anyway: one try (and the library's one retry)
-        const uint8_t refusalsBefore = refusalCount;
-        WiFi.begin(ssid.c_str(), password.c_str());
-        wipe(password);
+        uint8_t refusalsBefore = refusalCount;
+        bool started = startJoin(ssid, password, hint);
 
-        const uint32_t start = millis();
+        uint32_t start = millis();
         uint8_t refusals = 0;
         uint32_t lastRefusalMs = start;
-        while (WiFi.status() != WL_CONNECTED && millis() - start < kWifiTestMaxMs)
+        while (started && WiFi.status() != WL_CONNECTED && millis() - start < kWifiTestMaxMs)
         {
             housekeeping();
             captive_dns::serve(); // phones on the setup WiFi keep getting answers
@@ -763,33 +975,56 @@ namespace
                 refusals = seen;
                 lastRefusalMs = millis();
             }
+            const bool joining = (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
+            // Not where the page's scan saw it (the router changed channel?): once more, on every channel
+            if (!joining && hint.known && lastDisconnectReason == WIFI_REASON_NO_AP_FOUND && !sawAuthFailure)
+            {
+                LOG("WIFI", "Not on channel %ld after all: looking on every channel", static_cast<long>(hint.channel));
+                hint.known = false;
+                refusalsBefore = refusalCount;
+                refusals = 0;
+                started = startJoin(ssid, password, hint);
+                start = lastRefusalMs = millis();
+                continue;
+            }
             // The library tries once more after the first refusal since switch-on, and never again with
             // auto-reconnect off. So two refusals, or one and nothing since, means it has given up.
-            const bool joining = (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
             if (!joining && (refusals >= 2 || (refusals == 1 && millis() - lastRefusalMs >= kWifiTestSettleMs)))
                 break;
         }
+        wipe(password);
 
         // Joined but still waiting for an address from the router counts: the password worked
         const bool joined = WiFi.status() == WL_CONNECTED || (WiFi.getStatusBits() & STA_CONNECTED_BIT) != 0;
         const int32_t rssi = joined ? WiFi.RSSI() : 0;
         const uint8_t why = lastDisconnectReason;
         const bool authFailed = sawAuthFailure;
-        // Leave it again (the station side only: the setup WiFi stays up), and clear the name and
-        // password out of the WiFi driver's memory
+        const unsigned long tookMs = msSinceJoin();
+        // Leave it again (the station side only: the setup WiFi stays up). Stop the join first, then clear
+        // the name and password out of the driver's memory (it won't take a new config mid-join), so a late
+        // retry by the library has nothing to join.
+        WiFi.disconnect();
+        waitFor(kLeaveSettleMs);
         WiFi.disconnect(false, true);
 
         if (joined)
         {
-            LOG("WIFI", "Check: joined \"%s\" (signal %ld dBm) in %lu ms", ssid.c_str(), static_cast<long>(rssi),
-                static_cast<unsigned long>(millis() - start));
+            LOG("WIFI", "Check: joined \"%s\" (signal %ld dBm) in %lu ms", ssid.c_str(), static_cast<long>(rssi), tookMs);
             finishWifiTest(network::WifiTestStatus::Passed, rssi, "");
+        }
+        else if (authFailed || why == WIFI_REASON_NO_AP_FOUND)
+        {
+            LOG("WIFI", "Check: couldn't join \"%s\": %s%s (after %lu ms)", ssid.c_str(), reasonText(why),
+                authFailed ? ", after it turned the password down" : "", tookMs);
+            finishWifiTest(network::WifiTestStatus::Failed, 0, testFailureText(ssid, authFailed, why));
         }
         else
         {
-            LOG("WIFI", "Check: couldn't join \"%s\": %s%s", ssid.c_str(), reasonText(why),
-                authFailed ? ", after it turned the password down" : "");
-            finishWifiTest(network::WifiTestStatus::Failed, 0, testFailureText(ssid, authFailed, why));
+            LOG("WIFI", "Check: no answer from \"%s\" (%s, after %lu ms)", ssid.c_str(),
+                started ? reasonText(why) : "couldn't start", tookMs);
+            finishWifiTest(network::WifiTestStatus::Unsure, 0,
+                           ssid + " didn't answer in time, so the pumpkin couldn't tell whether the password "
+                                  "works. Save it anyway, and the pumpkin will try it when it restarts.");
         }
     }
 
@@ -874,10 +1109,17 @@ namespace
     void connectAtStart()
     {
         bool joined = false;
+        int32_t channel = 0;
         if (savedSsid.isEmpty())
+        {
             LOG("WIFI", "No home WiFi saved yet");
+            channel = strongestNetworksChannel();
+        }
         else
+        {
             joined = connectHome();
+            channel = homeHint.known ? homeHint.channel : 0; // where a check of it would go anyway
+        }
 
         lastRecheckMs = millis();
         if (joined)
@@ -887,7 +1129,7 @@ namespace
             startMdns();
             role = Role::Home; // from now on, keepConnected() looks after reconnects
         }
-        else if (startSetupAP())
+        else if (startSetupAP(channel))
         {
             role = Role::Setup; // ...or DNS and looking for the home WiFi
         }
@@ -914,7 +1156,8 @@ namespace
     void networkTask(void *)
     {
         const uint32_t startedMs = millis();
-        connectAtStart();
+        if (role.load() != Role::Offline)
+            connectAtStart();
 
         bool stackReported = false;
         for (;;)
@@ -944,6 +1187,8 @@ namespace
             case Role::Off:
                 keepWifiOff();
                 break;
+            case Role::Offline:
+                break;
             }
 
             if (!stackReported && now - startedMs >= kStackReportMs)
@@ -953,6 +1198,17 @@ namespace
             }
             vTaskDelay(pdMS_TO_TICKS(kTaskPeriodMs));
         }
+    }
+
+    // GB, channels 1-13, whatever routers say: under the driver's default (follow the router's country)
+    // channels 12 and 13, which UK routers can pick, are only listened to, and a router's country can lift
+    // the transmit power back up (see kTxPower). The four pumpkins are all in the UK.
+    void setCountry()
+    {
+        const wifi_country_t gb = {"GB", 1, 13, 20, WIFI_COUNTRY_POLICY_MANUAL};
+        if (esp_wifi_set_country(&gb) != ESP_OK)
+            LOG("WIFI", "Couldn't set the WiFi country");
+        keepTxPowerDown(); // the country's limit replaces it
     }
 
     bool startTask()
@@ -994,11 +1250,12 @@ namespace network
         // (Scribe took the first match). This matters more at reduced transmit power.
         WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
         WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
-        WiFi.onEvent(onWifiEvent, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+        WiFi.onEvent(onWifiEvent); // every event: it logs each step of a join
         // Start the radio here, not in the task: the first WiFi.mode() also starts the network stack
         // (lwIP), and web::begin() crashes without it. Station mode either way: if the setup WiFi is
         // needed, startSetupAP() adds it, name and password included.
         setWifiMode(WIFI_STA);
+        setCountry();
 
         // Joining (or the setup WiFi), then the captive DNS, reconnects, status LED, BOOT button and
         // the firmware trial, all in the background
@@ -1009,6 +1266,23 @@ namespace network
             LOG("NETWORK", "Couldn't start the network task: connecting before the show starts");
             connectAtStart();
         }
+    }
+
+    void beginOffline()
+    {
+        static bool started = false;
+        if (started)
+            return;
+        started = true;
+        textMutex = xSemaphoreCreateMutex();
+        scanMutex = xSemaphoreCreateMutex();
+        testMutex = xSemaphoreCreateMutex();
+        status_led::begin();
+        boot_button::begin();
+        currentMode = Mode::Off;
+        role = Role::Offline; // just the housekeeping: no radio, so nothing for keepWifiOff() to do
+        if (!startTask())
+            LOG("NETWORK", "Couldn't start the network task: no BOOT button");
     }
 
     Mode mode()
@@ -1110,9 +1384,11 @@ namespace network
         }
         else
         {
-            // Passive, as Scribe does, so the setup WiFi keeps working while it looks
+            // Active (asking each channel who's there): a passive listen of kScanMsPerChannel catches about
+            // one beacon per router and can miss the home WiFi. The radio goes back to the setup WiFi's
+            // channel between channels, so phones stay on it.
             havePageScanResults = false;
-            if (WiFi.scanNetworks(true, false, true, kScanMsPerChannel) == WIFI_SCAN_RUNNING)
+            if (startScan(nullptr, kScanMsPerChannel))
             {
                 pageScanRunning = true;
                 pageScanStartedMs = nowMs;
