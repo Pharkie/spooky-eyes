@@ -874,16 +874,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, {"ok": True})
 
     def api_mode(self, query):
-        mode = self.json_body().get("mode")
+        self.json_body_cached = self.json_body()
+        mode = self.json_body_cached.get("mode")
         if mode not in ("show", "buttons"):
             raise ApiError(400, 'The mode should be "show" or "buttons"')
+        from_top = self.json_body_cached.get("fromTop") is True  # player::startShow(fromTop)
         pumpkin = self.pumpkin
         if mode == "buttons":
             pumpkin.enter_buttons()
         else:
             with pumpkin.lock:
-                if pumpkin.player_mode != "show":
-                    pumpkin.start_show()  # does nothing if the show is playing already
+                if pumpkin.player_mode != "show" or from_top:
+                    pumpkin.start_show()  # carries on where it was (from the top with fromTop)
         self.send_json(200, {"ok": True, "mode": mode})
 
     # --- The show creator ---

@@ -17,7 +17,7 @@
 </header>
 <div id="status" class="status" role="status" aria-live="polite">Waking up the pumpkin…</div>
 <nav class="show-bar" aria-label="The show">
-  <button id="start-show" class="btn start-show" type="button">▶ Start the show</button>
+  <button id="start-show" class="btn start-show" type="button">▶ Resume the show</button>
   <a class="btn secondary" href="/show">✏️ Set up the show</a>
 </nav>
 <p id="wifi-notice" class="notice" hidden></p>
@@ -89,11 +89,11 @@ setTimeout(function () {
   // it's hidden: a phone put away in a pocket lets the pumpkin go back to its show.
 
   let HEARTBEAT_MS = 30000; // until /api/status says (kButtonsHeartbeatMs in the firmware)
-  let wantButtons = true;    // false after "Start the show", until the next press
+  let wantButtons = true;    // false after "Resume the show", until the next press
   let heartbeatTimer = 0;
   let buttonsOkAt = 0;       // when the pumpkin last agreed to buttons mode (a heartbeat or a press)
   let sawButtons = false;    // the news has said "buttons mode" since then
-  let modeQueue = Promise.resolve(); // mode requests go one at a time, so a late heartbeat can't undo "Start the show"
+  let modeQueue = Promise.resolve(); // mode requests go one at a time, so a late heartbeat can't undo "Resume the show"
 
   const onScreen = () => document.visibilityState === 'visible';
 
@@ -103,7 +103,7 @@ setTimeout(function () {
     return request;
   }
 
-  // Start (or restart) the 30 s countdown to the next heartbeat; none while hidden or after "Start the show"
+  // Start (or restart) the 30 s countdown to the next heartbeat; none while hidden or after "Resume the show"
   function scheduleHeartbeat() {
     clearTimeout(heartbeatTimer);
     heartbeatTimer = wantButtons && onScreen() ? setTimeout(heartbeat, HEARTBEAT_MS) : 0;
@@ -114,7 +114,7 @@ setTimeout(function () {
     if (!wantButtons || !onScreen()) return;
     try {
       await modeQueue;
-      if (!wantButtons) return; // "Start the show" got in first
+      if (!wantButtons) return; // "Resume the show" got in first
       await askMode('buttons');
       buttonsOkAt = Date.now();
     } catch (e) { /* the next one may work; the status line says if the pumpkin's gone */ }
@@ -209,7 +209,7 @@ setTimeout(function () {
     scheduleHeartbeat(); // stops it
     outline(startShow);
     expect((player) => player.mode === 'show');
-    setStatus('🎃 Starting the show…');
+    setStatus('🎃 Resuming the show…');
     try {
       await askMode('show');
     } catch (e) {
@@ -224,11 +224,18 @@ setTimeout(function () {
   });
 
   // What the pumpkin is doing, from server-sent events (or polling)
+  // What the pumpkin is playing (effect or words), so speech from the last one can stop when the next starts
+  let playingKey = '';
+
   function showPlayer(player) {
     if (!player) return;
+    const key = player.mode === 'buttons' && (player.effectId || player.label) ? player.effectId + '|' + player.label : '';
+    if (key && key !== playingKey) quiet(); // something new: the last one's words and sounds stop
+    playingKey = key;
     if (pending && Date.now() - pending.at < 2000 && !pending.test(player)) return;
     pending = null;
     noticeMode(player);
+    startShow.disabled = player.mode === 'show'; // it's playing already
     if (player.mode === 'show') {
       outline(startShow);
       setStatus(playerText(player, effects));
@@ -272,29 +279,30 @@ setTimeout(function () {
     voicePicker.hidden = false;
   }
 
-  // A hiss ("Shhhhhhh!", the creeper's and the TNT's fuse): phone voices clip it to a quick "sh" or stutter
-  // it, so the phone makes a real fizz instead, until the next words (the "Boom!") or HISS_MAX_MS
-  const HISS_WORD = /^\s*s*h+[!.]*\s*$|^\s*s{3,}[!.]*\s*$/i;
-  const HISS_MAX_MS = 4000;
+  // Sound words: the creeper's "Hissss!" and the TNT's "Fizzzz!". Phone voices clip or stutter long
+  // sounds, so the phone makes them instead (Web Audio, from white noise), until the next words (the
+  // "Boom!") or SOUND_MAX_MS. Without Web Audio the voice just says the word.
+  const SOUND_WORDS = [
+    { test: /^\s*(hiss+|s*h{3,})[!.]*\s*$/i, play: creeperHiss },
+    { test: /^\s*fiz{2,}[!.]*\s*$/i, play: tntFizz },
+  ];
+  const SOUND_MAX_MS = 4000;
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   let audio = null;
-  let hiss = null; // {source, gain} while one plays
+  let sound = null; // {sources, gain} while one plays
 
   function stopHiss() {
-    if (!hiss) return;
-    const { source, gain } = hiss;
-    hiss = null;
+    if (!sound) return;
+    const { sources, gain } = sound;
+    sound = null;
     const now = audio.currentTime;
     gain.gain.cancelScheduledValues(now);
     gain.gain.setTargetAtTime(0, now, 0.03);
-    source.stop(now + 0.2);
+    sources.forEach((source) => source.stop(now + 0.2));
   }
 
-  function playHiss() {
-    if (!audio) return;
-    stopHiss();
-    // Two seconds of white noise, looped, through a filter that leaves the "sss" part, getting louder as the
-    // fuse burns down
+  // Two seconds of white noise, looped
+  function noise() {
     const rate = audio.sampleRate;
     const buffer = audio.createBuffer(1, rate * 2, rate);
     const data = buffer.getChannelData(0);
@@ -302,28 +310,70 @@ setTimeout(function () {
     const source = audio.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
+    return source;
+  }
+
+  function startSound(sources, gain) {
+    const now = audio.currentTime;
+    gain.connect(audio.destination);
+    sources.forEach((source) => { source.start(now); source.stop(now + SOUND_MAX_MS / 1000); });
+    sound = { sources, gain };
+    sources[0].onended = () => { if (sound && sound.sources === sources) sound = null; };
+  }
+
+  // The creeper: a smooth, breathy hiss that rises in pitch and gets louder as it's about to go
+  function creeperHiss() {
+    const end = audio.currentTime + SOUND_MAX_MS / 1000;
+    const source = noise();
     const filter = audio.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 4500;
-    filter.Q.value = 0.7;
+    filter.Q.value = 1.4;
+    filter.frequency.setValueAtTime(2200, audio.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(4800, end);
     const gain = audio.createGain();
+    gain.gain.setValueAtTime(0.0001, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3, audio.currentTime + 0.2);
+    gain.gain.linearRampToValueAtTime(0.6, end);
+    source.connect(filter).connect(gain);
+    startSound([source], gain);
+  }
+
+  // The TNT: a lit fuse, high and thin, spitting sparks (random crackles on top)
+  function tntFizz() {
     const now = audio.currentTime;
+    const gain = audio.createGain();
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.15);
-    gain.gain.linearRampToValueAtTime(0.5, now + HISS_MAX_MS / 1000);
-    source.connect(filter).connect(gain).connect(audio.destination);
-    source.start(now);
-    source.stop(now + HISS_MAX_MS / 1000);
-    hiss = { source, gain };
-    source.onended = () => { if (hiss && hiss.source === source) hiss = null; };
+    gain.gain.exponentialRampToValueAtTime(0.35, now + 0.05);
+    // the steady fizz
+    const fizz = noise();
+    const high = audio.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 6000;
+    const fizzLevel = audio.createGain();
+    fizzLevel.gain.value = 0.35;
+    fizz.connect(high).connect(fizzLevel).connect(gain);
+    // the sparks: short bursts of mid-pitched noise at random moments
+    const crackle = noise();
+    const mid = audio.createBiquadFilter();
+    mid.type = 'bandpass';
+    mid.frequency.value = 2500;
+    mid.Q.value = 0.8;
+    const sparks = audio.createGain();
+    sparks.gain.setValueAtTime(0, now);
+    for (let t = now + 0.03; t < now + SOUND_MAX_MS / 1000; t += 0.02 + Math.random() * 0.07) {
+      sparks.gain.setValueAtTime(0.5 + Math.random() * 1.2, t);
+      sparks.gain.setTargetAtTime(0, t + 0.004, 0.008);
+    }
+    crackle.connect(mid).connect(sparks).connect(gain);
+    startSound([fizz, crackle], gain);
   }
 
   function speak(text) {
     if (!speech || !talk.checked || !text) return;
-    stopHiss(); // the next words (the "Boom!") end it
-    if (HISS_WORD.test(text) && audio) {
-      speech.cancel();
-      playHiss();
+    stopHiss(); // the next words (the "Boom!") end a sound
+    const soundWord = audio && SOUND_WORDS.find((word) => word.test.test(text));
+    if (soundWord) {
+      soundWord.play();
       return;
     }
     const utterance = new SpeechSynthesisUtterance(text);
@@ -332,11 +382,20 @@ setTimeout(function () {
       utterance.voice = voice;
       utterance.lang = voice.lang;
     }
-    if (speech.speaking || speech.pending) {
-      speech.cancel(); // newest words win
-      setTimeout(() => speech.speak(utterance), 60); // Safari can drop words spoken straight after cancel
-    } else {
-      speech.speak(utterance);
+    // Queued: one effect's words follow each other ("Hello. I'm an iron golem." then "Here's a flower for
+    // you!"). A new effect stops them (quiet(), from the status news). Safari can drop words spoken straight
+    // after a cancel, so those wait a moment.
+    const sinceCancel = Date.now() - cancelledAt;
+    if (sinceCancel < 80) setTimeout(() => speech.speak(utterance), 80 - sinceCancel);
+    else speech.speak(utterance);
+  }
+
+  let cancelledAt = 0;
+  function quiet() {
+    stopHiss();
+    if (speech && (speech.speaking || speech.pending)) {
+      speech.cancel();
+      cancelledAt = Date.now();
     }
   }
 

@@ -128,7 +128,7 @@ namespace
         }
         if (tnt)
         {
-            engine.say("Shhhhhhh!"); // a hiss: phone voices spell "Sssss" out letter by letter
+            engine.say("Fizzzz!"); // the button page plays a fizzing fuse for this word
             for (int i = 0; i < 8; i++)
                 showFor(engine, torch, (i % 2) ? S::tntFlash : S::tnt, 250);
             engine.say("BOOM!");
@@ -292,7 +292,7 @@ void creeperExplode(Engine &engine)
     const Frame &creeper = S::creeper;
     const Frame &flash = S::creeperFlash;
     showFor(engine, creeper, creeper, 1500);
-    engine.say("Shhhhhhhhhh!"); // the hiss (spelt so phone voices make the sound)
+    engine.say("Hissss!"); // the button page plays a real hiss for this word (phone voices clip "Shhhh")
     for (int i = 0; i < 10; i++)
     {
         const Frame &face = (i % 2) ? flash : creeper;

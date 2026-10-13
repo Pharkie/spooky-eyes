@@ -133,16 +133,16 @@ setTimeout(function () {
     const li = document.createElement('li');
     li.className = 'block';
     li.dataset.index = index;
+    // The grip is on the right, so a thumb scrolling the page down the left doesn't pick a block up
     const grip = document.createElement('button');
     grip.type = 'button';
     grip.className = 'grip';
     grip.setAttribute('aria-label', 'Drag to move block ' + number);
     grip.title = 'Drag to move (or use the arrow keys)';
-    const num = document.createElement('span'); // the block's number, on its grip
+    const num = document.createElement('span'); // the block's number
     num.className = 'num';
     num.setAttribute('aria-hidden', 'true');
     num.textContent = number;
-    grip.appendChild(num);
     const what = document.createElement('span');
     what.className = 'what';
     const emoji = document.createElement('span');
@@ -176,13 +176,7 @@ setTimeout(function () {
       emoji.textContent = fx ? fx.emoji : '❓';
       what.append(emoji, fx ? fx.label : block.id);
     }
-    const tools = document.createElement('span');
-    tools.className = 'tools';
-    tools.append(
-      tool('up', '↑', 'Move block ' + number + ' up', index === 0),
-      tool('down', '↓', 'Move block ' + number + ' down', index === blocks.length - 1),
-      tool('delete', '✕', 'Delete block ' + number, false));
-    li.append(grip, what, tools, ...extra);
+    li.append(num, what, tool('delete', '🗑️', 'Delete block ' + number, false), grip, ...extra);
     return li;
   }
 
@@ -223,14 +217,7 @@ setTimeout(function () {
   function focusTool(index, act) {
     const li = list.children[index];
     if (!li) return;
-    if (act === 'grip') {
-      li.querySelector('.grip').focus();
-      return;
-    }
-    let button = li.querySelector('[data-act=' + act + ']');
-    if (button.disabled) button = li.querySelector('[data-act=' + (act === 'up' ? 'down' : 'up') + ']');
-    if (button.disabled) button = li.querySelector('[data-act=delete]');
-    button.focus();
+    (act === 'grip' ? li.querySelector('.grip') : li.querySelector('[data-act=delete]')).focus();
   }
 
   function highlight(li, cls, ms) {
@@ -308,10 +295,7 @@ setTimeout(function () {
   list.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-act]');
     if (!button) return;
-    const index = Number(button.closest('li').dataset.index);
-    if (button.dataset.act === 'up') moveTo(index, index - 1, 'up');
-    else if (button.dataset.act === 'down') moveTo(index, index + 1, 'down');
-    else remove(index);
+    remove(Number(button.closest('li').dataset.index));
   });
 
   // Typing saves a second after it stops, or as soon as the words box is left
@@ -417,7 +401,18 @@ setTimeout(function () {
 
   addWords.addEventListener('click', () => {
     const li = add({ type: 'words', text: '' });
-    if (li) li.querySelector('input').focus({ preventScroll: true });
+    if (!li) return;
+    li.querySelector('input').focus({ preventScroll: true });
+    // Once the keyboard is up (and the bottom bar out of the way), bring the new box into view
+    setTimeout(() => li.scrollIntoView({ block: 'center', behavior: smooth }), 400);
+  });
+
+  // While typing, the bottom bar hides: with the keyboard up it would sit right over the words box
+  list.addEventListener('focusin', (event) => {
+    if (event.target.matches('.words-input')) document.body.classList.add('typing');
+  });
+  list.addEventListener('focusout', (event) => {
+    if (event.target.matches('.words-input')) document.body.classList.remove('typing');
   });
 
   function setPicker(open) {
@@ -554,7 +549,7 @@ setTimeout(function () {
     playButton.disabled = true;
     try {
       await settle();
-      await setMode('show');
+      await setMode('show', { fromTop: true }); // from the first block, to see the changes
       showNote(dirty() ? '🎃 Playing the last saved show.' : '🎃 The show is playing.');
     } catch (e) {
       showError(note, e);
