@@ -116,12 +116,18 @@ setTimeout(function () {
 
   // ---- The list of blocks ----
 
-  function tool(act, symbol, label, disabled) {
+  // A bin: a few white lines, its lid lifted a little
+  const BIN = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M4 7.6 19.6 5"/><path d="M9.6 6.4 9.3 4.7a1 1 0 0 1 .8-1.2l2.8-.5a1 1 0 0 1 1.2.8l.3 1.6"/>' +
+    '<path d="M6 10h12l-1 9.6a2 2 0 0 1-2 1.8H9a2 2 0 0 1-2-1.8z"/><path d="M10.2 13.5v4.5M13.8 13.5v4.5"/></svg>';
+
+  function tool(act, icon, label, disabled) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'tool' + (act === 'delete' ? ' del' : '');
     button.dataset.act = act;
-    button.textContent = symbol;
+    button.innerHTML = icon; // our own markup, never text from outside
     button.setAttribute('aria-label', label);
     button.title = label;
     button.disabled = disabled;
@@ -176,7 +182,7 @@ setTimeout(function () {
       emoji.textContent = fx ? fx.emoji : '❓';
       what.append(emoji, fx ? fx.label : block.id);
     }
-    li.append(num, what, tool('delete', '🗑️', 'Delete block ' + number, false), grip, ...extra);
+    li.append(num, what, tool('delete', BIN, 'Delete block ' + number, false), grip, ...extra);
     return li;
   }
 
