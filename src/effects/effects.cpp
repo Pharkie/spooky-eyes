@@ -4,6 +4,7 @@
 #include "effects/effects.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -648,6 +649,13 @@ void countdownBoo(Engine &engine)
     scrollMessage(engine, textFont, " BOO! ", 20);
 }
 
+void fruitMachine(Engine &engine)
+{
+    const uint32_t roll = engine.random(fruit_machine::kRolls);
+    const uint32_t pick = engine.random(fruit_machine::kPicks);
+    fruit_machine::play(engine, fruit_machine::spinFor(roll, pick));
+}
+
 // --- Words ---
 
 // The pumpkin's own name, e.g. "Jack's Pumpkin" (the old button page always scrolled one fixed name)
@@ -670,4 +678,247 @@ void trickOrTreat(Engine &engine)
 void happyHalloween(Engine &engine)
 {
     scrollMessage(engine, textFont, " Happy Halloween! ", 30);
+}
+
+// --- Inside the fruit machine ---
+
+namespace
+{
+    using fruit_machine::kSymbols;
+    using fruit_machine::Spin;
+    using fruit_machine::Symbol;
+
+    // The reels: the same symbols in the same order, but JACK on the left one and POT on the right
+    const Frame *const kLeftReel[kSymbols] = {&S::cherries, &S::bell, &S::bar, &S::melon, &S::doubleBar, &S::jack};
+    const Frame *const kRightReel[kSymbols] = {&S::cherries, &S::bell, &S::bar, &S::melon, &S::doubleBar, &S::pot};
+
+    // Each symbol is 8 rows tall, with 2 blank rows before the next one round the reel
+    constexpr int kReelPitch = 10;
+    constexpr uint32_t kSpinFrameMs = 35;
+
+    // A reel some rows into its spin. The symbols move down, so the next one comes in at the top; every
+    // kReelPitch rows a symbol fills the eye exactly (0 rows: the cherries).
+    Frame reelPicture(const Frame *const reel[], int rows)
+    {
+        const int symbol = floorDiv(rows, kReelPitch);
+        const int down = floorMod(rows, kReelPitch);
+        const Frame &leaving = *reel[floorMod(symbol, kSymbols)];
+        const Frame &coming = *reel[floorMod(symbol + 1, kSymbols)];
+        return overlay(lower(leaving, down), lower(coming, down - kReelPitch));
+    }
+
+    // How a reel spins: at full speed, then slowing down evenly to a crawl as it reaches its symbol,
+    // then a wobble as it lands
+    struct ReelSpin
+    {
+        Symbol symbol;  // where it lands
+        int speed;      // rows a frame at full speed
+        int slowFrames; // frames it takes to slow down
+        int landFrame;  // the frame it reaches its symbol
+    };
+
+    // How fast a reel is crawling when it reaches its symbol, in rows a frame
+    constexpr double kCrawlSpeed = 0.5;
+
+    // The wobble as a reel lands: rows past its symbol on each frame from landFrame on. It clunks a
+    // little too far, bounces back the other way, then sits still.
+    constexpr int kWobble[] = {0, 1, 2, 2, 1, 0, -1, -1, 0};
+    constexpr int kWobbleFrames = static_cast<int>(std::size(kWobble));
+
+    // Rows still to go when a reel is this many frames from its symbol, slowing down evenly from full
+    // speed to kCrawlSpeed
+    int slowingRows(const ReelSpin &reel, int frames)
+    {
+        const double extra = (reel.speed - kCrawlSpeed) * frames * frames / (2.0 * reel.slowFrames);
+        return static_cast<int>(std::lround(kCrawlSpeed * frames + extra));
+    }
+
+    // How many rows into its spin a reel is on a frame (see reelPicture()). Worked out backwards from
+    // where it lands, so it always lands exactly on its symbol, whatever the speeds.
+    int reelRows(const ReelSpin &reel, int frame)
+    {
+        const int landing = static_cast<int>(reel.symbol) * kReelPitch;
+        const int toGo = reel.landFrame - frame; // frames until it reaches its symbol
+        if (toGo <= 0)
+            return landing + kWobble[std::min(-toGo, kWobbleFrames - 1)];
+        if (toGo <= reel.slowFrames)
+            return landing - slowingRows(reel, toGo);
+        return landing - slowingRows(reel, reel.slowFrames) - reel.speed * (toGo - reel.slowFrames);
+    }
+
+    // The landed symbols flashing, brighter than usual
+    void flashSymbols(Engine &engine, const Spin &spin, int times)
+    {
+        const Frame &left = fruit_machine::picture(spin.left, false);
+        const Frame &right = fruit_machine::picture(spin.right, true);
+        for (int i = 0; i < times; i++)
+        {
+            engine.setBrightness(flashBrightness(engine));
+            showFor(engine, left, right, 250);
+            engine.setBrightness(engine.maxBright());
+            showFor(engine, S::empty, S::empty, 150);
+        }
+    }
+
+    // WIN! is too wide for one eye, so: WI on the left, N! on the right, WI again, then both together
+    void winWords(Engine &engine, uint32_t ms)
+    {
+        const Frame &wi = S::winLeft;
+        const Frame &n = S::winRight;
+        const SequenceStep steps[] = {{wi, S::empty, ms}, {S::empty, n, ms}, {wi, S::empty, ms}, {wi, n, ms * 3}};
+        for (const SequenceStep &step : steps)
+        {
+            engine.mouthRandomColour();
+            showFor(engine, step.left, step.right, step.ms);
+        }
+    }
+
+    // Coins (dots) rain down both eyes and pile up at the bottom. A coin that lands on another tumbles
+    // down beside it if there's room, so the pile spreads out like a heap of treasure.
+    void coinRain(Engine &engine, int frames)
+    {
+        Frame piles[2] = {};
+        Frame falling[2] = {};
+        for (int frame = 0; frame < frames; frame++)
+        {
+            for (int eye = 0; eye < 2; eye++)
+            {
+                Frame &pile = piles[eye];
+                Frame next{};
+                // Bottom row first, so a coin can land on one that has only just landed
+                for (int row = 7; row >= 0; row--)
+                {
+                    for (int col = 0; col < 8; col++)
+                    {
+                        if (!(falling[eye][row] & (0x80 >> col)))
+                            continue;
+                        // Down if it can, else down to one side (which side it tries first changes every
+                        // frame), else it stays where it is
+                        const uint8_t below = row < 7 ? pile[row + 1] | next[row + 1] : 0xff; // full at the bottom
+                        const int side = frame % 2 ? 1 : -1;
+                        bool moved = false;
+                        for (int to : {col, col + side, col - side})
+                        {
+                            if (to >= 0 && to < 8 && !(below & (0x80 >> to)))
+                            {
+                                next[row + 1] |= 0x80 >> to;
+                                moved = true;
+                                break;
+                            }
+                        }
+                        if (!moved)
+                            pile[row] |= 0x80 >> col;
+                    }
+                }
+                next[0] |= 0x80 >> engine.random(8); // a new coin at the top
+                falling[eye] = next;
+            }
+            if (frame % 4 == 0)
+                engine.mouthRandomColour();
+            showFor(engine, overlay(piles[0], falling[0]), overlay(piles[1], falling[1]), 40);
+        }
+    }
+
+    void win(Engine &engine, const Spin &spin)
+    {
+        engine.say("You win!");
+        flashSymbols(engine, spin, 3);
+        winWords(engine, 400);
+        sparkles(engine, 15);
+        showFor(engine, S::winLeft, S::winRight, 1000);
+    }
+
+    void lose(Engine &engine)
+    {
+        engine.say("Oh no! Try again!");
+        for (int i = 0; i < 2; i++)
+            sequence(engine, {{S::loseLeft, S::loseRight, 350}, {S::empty, S::empty, 150}});
+        showFor(engine, S::loseLeft, S::loseRight, 600);
+        // The letters droop, then fall off the bottom, faster and faster
+        for (int rows = 1; rows <= 8; rows++)
+            showFor(engine, lower(S::loseLeft, rows), lower(S::loseRight, rows), 240 / rows);
+        // Sad eyes, with a sigh
+        const Frame &sadLeft = E::sadLeft;
+        const Frame &sadRight = E::sadRight;
+        sequence(engine,
+                 {{sadLeft, sadRight, 700}, {lower(sadLeft, 1), lower(sadRight, 1), 500}, {sadLeft, sadRight, 300}});
+    }
+
+    void jackpot(Engine &engine)
+    {
+        engine.say("Jackpot!");
+        for (int i = 0; i < 2; i++)
+            sequence(engine, {{S::jack, S::empty, 300}, {S::empty, S::pot, 300}});
+        engine.setBrightness(flashBrightness(engine));
+        showFor(engine, S::jack, S::pot, 800);
+        engine.setBrightness(engine.maxBright());
+        scrollMessage(engine, textFont, " JACKPOT WIN! ", 20);
+        coinRain(engine, 40);
+        engine.setBrightness(flashBrightness(engine));
+        sparkles(engine, 10, 1);
+        engine.setBrightness(engine.maxBright());
+        winWords(engine, 300);
+        explode(engine);
+    }
+}
+
+namespace fruit_machine
+{
+    Spin spinFor(uint32_t roll, uint32_t pick)
+    {
+        constexpr int kCanWin = kSymbols - 1; // every symbol but JACK and POT
+        pick %= kPicks;
+        if (roll == 0)
+            return {Result::Jackpot, Symbol::JackOrPot, Symbol::JackOrPot};
+        if (roll <= 3)
+        {
+            const Symbol both = static_cast<Symbol>(pick % kCanWin);
+            return {Result::Win, both, both};
+        }
+        // Any symbol on the left (JACK with a fruit is a near miss), and any of the other 5 on the right
+        const int left = static_cast<int>(pick) / kCanWin;
+        const int right = (left + 1 + static_cast<int>(pick) % kCanWin) % kSymbols;
+        return {Result::Lose, static_cast<Symbol>(left), static_cast<Symbol>(right)};
+    }
+
+    const Frame &picture(Symbol symbol, bool rightReel)
+    {
+        const int i = static_cast<int>(symbol) % kSymbols;
+        return rightReel ? *kRightReel[i] : *kLeftReel[i];
+    }
+
+    void spinReels(Engine &engine, const Spin &spin)
+    {
+        // Both reels start together, the right one faster. The left one lands first, about 2 s in. The
+        // right one spins on, then slows down and lands a second or so later, and more slowly still if
+        // the left one shows JACK: will it be POT?
+        const bool tease = spin.left == Symbol::JackOrPot;
+        const ReelSpin left = {spin.left, 2, 30, 54}; // lands about 1.9 s in
+        const ReelSpin right = {spin.right, 3, tease ? 54 : 30, tease ? 114 : 90}; // 4 s or 3.2 s in
+        for (int frame = 0; frame < right.landFrame + kWobbleFrames; frame++)
+        {
+            if (frame % 6 == 0)
+                engine.mouthRandomColour(); // the machine's flashing lights
+            showFor(engine, reelPicture(kLeftReel, reelRows(left, frame)),
+                    reelPicture(kRightReel, reelRows(right, frame)), kSpinFrameMs);
+        }
+    }
+
+    void play(Engine &engine, const Spin &spin)
+    {
+        spinReels(engine, spin);
+        engine.wait(500);
+        switch (spin.result)
+        {
+        case Result::Win:
+            win(engine, spin);
+            break;
+        case Result::Jackpot:
+            jackpot(engine);
+            break;
+        case Result::Lose:
+            lose(engine);
+            break;
+        }
+    }
 }
