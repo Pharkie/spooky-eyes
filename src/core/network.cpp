@@ -30,8 +30,9 @@
 //   its access points one by one), and log every step (onWifiEvent())
 // - Scribe's handleTestWiFi() (check the password before saving it) runs here on the network task,
 //   under scanMutex, while the web server only asks and polls (runWifiTest())
-// - nobody has used the pumpkin for kWifiIdleOffMs: switch the WiFi off to save batteries, until a
-//   restart (saveBatteries())
+// - on its own WiFi (setup, or the doorstep fallback) with nobody using it for kWifiIdleOffMs: switch the
+//   WiFi off to save batteries, until a restart (saveBatteries()). On the home WiFi it stays joined, dozing
+//   between messages (the driver's modem sleep), so the page always works when someone comes back.
 // - the country is set to GB, channels 1-13, so routers on 12 and 13 are found
 // - a brand-new pumpkin starts its setup WiFi on the channel of the strongest network around (most likely
 //   the home WiFi), so checking the home WiFi rarely moves it to another channel and drops phones
@@ -1170,8 +1171,7 @@ namespace
             case Role::Starting:
                 break;
             case Role::Home:
-                keepConnected(now);
-                saveBatteries();
+                keepConnected(now); // stays on: modem sleep is cheap, and the page always works
                 break;
             case Role::Setup:
                 captive_dns::serve();

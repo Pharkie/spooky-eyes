@@ -1033,7 +1033,7 @@ class Handler(BaseHTTPRequestHandler):
                 pumpkin.mouth_led = mouth
             if saver is not None:
                 pumpkin.wifi_saver = saver
-                print(f"  (save batteries {'on: the board switches WiFi off after ' + str(WIFI_IDLE_OFF_MINUTES) + ' minutes without requests' if saver else 'off'})")
+                print(f"  (save batteries {'on: the board switches its own WiFi off after ' + str(WIFI_IDLE_OFF_MINUTES) + ' minutes unused (home WiFi stays on)' if saver else 'off'})")
             settings = pumpkin.settings()
         self.send_json(200, {"ok": True, "message": "Saved", "settings": settings})
 
