@@ -221,7 +221,7 @@
       <p><b>Spooky Pumpkin WiFi gone?</b> Unused for 10 minutes, it switches off to save batteries: press BOOT.</p>
       <p><b>Page won’t open later?</b> Check your phone is on your WiFi, or switch Spooky Eyes off and on.</p>
       <p><b>On the doorstep?</b> Out of reach of your WiFi for 3 minutes, Spooky Eyes brings back the Spooky
-        Pumpkin WiFi: join and open pumpkin.local. Back in range, Spooky Eyes rejoins your WiFi.</p>
+        Pumpkin WiFi: join and open pumpkin.local. Back indoors? Switch off and on to rejoin your WiFi.</p>
       <p><b>BOOT button</b> (on the board): press to repeat the address; hold 5 seconds to forget your WiFi.</p>
       <p><b>No WiFi to hand?</b> On the setup page, “just use the buttons” works on Spooky Eyes’ own WiFi.</p>
     </div>
@@ -316,7 +316,7 @@ function drawDiagram() {
   const eyePin = name => ({ x: E.pinX, y: eyeY(name) });
 
   // ---- the mouth LED, on its side between them: dome to the left, legs to the right, the G leg level with its pin ----
-  const M = { x: 55, pitch: 3.3, body: 12, d: 9.5, flange: 1.4, leg: 7, longer: 3 };
+  const M = { x: 55, pitch: 3.3, body: 12, d: 9.5, flange: 1.4, leg: 7, longer: 9.5 }; // the + leg: long, with its label on it
   M.legX = M.x + M.body + M.flange;                // where the legs leave the LED
   const legY = name => {
     const i = LED_LEGS.indexOf(name);
@@ -499,10 +499,17 @@ function drawDiagram() {
                "stroke-width": 0.3 }, led);
   [["#e53935", -1.3, 0], ["#43a047", 0, 1.5], ["#1e88e5", 1.3, 0]].forEach(([fill, dy, dx]) =>
     el("circle", { cx: M.x + rr + 1.6 + dx, cy: M.yc + dy, r: 0.55, fill, opacity: 0.8 }, led));
-  LED_LEGS.forEach(n => {                         // each leg's name, on the leg
+  LED_LEGS.forEach(n => {                         // each leg's name, on the leg; the + leg's says it's the long one
     const x = M.legX + 3.2, y = legY(n);
-    el("rect", { x: x - 1.25, y: y - 1.3, width: 2.5, height: 2.6, rx: 0.5, fill: PAPER }, led);
-    el("text", { x, y: y + 0.95, "text-anchor": "middle", "font-family": SILK, "font-size": pt(8), "font-weight": 700, fill: INK }, led, n);
+    const label = el("text", { x, y: y + 0.95, "text-anchor": "middle", "font-family": SILK, "font-size": pt(8), "font-weight": 700,
+                               fill: INK }, led, n);
+    if (n === "+") {
+      label.setAttribute("text-anchor", "start");
+      label.setAttribute("x", x - 0.83);         // the + where the other legs' names are
+      el("tspan", { "font-size": pt(7), "font-weight": 400 }, label, " (long leg)");
+    }
+    const box = label.getBBox();
+    led.insertBefore(el("rect", { x: box.x - 0.6, y: y - 1.3, width: box.width + 1.2, height: 2.6, rx: 0.5, fill: PAPER }, led), label);
   });
 
   // ---- draw: the battery pack (3 x AA) ----

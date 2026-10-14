@@ -92,7 +92,8 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
   the setup WiFi too (phones look up .local names by multicast, which the captive DNS never sees). SuperMini boards need reduced
   WiFi transmit power to connect reliably. Our own captive-portal DNS (`captive_dns.cpp`) replaces
   Arduino's, which ignores queries with EDNS records. Losing home WiFi for 3 minutes (carried out to the
-  doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range. Before saving, the setup
+  doorstep) starts the setup WiFi; it rejoins home WiFi when it's back in range (unless the WiFi saver has
+  switched the setup WiFi off by then: the idle time starts when the setup WiFi does). Before saving, the setup
   page has the network task try the WiFi on the station side (`network::startWifiTest()`, `/api/wifi/test`)
   and only saves one that joined, or one the router didn't answer about in time ("unsure": the page offers
   Save anyway); skipped on home WiFi, where a check would drop the connection. Joins (`startJoin()`) go

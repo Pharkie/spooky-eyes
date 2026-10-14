@@ -61,8 +61,10 @@ const Pumpkin = (() => {
 
   // Why the pumpkin is on its own WiFi although home WiFi is saved. The firmware always says, so the
   // fallback is just in case.
+  // Why it's on its own WiFi, as a sentence (the firmware's reasons, e.g. Lost "Home", have no full stop)
   function setupReason(status) {
-    return status.setupReason || 'The pumpkin couldn’t use ' + status.homeSsid + '.';
+    const reason = status.setupReason || 'The pumpkin couldn’t use ' + status.homeSsid;
+    return /[.?!]$/.test(reason) ? reason : reason + '.';
   }
 
   // Live news from the pumpkin: handlers.status(playerStatus), handlers.say(words). If server-sent

@@ -3,7 +3,8 @@
 
     python3 scripts/build_release.py
 
-Writes to release/ (gitignored: attach the files to a GitHub release):
+Writes to release/ (gitignored; keep the files private: they include local/credits.h, so never attach them
+to a public GitHub release):
   spooky-pumpkin-eyes-<version>-full.bin  for a new board: bootloader + partitions + app, flashed at 0x0
   spooky-pumpkin-eyes-<version>-ota.bin   to update a running pumpkin from its Settings page
 
@@ -53,6 +54,9 @@ def flash_layout():
 
 def main():
     version = firmware_version()
+    # The pages first: in a fresh checkout, creating src/generated/ during the build changes PlatformIO's
+    # project checksum, and the metadata call below would then clean the build away
+    run([sys.executable, "scripts/embed_web.py"])
     run(["pio", "run", "-e", ENV])
     images, app = flash_layout()
 

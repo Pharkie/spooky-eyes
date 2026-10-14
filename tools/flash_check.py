@@ -16,6 +16,7 @@ log must show:
     [PLAYER] Eyes on, <N> effects (N from src/effects/registry.cpp)
     [WIFI] No home WiFi saved yet
     [WIFI] Setup WiFi "<kSetupApName>" is on
+    [MDNS] Web address http://<kHostname>.local
     [WEB] Web server on port 80
 and never a crash (Guru Meditation, Backtrace, abort()), a brownout, or a second start-up. Each check
 prints PASS or FAIL; the exit status is 1 if any failed. --save-log keeps the log.
@@ -60,6 +61,8 @@ def expected_lines(version):
         ("no home WiFi saved", r"\[WIFI\] No home WiFi saved yet"),
         (f'setup WiFi "{FIRMWARE["kSetupApName"]}" on', r'\[WIFI\] Setup WiFi "' + re.escape(FIRMWARE["kSetupApName"])
          + r'" is on'),
+        (f"{FIRMWARE['kHostname']}.local on the setup WiFi",
+         r"\[MDNS\] Web address http://" + re.escape(FIRMWARE["kHostname"]) + r"\.local"),
         (f"web server on port {FIRMWARE['kWebServerPort']}", rf"\[WEB\] Web server on port {FIRMWARE['kWebServerPort']}\b"),
     ]
 
@@ -135,6 +138,11 @@ def flash_and_read(bin_path, port, version, timeout, save_log):
     import pumpkin_serial  # pyserial, only needed here
 
     port = port or pumpkin_serial.find_port()
+    # One program at a time on the port: a forgotten logger once made esptool fail mid-write (boot loop)
+    users = subprocess.run(["lsof", "-t", port], capture_output=True, text=True).stdout.split()
+    if users:
+        print(f"  FAIL  {port} is open in another program (PIDs {', '.join(users)}): stop it first")
+        return False
     command = esptool_command(port, bin_path)
     print("$ " + " ".join(command), flush=True)
     if subprocess.run(command).returncode != 0:
@@ -180,6 +188,7 @@ def made_up_boot_log(version):
         "[WIFI] No home WiFi saved yet",
         f'[WIFI] Setup WiFi "{FIRMWARE["kSetupApName"]}" is on (password "{FIRMWARE["kSetupApPassword"]}"), '
         "page at http://192.168.4.1",
+        f"[MDNS] Web address http://{FIRMWARE['kHostname']}.local",
         f"[WEB] Web server on port {FIRMWARE['kWebServerPort']} (6 files)",
         "[PLAYER] Show: 24 blocks (the original)",
     ]

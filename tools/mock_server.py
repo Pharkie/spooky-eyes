@@ -25,7 +25,7 @@ saved show lives in memory and starts as the default show from src/effects/show.
 
 The setup page's WiFi check (POST then GET /api/wifi/test) takes WIFI_TEST_SECONDS, then: "That password
 didn't work" if the password is empty (for a WiFi that needs one) or has "wrong" in it, "unsure" (the router
-didn't answer in time: the page offers Save anyway) if it has "slow" in it, "Can't find ..." if the WiFi
+didn't answer in time: the page offers Connect anyway) if it has "slow" in it, "Can't find ..." if the WiFi
 isn't in the fake scan list, otherwise it passes. On home WiFi it's skipped, as on the board.
 MOCK_WIFI_DROP_SECONDS=8 pretends the phone drops off the setup WiFi for that long when a check starts
 (the radio changing channel): API requests get no answer meanwhile.
@@ -409,9 +409,9 @@ class Pumpkin:
 
     def setup_reason(self):
         if self.mode == "lost":
-            return f'Couldn\'t find "{self.wifi_ssid}" - is it a 2.4 GHz network, in range, with the router on?'
+            return f'Couldn\'t find "{self.wifi_ssid}" — is it a 2.4 GHz network, in range, with the router on?'
         if self.mode == "wrong":
-            return f'Couldn\'t join "{self.wifi_ssid}" - wrong password?'
+            return f'Couldn\'t join "{self.wifi_ssid}" — wrong password?'
         return ""
 
     # --- The BOOT button ---
@@ -638,7 +638,7 @@ class Pumpkin:
                                         "signal is weak, move the pumpkin closer to the router.")
             elif "slow" in (password or "").lower():
                 outcome = ("unsure", 0, f"{ssid} didn't answer in time, so the pumpkin couldn't tell whether the "
-                                        "password works. Save it anyway, and the pumpkin will try it when it restarts.")
+                                        "password works. Connect anyway, and the pumpkin will try it when it restarts.")
             else:
                 outcome = ("passed", max(n["rssi"] for n in seen) + random.randint(-3, 3), "")
             self.wifi_test = {"ssid": ssid, "started": time.time(), "status": "running", "rssi": 0, "reason": "",

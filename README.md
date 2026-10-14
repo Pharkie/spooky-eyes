@@ -19,7 +19,7 @@ Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
 1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network called "Spooky Pumpkin",
    and its eyes scroll how to join it. The password is `spookyeyes`.
 2. Join it on a phone, tablet or laptop. A setup page pops up (or open http://pumpkin.local or http://192.168.4.1): give the pumpkin a name (e.g.
-   "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Save.
+   "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Connect.
    The pumpkin tries the password first (up to 30 seconds) and only saves one that works. WiFi is
    optional: save just a name, or tap "just use the buttons" at the bottom, and the pumpkin keeps its own
    WiFi.
@@ -30,8 +30,9 @@ Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
 
 If the eyes say "Join WiFi..." again after that, the password was probably wrong: join the pumpkin's WiFi
 again and the setup page says what went wrong. If it loses home WiFi for 3 minutes (carried out to the
-doorstep, say) it makes its own network again, so you can still join it and open http://192.168.4.1; it
-rejoins home WiFi when it's back in range.
+doorstep, say) it makes its own network again, so you can still join it and open http://pumpkin.local or
+http://192.168.4.1. It rejoins home WiFi when it's back in range, unless its own WiFi has been unused for
+10 minutes and switched off by then: then switch it off and on.
 
 The BOOT button on the board: a quick press scrolls the address again (and unlocks firmware updates for 5
 minutes); hold it for 5 seconds to make it forget the home WiFi. If the eyes say "New batteries please",
@@ -48,9 +49,9 @@ pumpkin off and on. You can turn this off in Settings ("Save batteries").
 |---|---|
 | + power (battery pack + and eyes VCC) | 5V |
 | − ground (battery pack − and eyes GND) | G |
-| Eyes DIN | 7 |
-| Eyes CLK | 6 |
-| Eyes CS | 5 |
+| Eyes DIN | 5 |
+| Eyes CS | 6 |
+| Eyes CLK | 7 |
 | Mouth LED long leg (+, common anode) | 3.3 |
 | Mouth LED red | 4 |
 | Mouth LED green | 3 |
@@ -120,7 +121,10 @@ What needs real phones and routers is in
 python3 scripts/build_release.py
 ```
 
-This writes two images to `release/` (attach them to a GitHub release rather than committing them):
+This writes two images to `release/` (gitignored). Keep them private, never on a public GitHub release:
+the release build includes `local/credits.h`, whose names aren't for the public repo. Tag the commit you
+flash (e.g. `git tag 2026.10.0`), and bump `FIRMWARE_VERSION` for every image handed out, so a pumpkin's
+Settings page can show that an update worked.
 
 - `spooky-pumpkin-eyes-<version>-full.bin`: for a new board, flashed at address 0x0.
 - `spooky-pumpkin-eyes-<version>-ota.bin`: to update a pumpkin that's already running, from its Settings

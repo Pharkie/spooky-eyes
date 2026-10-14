@@ -27,7 +27,7 @@
 
   <p class="notice" id="current" hidden></p>
   <div class="notice problem" id="reason" role="alert" hidden>
-    <b></b><br>Check the WiFi name and password below, then save again.
+    <b></b><br>Check the WiFi name and password below, then connect again.
   </div>
   <form id="setup" novalidate>
     <div class="card">
@@ -60,7 +60,7 @@
       <p id="check" class="check" role="status" hidden></p>
     </div>
 
-    <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you save. It proves you’re holding the pumpkin.</p>
+    <p class="notice" id="boot-hint" hidden>👆 Press the small BOOT button on the pumpkin’s board before you connect. It proves you’re holding the pumpkin.</p>
     <p id="error" class="error" role="alert"></p>
     <button type="submit" id="save" class="btn wide">Connect</button>
     <p class="hint center" id="play-now" style="margin-top:28px" hidden>
@@ -346,7 +346,7 @@ setTimeout(function () {
     showCheck('✓ Joined ' + ssid + ' (' + signalWords(result.rssi).toLowerCase() + ' signal)', 'ok');
     if (!hasPassed(chosenSsid(), password.value)) {
       // Changed while it was checking: check what's there now
-      showMessage(errorEl, 'The WiFi details changed while the pumpkin was checking. Tap Save again.', 'error');
+      showMessage(errorEl, 'The WiFi details changed while the pumpkin was checking. Tap Connect again.', 'error');
       return false;
     }
     return true;
@@ -374,29 +374,34 @@ setTimeout(function () {
         $('done-hint').hidden = false;
       }
       if (waited > 180000) return;
+      // Ask this address first: as pumpkin.local it finds the pumpkin on either WiFi; as 192.168.4.1 it
+      // answers only if the pumpkin is back on its own WiFi (it couldn't join)
+      const status = await ask('/api/status');
+      // Only answers from after the restart count (before it, it's still on its old WiFi)
+      const restarted = status && status.uptime * 1000 < waited;
+      if (restarted && status.mode === 'connected') { location.href = home; return; }
+      // Restarted but couldn't join (it's back on its own WiFi): the setup page says why
+      if (restarted && status.mode === 'setup') { location.href = '/setup'; return; }
+      // From 192.168.4.1, pumpkin.local is another site: all we can tell is that it answers
+      if (!sameOrigin && !status && (await ask(home + 'api/status', 'no-cors'))) { location.href = home; return; }
+      setTimeout(attempt, 2000);
+    };
+    // A GET with a 3 s limit: the reply's JSON (true for no-cors, which can't be read), or null
+    const ask = async (url, mode) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 3000);
       try {
-        if (sameOrigin) {
-          // pumpkin.local: ask it, and go once it's on the WiFi (not still on its own, before restarting)
-          const reply = await fetch('/api/status', { cache: 'no-store', signal: controller.signal });
-          const status = reply.ok ? await reply.json() : {};
-          // Only answers from after the restart count (before it, it's still on its old WiFi)
-          const restarted = status.uptime * 1000 < waited;
-          if (restarted && status.mode === 'connected') { location.href = home; return; }
-          // Restarted but couldn't join (it's back on its own WiFi): the setup page says why
-          if (restarted && status.mode === 'setup') { location.href = '/setup'; return; }
-        } else {
-          // Opened at 192.168.4.1: pumpkin.local is another site, so all we can tell is that it answers
-          await fetch(home + 'api/status', { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
-          location.href = home;
-          return;
-        }
-      } catch (e) { /* not back yet */ } finally { clearTimeout(timer); }
-      setTimeout(attempt, 2000);
+        const reply = await fetch(url, { mode: mode || 'cors', cache: 'no-store', signal: controller.signal });
+        if (mode === 'no-cors') return true;
+        return reply.ok ? await reply.json() : null;
+      } catch (e) {
+        return null; // not there (yet)
+      } finally {
+        clearTimeout(timer);
+      }
     };
-    // The restart comes kWifiSavedRestartDelayMs (3 s) after the save. pumpkin.local answers from before
-    // it are told apart by the uptime; from 192.168.4.1 they can't be, so start once it has gone.
+    // The restart comes kWifiSavedRestartDelayMs (3 s) after the save. Answers from before it are told
+    // apart by the uptime, but pumpkin.local's (from 192.168.4.1) can't be, so start then once it's gone.
     setTimeout(attempt, sameOrigin ? 2000 : 5000);
   }
 
@@ -461,7 +466,7 @@ setTimeout(function () {
     // No confirm() here: captive-portal browsers don't always show pop-ups
     if (!pass && (!selected || selected.secure) && !warnedNoPassword) {
       warnedNoPassword = true;
-      showMessage(errorEl, 'No password? Most WiFi needs one. Tap Save again to carry on without.', 'error');
+      showMessage(errorEl, 'No password? Most WiFi needs one. Tap Connect again to carry on without.', 'error');
       password.focus();
       return;
     }
@@ -508,7 +513,7 @@ setTimeout(function () {
       $('boot-hint').hidden = !status.wifiNeedsBoot;
       if (status.mode === 'connected') {
         const current = $('current');
-        current.textContent = 'The pumpkin is on ' + status.homeSsid + ' now. Choosing another WiFi restarts it.';
+        current.textContent = 'The pumpkin is on ' + status.homeSsid + ' now. Choosing another WiFi restarts it (it can’t check the password first).';
         current.hidden = false;
         $('back').href = '/settings';
       } else if (status.homeWifiOutOfReach) {

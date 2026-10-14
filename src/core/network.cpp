@@ -777,13 +777,17 @@ namespace
     }
 
     // Home WiFi gone for kLostWifiFallbackMs: switch to the setup WiFi so phones nearby can still reach
-    // the pumpkin. lookForHomeWifi() brings it back (by restarting) once the home WiFi is in range again.
+    // the pumpkin. lookForHomeWifi() brings it back (by restarting) once the home WiFi is in range again,
+    // unless the WiFi saver has switched the setup WiFi off by then (then only a restart does).
     void fallBackToSetupWifi()
     {
         LOG("WIFI", "No \"%s\" for %lu minutes: starting the setup WiFi", savedSsid.c_str(),
             static_cast<unsigned long>(kLostWifiFallbackMs / 60000));
         MDNS.end();
         setRegisteredMdnsName("");
+        // The idle time starts now: on the home WiFi nobody's use was noted, and an old time would switch
+        // the new setup WiFi off at the next saveBatteries()
+        lastActivityMs = millis();
         setReason(Reason::Lost, "Lost \"" + savedSsid + "\"");
         if (startSetupAP(homeHint.known ? homeHint.channel : 0))
         {
@@ -1028,7 +1032,7 @@ namespace
                 started ? reasonText(why) : "couldn't start", tookMs);
             finishWifiTest(network::WifiTestStatus::Unsure, 0,
                            ssid + " didn't answer in time, so the pumpkin couldn't tell whether the password "
-                                  "works. Save it anyway, and the pumpkin will try it when it restarts.");
+                                  "works. Connect anyway, and the pumpkin will try it when it restarts.");
         }
     }
 
