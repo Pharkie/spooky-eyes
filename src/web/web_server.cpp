@@ -203,6 +203,7 @@ namespace web
             response->addHeader("Content-Encoding", "gzip");
             response->addHeader("ETag", asset.etag);
             response->addHeader("Cache-Control", "no-cache");
+            response->addHeader("X-Frame-Options", "DENY"); // no other site can show a page in a frame
             request->send(response);
         }
 
@@ -268,10 +269,33 @@ namespace web
             {
                 return true;
             }
+            if (host == String(kHostname) + ".local")
+            {
+                return true; // even before mDNS has registered the name
+            }
             String mdns = network::mdnsHostname();
             mdns.toLowerCase();
             return mdns.length() > 0 && host == mdns + ".local";
         }
+
+        // Off the setup WiFi, a request for another website's name is refused (421). A web page elsewhere can
+        // point its own name at the pumpkin's address ("DNS rebinding") to get past the browser's same-site
+        // rule, and then send the X-Pumpkin header too; the Host header still gives it away.
+        class ForeignHostHandler : public AsyncWebHandler
+        {
+        public:
+            bool canHandle(AsyncWebServerRequest *request) override
+            {
+                return !network::isSetupAP() && !isOurHost(request->host());
+            }
+
+            void handleRequest(AsyncWebServerRequest *request) override
+            {
+                LOG("WEB", "%s %s for \"%s\" -> 421 (another website's name)", request->methodToString(),
+                    request->url().c_str(), request->host().c_str());
+                request->send(421, "text/plain", "This isn't the pumpkin's address. Open http://pumpkin.local");
+            }
+        };
 
         // Checked first: notes that someone's using the pumpkin, then lets the other handlers have the
         // request. The one place requests are counted, so the WiFi stays on while they come (a firmware
@@ -352,8 +376,9 @@ namespace web
 
     void begin()
     {
-        server.addHandler(new ActivityHandler());      // first two, so they see every request
+        server.addHandler(new ActivityHandler());      // first three, so they see every request
         server.addHandler(new CaptivePortalHandler());
+        server.addHandler(new ForeignHostHandler());
         addPageRoutes();
         registerApiRoutes(server);
         registerShowRoutes(server);

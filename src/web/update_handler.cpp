@@ -14,6 +14,8 @@
 
 namespace web
 {
+    constexpr const char *kUpdateNeedsHomeWifi = "Firmware updates only work when the pumpkin is on your home WiFi.";
+
     namespace
     {
         // Progress of one upload. Lives in the request's _tempObject, which the library free()s.
@@ -106,6 +108,11 @@ namespace web
             if (updateFinished)
             {
                 fail(state, "The pumpkin already has the new firmware and is restarting. Wait for it to come back.");
+                return state;
+            }
+            if (network::isSetupAP())
+            {
+                fail(state, kUpdateNeedsHomeWifi); // reported as a 403 when the request completes
                 return state;
             }
             if (!boot_button::unlocked())
@@ -227,6 +234,18 @@ namespace web
             if (!hasCsrfHeader(request))
             {
                 sendError(request, 403, "Missing X-Pumpkin header");
+                return;
+            }
+            // Never on its own WiFi: anyone nearby can join that (its password is on the guide), and a BOOT
+            // press there (to repeat the address, say) would let them install firmware that reads the
+            // saved WiFi password
+            if (network::isSetupAP())
+            {
+                if (owner)
+                {
+                    uploadOwner = nullptr;
+                }
+                sendError(request, 403, kUpdateNeedsHomeWifi);
                 return;
             }
             if ((state != nullptr && state->needsBoot) || (state == nullptr && !boot_button::unlocked()))

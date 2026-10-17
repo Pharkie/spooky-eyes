@@ -1,4 +1,4 @@
-// The saved show, in LittleFS on min_spiffs.csv's spare 128 KB "spiffs" partition (see show_store.h).
+// The saved show, in LittleFS on the 116 KB "spiffs" partition (partitions.csv; see show_store.h).
 // The file holds the same blocks as the web API:
 //   {"version":1,"blocks":[{"type":"effect","id":"creeper"},{"type":"words","text":"Happy Halloween!"}]}
 //
@@ -25,7 +25,7 @@ namespace show_store
 {
     namespace
     {
-        constexpr const char *kPartitionLabel = "spiffs"; // the name in min_spiffs.csv
+        constexpr const char *kPartitionLabel = "spiffs"; // the name in partitions.csv
         constexpr const char *kMountPoint = "/littlefs";
         constexpr uint8_t kMaxOpenFiles = 5;
         constexpr const char *kShowPath = "/show.json";

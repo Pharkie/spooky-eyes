@@ -24,9 +24,14 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
   `src/core/text.h`. Don't re-implement them elsewhere.
 - Every restart goes through `firmware::restart()`. A firmware update is only kept after running 30 s
   without crashing; otherwise the bootloader rolls back.
-- Every POST from the pages carries the `X-Pumpkin: 1` header (cheap CSRF protection). Risky actions
-  (firmware update; WiFi, settings and show changes while strangers could be on the setup WiFi) also need a
-  short BOOT press in the last 5 minutes (`boot_button::unlocked()`). The buttons and words stay open.
+- Every POST from the pages carries the `X-Pumpkin: 1` header (cheap CSRF protection), and off the setup
+  WiFi a request for another website's name gets 421 (DNS rebinding; `ForeignHostHandler`). Risky actions
+  (firmware update; WiFi, settings, show changes and restarts while strangers could be on the setup WiFi)
+  also need a short BOOT press in the last 5 minutes (`boot_button::unlocked()`), and firmware updates are
+  refused on the setup WiFi altogether. The buttons and words stay open.
+- The home WiFi's name and password live in their own NVS partition ("wifi", `partitions.csv`), erased
+  whole when they're forgotten or changed: NVS only marks removed entries, so the old password would stay
+  readable in flash. They're never logged or returned by the API.
 - The repo is public: no real people's names in it. Credits with names go in `local/credits.h` (gitignored,
   in the main checkout where releases are built), e.g. `#define MINECRAFT_BY "..."` for the Minecraft heading
   (`groupTitle()` in `src/effects/registry.cpp`).

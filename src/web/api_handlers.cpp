@@ -294,6 +294,11 @@ namespace web
         // POST /api/restart
         void handleRestart(AsyncWebServerRequest *request, JsonDocument &)
         {
+            // On the doorstep anyone on the setup WiFi could restart it over and over
+            if (strangersMayBeConnected() && !requireBootPress(request))
+            {
+                return;
+            }
             sendOk(request, "The pumpkin is restarting. It'll be back in about 20 seconds.");
             restartSoon("Restart button on the Settings page");
         }

@@ -8,6 +8,9 @@ const Pumpkin = (() => {
   // GET or POST some JSON. Every POST carries "X-Pumpkin: 1": the pumpkin refuses POSTs without it,
   // which stops other websites sending it requests (cheap CSRF protection). Throws an Error with a
   // message worth showing; error.needsBoot is true if the BOOT button has to be pressed first.
+  // This script arrived: a later stall may reload the page by itself again (see the pages' first script)
+  try { sessionStorage.removeItem('reloaded ' + location.pathname); } catch (e) { /* no storage */ }
+
   async function request(path, { method = 'GET', body, timeout = 10000 } = {}) {
     const init = { method, headers: {}, cache: 'no-store' };
     if (method !== 'GET') {

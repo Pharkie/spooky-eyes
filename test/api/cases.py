@@ -253,6 +253,7 @@ SKIPPED = {"skipped": bool, "reason": str}
 
 # Error texts used more than once (the firmware's words)
 BOOT_PRESS = "Press the small BOOT button on the pumpkin's board, then try again"
+UPDATE_HOME_WIFI = "Firmware updates only work when the pumpkin is on your home WiFi."
 NO_HEADER = "Missing X-Pumpkin header"
 BAD_JSON = "That request didn't make sense (bad JSON)"
 NOT_JSON = "The pumpkin couldn't read that request (it expects JSON)"
@@ -284,6 +285,10 @@ def no_route(method, path):
 TO_BUTTONS = r"^http://[^/]+/$"
 TO_SETUP = r"^http://[^/]+/setup$"
 PORTAL = by_mode(lost=TO_BUTTONS, default=TO_SETUP)
+# Firmware updates: refused outright on the pumpkin's own WiFi, otherwise they need BOOT
+UPDATE_REFUSED = by_mode(home=BOOT_ERROR, off=BOOT_ERROR, default=ERROR)
+UPDATE_REFUSED_EXPECT = by_mode(home={"needsBoot": True}, off={"needsBoot": True}, default={})
+UPDATE_REFUSED_ERROR = by_mode(home=BOOT_PRESS, off=BOOT_PRESS, default=UPDATE_HOME_WIFI)
 # Where an address the pumpkin doesn't have goes: the portal on its own WiFi, otherwise a 404 page
 NOT_HERE_STATUS = by_mode(home=404, off=404, default=302)
 NOT_HERE_LOCATION = by_mode(home=None, off=None, lost=TO_BUTTONS, default=TO_SETUP)
@@ -429,7 +434,9 @@ CASES = [
     Case("another website's API call", "POST", "/api/play", {"id": PLAYABLE}, headers={"Host": "example.com"},
          modes=SETUP_WIFI, status=302, location=PORTAL, note="any method, not just GET"),
     Case("another website's name on home WiFi", "GET", "/api/status", headers={"Host": "example.com"},
-         modes=NOT_SETUP_WIFI, shape=STATUS, note="only the setup WiFi redirects"),
+         modes=NOT_SETUP_WIFI, status=421, note="refused: a website pointing its name here (DNS rebinding)"),
+    Case("another website's API call on home WiFi", "POST", "/api/settings", {"brightness": 3},
+         headers={"Host": "example.com"}, modes=NOT_SETUP_WIFI, status=421, note="even with X-Pumpkin"),
 
     # --- Plumbing every POST goes through ---
     needs_header("/api/play", {"id": PLAYABLE}),
@@ -697,8 +704,10 @@ CASES = [
 
     # --- Firmware updates: POST /api/update (never a real one) ---
     Case("update without BOOT", "POST", "/api/update", GARBAGE_FILE, headers=MULTIPART, status=403,
-         shape=BOOT_ERROR, expect={"needsBoot": True}, error=BOOT_PRESS),
+         shape=UPDATE_REFUSED, expect=UPDATE_REFUSED_EXPECT, error=UPDATE_REFUSED_ERROR),
     Case("update without BOOT or a file", "POST", "/api/update", b"", headers={"Content-Type": None}, status=403,
+         shape=UPDATE_REFUSED, expect=UPDATE_REFUSED_EXPECT, error=UPDATE_REFUSED_ERROR),
+    Case("restart on the doorstep without BOOT", "POST", "/api/restart", {}, modes=DOORSTEP, status=403,
          shape=BOOT_ERROR, expect={"needsBoot": True}, error=BOOT_PRESS),
 
     # --- The talking pumpkin: server-sent events ---
@@ -707,13 +716,19 @@ CASES = [
          note=f"opens /events, expects a status event, plays {SAY_EFFECT} and expects its phrase"),
 
     # --- With the BOOT button pressed (run after everything above) ---
-    Case("update: not firmware", "POST", "/api/update", GARBAGE_FILE, headers=MULTIPART, boot=True, status=400,
-         shape=ERROR, error="That isn't a firmware file. Choose the file ending -ota.bin."),
-    Case("update: too small", "POST", "/api/update", TINY_FILE, headers=MULTIPART, boot=True, status=400,
-         shape=ERROR, error="That file is too small to be pumpkin firmware."),
+    Case("update: not firmware", "POST", "/api/update", GARBAGE_FILE, headers=MULTIPART, boot=True,
+         status=by_mode(home=400, off=400, default=403), shape=ERROR,
+         error=by_mode(home="That isn't a firmware file. Choose the file ending -ota.bin.", off="That isn't a "
+                       "firmware file. Choose the file ending -ota.bin.", default=UPDATE_HOME_WIFI)),
+    Case("update: too small", "POST", "/api/update", TINY_FILE, headers=MULTIPART, boot=True,
+         status=by_mode(home=400, off=400, default=403), shape=ERROR,
+         error=by_mode(home="That file is too small to be pumpkin firmware.",
+                       off="That file is too small to be pumpkin firmware.", default=UPDATE_HOME_WIFI)),
     Case("update: not a form", "POST", "/api/update", b"\xe9 not a form", boot=True,
-         headers={"Content-Type": "application/octet-stream"}, status=400, shape=ERROR,
-         error="No firmware file arrived. Choose the file ending -ota.bin and try again."),
+         headers={"Content-Type": "application/octet-stream"}, status=by_mode(home=400, off=400, default=403),
+         shape=ERROR, error=by_mode(home="No firmware file arrived. Choose the file ending -ota.bin and try again.",
+                                    off="No firmware file arrived. Choose the file ending -ota.bin and try again.",
+                                    default=UPDATE_HOME_WIFI)),
     wifi_check("on the doorstep with BOOT", password=TEST_PASSWORD, modes=DOORSTEP, boot=True, status=202,
                shape={"testing": bool}),
     Case("wifi check on the doorstep: result", "GET", "/api/wifi/test", modes=DOORSTEP, boot=True,

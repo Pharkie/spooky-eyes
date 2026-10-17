@@ -700,6 +700,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", CONTENT_TYPES.get(path.suffix, "application/octet-stream"))
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Frame-Options", "DENY")
         self.end_headers()
         self.wfile.write(data)
 
@@ -739,7 +740,7 @@ class Handler(BaseHTTPRequestHandler):
         """Was this meant for the pumpkin, or for a website the setup WiFi's DNS would send here?"""
         host = (self.headers.get("Host") or "").lower()
         host = host[1:host.find("]")] if host.startswith("[") else host.split(":")[0]
-        return host in ("", "localhost", "127.0.0.1", "::1", "192.168.4.1") or host.endswith(".local")
+        return host in ("", "localhost", "127.0.0.1", "::1", "192.168.4.1", f"{HOSTNAME}.local")
 
     def portal_url(self):
         host = self.headers.get("Host") if self.our_host() else f"localhost:{self.server.server_port}"
@@ -787,6 +788,16 @@ class Handler(BaseHTTPRequestHandler):
         if pumpkin.network_mode() == "setup" and (path in PROBE_PATHS or not self.our_host()):
             self.drain()
             self.redirect(self.portal_url())
+            return
+        # Off the setup WiFi, another website's name is refused (DNS rebinding), as by ForeignHostHandler
+        if pumpkin.network_mode() != "setup" and not self.our_host():
+            self.drain()
+            data = b"This isn't the pumpkin's address. Open http://pumpkin.local"
+            self.send_response(421)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         try:
@@ -1039,6 +1050,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_restart(self, query):
         self.json_body()
+        if self.pumpkin.strangers_may_be_connected() and not self.pumpkin.boot_unlocked():
+            raise boot_needed()
         self.send_json(200, {"ok": True, "message": "The pumpkin is restarting. It'll be back in about 20 seconds."})
         self.pumpkin.restart_soon(RESTART_DELAY_SECONDS)
 
@@ -1144,6 +1157,8 @@ class Handler(BaseHTTPRequestHandler):
         match = re.search(r"boundary=(?:\"([^\"]+)\"|([^;]+))", content_type)
         body = self.read_body(MAX_UPLOAD)
         pumpkin = self.pumpkin
+        if pumpkin.network_mode() == "setup":
+            raise ApiError(403, "Firmware updates only work when the pumpkin is on your home WiFi.")
         if pumpkin.update_finished:
             raise ApiError(400, "The pumpkin already has the new firmware and is restarting. Wait for it to come back.")
         if not pumpkin.boot_unlocked():

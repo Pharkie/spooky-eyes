@@ -35,7 +35,8 @@ http://192.168.4.1. It rejoins home WiFi when it's back in range, unless its own
 10 minutes and switched off by then: then switch it off and on.
 
 The BOOT button on the board: a quick press scrolls the address again (and unlocks firmware updates for 5
-minutes); hold it for 5 seconds to make it forget the home WiFi. If the eyes say "New batteries please",
+minutes, which only work on the home WiFi); hold it for 5 seconds to make it forget the home WiFi. That
+erases the WiFi name and password from the board's memory, so do it before passing the pumpkin on. If the eyes say "New batteries please",
 they mean it: weak batteries can't power the WiFi.
 
 To make the batteries last, the pumpkin's own WiFi (before it's set up, or on the doorstep) switches off when

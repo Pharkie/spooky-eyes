@@ -7,8 +7,8 @@
     python3 tools/flash_check.py --self-test                          check the checker on made-up logs
 
 Flashing: esptool --chip esp32c3 --port <port> --after no-reset write-flash -e 0x0 <bin>, then the serial
-port is opened (DTR and RTS low) and RTS pulsed to start the new firmware, so the log is read from the very
-first line (the board's USB log keeps only ~256 bytes while nobody's reading). Within --timeout (45 s) the
+port is opened (DTR and RTS low), which usually starts the new firmware by itself (RTS is pulsed only if it
+didn't), so the log is read from the very first line (the board's USB log keeps only ~256 bytes while nobody's reading). Within --timeout (45 s) the
 log must show:
     [BOOT] Spooky Pumpkin Eyes <version>
     [SETTINGS] "<default name>", home WiFi not set up, ... (fresh settings: the erase worked)
@@ -151,8 +151,12 @@ def flash_and_read(bin_path, port, version, timeout, save_log):
 
     print(f"\nReading the first boot from {port} (up to {timeout:g} s)...", flush=True)
     with pumpkin_serial.PumpkinSerial(port, echo=True) as board:
-        time.sleep(0.3)
-        board.reset()  # leave the bootloader esptool left it in, and start the new firmware
+        time.sleep(0.5)
+        # Opening the port often starts the new firmware by itself (the C3's USB serial resets it). Only
+        # if nothing has started, pulse RTS to leave the bootloader esptool left it in: a second reset
+        # would cut the first boot short (while it formats the show's filesystem, say).
+        if not any("rst:" in line.text or "[BOOT]" in line.text for line in board.lines):
+            board.reset()
         deadline = time.monotonic() + timeout
         done_at = None
         while time.monotonic() < deadline:
@@ -183,7 +187,7 @@ def made_up_boot_log(version):
         f'[SETTINGS] "{FIRMWARE["kDefaultPumpkinName"]}", home WiFi not set up, brightness '
         f'{FIRMWARE["kDefaultBrightness"]}, eye gap {FIRMWARE["kDefaultEyeGap"]}, mouth LED '
         f'{on_off(FIRMWARE["kDefaultMouthLed"])}, WiFi saver {on_off(FIRMWARE["kDefaultWifiSaver"])}',
-        "[SHOW] Storage ready: 8192 of 131072 bytes used, no saved show (took 1450 ms)",
+        "[SHOW] Storage ready: 8192 of 118784 bytes used, no saved show (took 1450 ms)",
         f"[PLAYER] Eyes on, {effects} effects. Type help on serial for test commands.",
         "[WIFI] No home WiFi saved yet",
         f'[WIFI] Setup WiFi "{FIRMWARE["kSetupApName"]}" is on (password "{FIRMWARE["kSetupApPassword"]}"), '

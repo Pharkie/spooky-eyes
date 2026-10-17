@@ -1,4 +1,5 @@
-// User settings in NVS (Preferences namespace "pumpkin").
+// User settings in NVS (Preferences namespace "pumpkin"); the home WiFi's name and password in an NVS
+// partition of their own ("wifi"), so they can be erased completely.
 // Loading with defaults for missing or out-of-range values, and saving only what changed (to spare
 // the flash), are adapted from Scribe Evolution's src/core/config_loader.cpp. The text rules (curly
 // quotes, web address names, WiFi passwords) live in text.cpp.
@@ -9,7 +10,9 @@
 #include "core/settings.h"
 
 #include <Preferences.h>
+#include <esp_partition.h>
 #include <freertos/FreeRTOS.h>
+#include <nvs_flash.h>
 #include <freertos/semphr.h>
 #include <vector>
 
@@ -20,6 +23,14 @@
 namespace
 {
     constexpr const char *kNamespace = "pumpkin";
+
+    // The home WiFi's name and password live in their own small NVS partition (partitions.csv), so that
+    // forgetting or changing them can erase the whole partition. NVS only marks a removed or replaced
+    // entry as erased: the old password would otherwise stay readable in flash for anyone with the board
+    // and a USB cable. A board flashed with an older partition table (no "wifi" partition) keeps them with
+    // the other settings, as before.
+    constexpr const char *kWifiPartition = "wifi";
+    constexpr const char *kWifiNamespace = "home_wifi";
 
     // NVS keys (15 characters at most)
     constexpr const char *kKeyName = "name";
@@ -172,6 +183,42 @@ namespace
         return prefs.isKey(key) ? prefs.getString(key, fallback) : fallback;
     }
 
+    bool hasWifiPartition()
+    {
+        return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, kWifiPartition) !=
+               nullptr;
+    }
+
+    // Opens wherever the WiFi details live, read-write
+    bool openWifi(Preferences &prefs)
+    {
+        if (!hasWifiPartition())
+            return prefs.begin(kNamespace, false);
+        if (prefs.begin(kWifiNamespace, false, kWifiPartition))
+            return true;
+        // Unreadable (written by another NVS version, say): start it afresh
+        nvs_flash_erase_partition(kWifiPartition);
+        return prefs.begin(kWifiNamespace, false, kWifiPartition);
+    }
+
+    // Every copy of the WiFi details gone: the whole "wifi" partition erased (with an older partition
+    // table, the keys removed, which is the best NVS can do there)
+    bool wipeWifi()
+    {
+        if (hasWifiPartition())
+            return nvs_flash_erase_partition(kWifiPartition) == ESP_OK; // de-initialises it first
+        Preferences prefs;
+        if (!prefs.begin(kNamespace, false))
+            return false;
+        bool ok = true;
+        if (prefs.isKey(kKeySsid))
+            ok &= prefs.remove(kKeySsid);
+        if (prefs.isKey(kKeyPassword))
+            ok &= prefs.remove(kKeyPassword);
+        prefs.end();
+        return ok;
+    }
+
     // Anything missing or out of range (say, saved by a firmware with different limits) gets its default
     Settings loadFromNvs()
     {
@@ -184,13 +231,22 @@ namespace
             return s;
         }
         s.pumpkinName = readString(prefs, kKeyName, s.pumpkinName);
-        s.wifiSsid = readString(prefs, kKeySsid, "");
-        s.wifiPassword = readString(prefs, kKeyPassword, "");
         s.brightness = prefs.getUChar(kKeyBrightness, s.brightness);
         s.eyeGap = prefs.getUChar(kKeyEyeGap, s.eyeGap);
         s.mouthLed = prefs.getBool(kKeyMouthLed, s.mouthLed);
         s.wifiSaver = prefs.getBool(kKeyWifiSaver, s.wifiSaver);
         prefs.end();
+        Preferences wifi;
+        if (openWifi(wifi))
+        {
+            s.wifiSsid = readString(wifi, kKeySsid, "");
+            s.wifiPassword = readString(wifi, kKeyPassword, "");
+            wifi.end();
+        }
+        else
+        {
+            LOG("SETTINGS", "Couldn't open the WiFi details: no home WiFi");
+        }
 
         const Settings fallback = defaults();
         String error;
@@ -241,20 +297,38 @@ namespace
         return prefs.putBool(key, value) == sizeof(uint8_t);
     }
 
-    bool saveToNvs(const Settings &s)
+    // `before` is what's saved now: the WiFi details are only rewritten (old ones erased first) if they change
+    bool saveToNvs(const Settings &s, const Settings &before)
     {
         Preferences prefs;
         if (!prefs.begin(kNamespace, false))
             return false;
         bool ok = true;
         ok &= putString(prefs, kKeyName, s.pumpkinName);
-        ok &= putString(prefs, kKeySsid, s.wifiSsid);
-        ok &= putString(prefs, kKeyPassword, s.wifiPassword);
         ok &= putUChar(prefs, kKeyBrightness, s.brightness);
         ok &= putUChar(prefs, kKeyEyeGap, s.eyeGap);
         ok &= putBool(prefs, kKeyMouthLed, s.mouthLed);
         ok &= putBool(prefs, kKeyWifiSaver, s.wifiSaver);
         prefs.end();
+
+        if (s.wifiSsid != before.wifiSsid || s.wifiPassword != before.wifiPassword)
+        {
+            ok &= wipeWifi();
+            if (!s.wifiSsid.isEmpty())
+            {
+                Preferences wifi;
+                if (openWifi(wifi))
+                {
+                    ok &= putString(wifi, kKeySsid, s.wifiSsid);
+                    ok &= putString(wifi, kKeyPassword, s.wifiPassword);
+                    wifi.end();
+                }
+                else
+                {
+                    ok = false;
+                }
+            }
+        }
         return ok;
     }
 }
@@ -297,7 +371,7 @@ namespace settings
         }
 
         Lock saving(saveMutex);
-        if (!saveToNvs(tidy))
+        if (!saveToNvs(tidy, get()))
         {
             // Some values may have been written: reload so memory matches the flash
             const Settings reloaded = loadFromNvs();
@@ -320,15 +394,8 @@ namespace settings
     void forgetWifi()
     {
         Lock saving(saveMutex);
-        Preferences prefs;
-        if (prefs.begin(kNamespace, false))
-        {
-            if (prefs.isKey(kKeySsid))
-                prefs.remove(kKeySsid);
-            if (prefs.isKey(kKeyPassword))
-                prefs.remove(kKeyPassword);
-            prefs.end();
-        }
+        if (!wipeWifi())
+            LOG("SETTINGS", "Couldn't erase the WiFi details");
         {
             Lock lock(stateMutex);
             current.wifiSsid = "";

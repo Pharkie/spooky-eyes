@@ -51,16 +51,20 @@
 </div>
 </main>
 <script>
-// If the page's own script never arrives (the pumpkin restarted mid-load, or the WiFi blinked), say so rather
-// than sitting on "Waking up..." for ever
+// If the page's own script never arrives (the pumpkin restarted mid-load, or the phone was still changing
+// WiFi), reload once by itself, as a person would. If that doesn't help, say so rather than sitting on
+// "Waking up..." for ever. (common.js clears the mark once it has loaded.)
 setTimeout(function () {
   if (typeof Pumpkin !== 'undefined') return; // (a top-level const, so not window.Pumpkin)
+  var mark = 'reloaded ' + location.pathname, tried = true;
+  try { tried = sessionStorage.getItem(mark) === '1'; sessionStorage.setItem(mark, '1'); } catch (e) { /* no storage */ }
+  if (!tried) { location.reload(); return; }
   var note = document.createElement('p');
   note.className = 'notice problem';
   note.setAttribute('role', 'alert');
   note.textContent = 'The page didn\u2019t load properly. Reload it to try again.';
   document.body.insertBefore(note, document.body.firstChild);
-}, 8000);
+}, 6000);
 </script>
 <script src="/common.js"></script>
 <script>

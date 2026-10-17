@@ -39,16 +39,20 @@
 
 </main>
 <script>
-// If the page's own script never arrives (the pumpkin restarted mid-load, or the WiFi blinked), say so rather
-// than sitting on "Waking up..." for ever
+// If the page's own script never arrives (the pumpkin restarted mid-load, or the phone was still changing
+// WiFi), reload once by itself, as a person would. If that doesn't help, say so rather than sitting on
+// "Waking up..." for ever. (common.js clears the mark once it has loaded.)
 setTimeout(function () {
   if (typeof Pumpkin !== 'undefined') return; // (a top-level const, so not window.Pumpkin)
+  var mark = 'reloaded ' + location.pathname, tried = true;
+  try { tried = sessionStorage.getItem(mark) === '1'; sessionStorage.setItem(mark, '1'); } catch (e) { /* no storage */ }
+  if (!tried) { location.reload(); return; }
   var note = document.createElement('p');
   note.className = 'notice problem';
   note.setAttribute('role', 'alert');
   note.textContent = 'The page didn\u2019t load properly. Reload it to try again.';
   document.body.insertBefore(note, document.body.firstChild);
-}, 8000);
+}, 6000);
 </script>
 <script src="/common.js"></script>
 <script>
@@ -150,14 +154,23 @@ setTimeout(function () {
 
   // ---- Buttons, built from the firmware's list of effects ----
 
-  async function loadEffects() {
+  // Just after a restart or a change of WiFi the first tries can go nowhere: try again by itself a few
+  // times before saying so
+  const AUTO_TRIES = 4;
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  async function loadEffects(tries = 1) {
     const box = $('effects');
     try {
-      const data = await get('/api/effects');
+      const data = await get('/api/effects', { timeout: 6000 });
       for (const fx of data.effects) effects.set(fx.id, fx);
       effectAccordion(box, data.effects, { storeKey: 'section', titles: data.groupTitles });
     } catch (e) {
-      loadFailed(box, 'the buttons', e, loadEffects);
+      if (e.unreachable && tries < AUTO_TRIES) {
+        await pause(2000);
+        return loadEffects(tries + 1);
+      }
+      loadFailed(box, 'the buttons', e, () => loadEffects());
     }
   }
 
@@ -272,7 +285,9 @@ setTimeout(function () {
     const others = document.createElement('optgroup');
     others.label = 'Other languages';
     for (const voice of voices) {
-      (isEnglish(voice) ? english : others).appendChild(new Option(voice.name + ' (' + voice.lang + ')', voice.voiceURI));
+      // Online voices (Chrome's "Google ..." ones) send what's spoken to the internet: say so
+      const label = voice.name + ' (' + voice.lang + (voice.localService === false ? ', online' : '') + ')';
+      (isEnglish(voice) ? english : others).appendChild(new Option(label, voice.voiceURI));
     }
     if (english.children.length) voicePicker.appendChild(english);
     if (others.children.length) voicePicker.appendChild(others);
@@ -439,7 +454,7 @@ setTimeout(function () {
 
   // ---- Start ----
 
-  async function showWifiNotice() {
+  async function showWifiNotice(tries = 1) {
     try {
       const status = await loadStatus();
       if (status.buttonsHeartbeatMs) HEARTBEAT_MS = status.buttonsHeartbeatMs;
@@ -457,6 +472,10 @@ setTimeout(function () {
       }
       showPlayer(status.player);
     } catch (e) {
+      if (e.unreachable && tries < AUTO_TRIES) {
+        await pause(2000);
+        return showWifiNotice(tries + 1);
+      }
       setStatus('Oops, can’t reach the pumpkin.');
       err.textContent = e.message;
     }
@@ -468,7 +487,7 @@ setTimeout(function () {
   // Opening the page pauses the show (buttons mode), once it's on screen
   if (onScreen()) expect((player) => player.mode === 'buttons');
   heartbeat();
-  loadEffects().then(showWifiNotice);
+  loadEffects().then(() => showWifiNotice());
   listen({ status: showPlayer, say: speak });
 })();
 </script>
