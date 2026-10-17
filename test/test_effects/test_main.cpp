@@ -1,7 +1,7 @@
 // Effect tests: the C++ effects against the MicroPython originals, and every effect at the extremes.
 //
-// Golden tests: tools/capture_python_frames.py ran the old main.py with fake hardware and wrote down
-// every frame, wait, brightness change, SAY line and mouth colour change into test/golden/<id>.txt.
+// Golden tests: a capture script (since retired, with the MicroPython code, from this repo) ran the old
+// main.py with fake hardware and wrote down every frame, wait, brightness change, SAY line and mouth colour change into test/golden/<id>.txt.
 // Here each effect runs on a RecordingEngine and the two recordings are compared line by line. Waits may
 // differ by 1 ms (Python rounds seconds to milliseconds). The old pumpkin is frozen, so effects added
 // since have no golden file; that's fine.
@@ -52,8 +52,8 @@ void tearDown()
 
 // ---- Golden files ----
 
-// Golden recordings that aren't buttons, and the C++ that should do the same thing. The Python side
-// of each is in EXTRA in tools/capture_python_frames.py. Every other id is looked up with findEffect().
+// Golden recordings that aren't buttons, and the C++ that should do the same thing. Every other id is
+// looked up with findEffect().
 using Runner = void (*)(Engine &);
 
 struct ExtraCase

@@ -163,10 +163,9 @@ owner names it on the setup page (or later in Settings). Nothing to track per pe
 | `src/core/` | Settings (saved in flash), WiFi and captive portal (from Scribe Evolution), constants |
 | `src/web/` | Web server and JSON API |
 | `web/` | The pages: buttons, show creator, setup, settings |
-| `test/` | Golden tests: the C++ effects frame-for-frame against the MicroPython originals; `test/api/`: the web API cases |
+| `test/` | Golden tests: the C++ effects frame-for-frame against recordings of the 2023-24 MicroPython version; `test/api/`: the web API cases |
 | `docs/instructions/` | The printed one-page guide for the 2026 WiFi upgrade |
 | `docs/testing/` | The checks before posting that need phones and routers |
-| `legacy/pico-micropython/` | The 2023-24 MicroPython version for the Raspberry Pi Pico, and its Mac tools |
 
 [CLAUDE.md](CLAUDE.md) explains how the pieces fit together, including how to add an effect (write the
 function, add one line to the table).
@@ -174,9 +173,11 @@ function, add one line to the table).
 ## Credits
 
 - Original pumpkin eyes code and tutorial by [GurgleApps](https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico)
-  ([gurgleapps/pico-pumpkin](https://github.com/gurgleapps/pico-pumpkin)). This project began in 2023 as a
-  fork of it, called pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with
-  the move to the ESP32-C3.
+  ([gurgleapps/pico-pumpkin](https://github.com/gurgleapps/pico-pumpkin), GPL): the eye pictures, many of
+  the shapes, the first eye animations and the scrolling font are theirs. This project began in 2023 as a fork of it, called
+  pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with the move to the
+  ESP32-C3 and a rewrite in C++. The 2023-24 MicroPython version isn't kept here any more: it lives on in
+  the history before then, and in GurgleApps' repo.
 - WiFi setup, captive portal and web server patterns from Adam's Scribe Evolution project.
 - Libraries: [ArduinoJson](https://arduinojson.org/) (MIT),
   [ESPAsyncWebServer and AsyncTCP](https://github.com/esphome/ESPAsyncWebServer) (LGPL 3.0), and
@@ -186,6 +187,6 @@ function, add one line to the table).
 
 ## Licence
 
-GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). The
-original GurgleApps code is released under the GPL without a version number, which lets anyone choose
-any version; this project uses version 3 or later.
+GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). It
+includes GurgleApps' GPL pictures, animations and font, released under the GPL without a version number (which
+lets anyone choose any version); this project uses version 3 or later throughout.

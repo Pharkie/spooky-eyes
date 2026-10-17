@@ -1,7 +1,6 @@
 # PlatformIO
 .pio/
 .vscode/
-!legacy/pico-micropython/.vscode/
 
 # Generated at build time from web/ by scripts/embed_web.py
 src/generated/

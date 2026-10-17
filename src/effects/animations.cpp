@@ -1,5 +1,5 @@
 // The eye animations from eyes_ani.json, and the player that runs them.
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// The first six (stareAndBlink to ghosts1) are GurgleApps' originals (GPL); the rest are the family's.
 
 #include "effects/animations.h"
 

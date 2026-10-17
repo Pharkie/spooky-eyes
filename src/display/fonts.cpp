@@ -1,5 +1,5 @@
-// The fonts from matrix_fonts.py.
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// The fonts. textFont is GurgleApps' (github.com/gurgleapps/pico-pumpkin, GPL), their tweaks of IBM's
+// VGA font (e.g. a wider S); the sprite fonts are the pumpkin's own.
 
 #include "display/fonts.h"
 

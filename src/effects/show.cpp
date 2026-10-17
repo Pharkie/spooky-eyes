@@ -8,8 +8,7 @@
 
 const Show &defaultShow()
 {
-    // The old main.py loop, step by step, as blocks. tools/capture_python_frames.py and
-    // tools/mock_server.py read this table, so keep one {ShowBlock::Kind::..., "..."} entry per line.
+    // The old main.py loop, step by step, as blocks. tools/mock_server.py reads this table, so keep one {ShowBlock::Kind::..., "..."} entry per line.
     // Each step is the button's effect, which is exactly what main() did except for the second lot of
     // space invaders: main() flipped them 3 times at 0.5 s, the button does 8 flips at 0.3 s.
     static const Show kShow = {

@@ -1,6 +1,6 @@
 #pragma once
 // The eyes: two daisy-chained MAX7219 8x8 LED matrices on SPI (pins in board.h).
-// A port of legacy/pico-micropython/max7219_matrix.py with the same bytes on the wire.
+// Sends the same bytes on the wire as the 2023-24 MicroPython pumpkin did (the MAX7219 datasheet's sequence).
 // Call only from the Arduino loop task (the player and the effects run there).
 
 #include <cstdint>

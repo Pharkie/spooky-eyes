@@ -1,6 +1,6 @@
 #pragma once
 // An Engine for tests on a computer: instead of driving LEDs it writes down everything an effect does,
-// one line per event, in the same format as the golden files made by tools/capture_python_frames.py:
+// one line per event, in the same format as the golden files in test/golden:
 //
 //   F <left> <right>   both eyes (viewer's left and right), 8 rows each as 16 hex digits
 //   W <ms>             wait
@@ -8,7 +8,7 @@
 //   S <words>          the talking pumpkin says something
 //   M                  the mouth LED picks a new random colour
 //
-// Random numbers come from the same generator the Python capture uses (xorshift32 seeded with 12345),
+// Random numbers come from the same generator the golden recordings used (xorshift32 seeded with 12345),
 // so effects that use random() should record exactly what the MicroPython original did. The settings
 // default to the ones the originals had built in, which the golden files were recorded with.
 

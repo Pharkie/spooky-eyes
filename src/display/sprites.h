@@ -1,6 +1,6 @@
 #pragma once
-// Every picture from the pumpkin, one 8x8 Frame each: the eyes and shapes from matrix_fonts.py.
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// Every picture from the pumpkin, one 8x8 Frame each. The eyes and many shapes are from GurgleApps'
+// original pumpkin (GPL); the rest are the family's own.
 //
 // Names are the old Python names, except all_off and all_on, which became allOff and allOn.
 // Pictures shorter than 8 rows (spider has 4, slime has 5) are padded with blank rows at the bottom.
