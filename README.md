@@ -24,9 +24,10 @@ Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
    optional: save just a name, or tap "just use the buttons" at the bottom, and the pumpkin keeps its own
    WiFi.
 3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes:
-   `http://pumpkin.local  or  192.168.1.23`. Open that on any phone, tablet or laptop on the same WiFi
-   (Android phones often need the numbers). The name and address are the same on every pumpkin (one per
-   house), so the guide can print them; the name you give it is what it scrolls on its eyes.
+   `http://pumpkin.local  or  192.168.1.23`. The setup page waits for it and opens the buttons by itself;
+   later, open that address on any phone, tablet or laptop on the same WiFi (if `pumpkin.local` doesn't
+   open, type the numbers). The WiFi name and address are the same on every pumpkin (one per house), so the
+   guide can print them; the name you give it is what it scrolls on its eyes.
 
 If the eyes say "Join WiFi..." again after that, the password was probably wrong: join the pumpkin's WiFi
 again and the setup page says what went wrong. If it loses home WiFi for 3 minutes (carried out to the
@@ -36,8 +37,8 @@ http://192.168.4.1. It rejoins home WiFi when it's back in range, unless its own
 
 The BOOT button on the board: a quick press scrolls the address again (and unlocks firmware updates for 5
 minutes, which only work on the home WiFi); hold it for 5 seconds to make it forget the home WiFi. That
-erases the WiFi name and password from the board's memory, so do it before passing the pumpkin on. If the eyes say "New batteries please",
-they mean it: weak batteries can't power the WiFi.
+erases the WiFi name and password from the board's memory, so do it before passing the pumpkin on. If the
+eyes say "New batteries please", they mean it: weak batteries can't power the WiFi.
 
 To make the batteries last, the pumpkin's own WiFi (before it's set up, or on the doorstep) switches off when
 nobody has used it for 10 minutes. On your home WiFi it stays connected, dozing between messages, so the page
@@ -129,7 +130,8 @@ Settings page can show that an update worked.
 
 - `spooky-pumpkin-eyes-<version>-full.bin`: for a new board, flashed at address 0x0.
 - `spooky-pumpkin-eyes-<version>-ota.bin`: to update a pumpkin that's already running, from its Settings
-  page (no cable needed; you'll be asked to press the BOOT button on the board first).
+  page (no cable needed; it must be on the home WiFi, and you'll be asked to press the BOOT button on the
+  board first).
 
 ### Preparing pumpkins for posting
 
@@ -148,10 +150,7 @@ owner names it on the setup page (or later in Settings). Nothing to track per pe
    the board's first boot (see Testing).
 2. Switch it on with the eyes attached and check they scroll "Join WiFi: Spooky Pumpkin ...".
 3. Print the guide, [docs/instructions/2026-wifi-upgrade.pdf](docs/instructions/2026-wifi-upgrade.pdf),
-   once per pumpkin.
-
-(If you'd rather post a named one, `name Jack's Pumpkin` over USB serial or the Settings page does it,
-and `tools/make_instructions.sh "Jack's Pumpkin"` makes a matching guide. Not needed.)
+   once per pumpkin (`tools/make_instructions.sh` rebuilds it from the HTML next to it).
 
 ## How the code is organised
 
@@ -163,7 +162,7 @@ and `tools/make_instructions.sh "Jack's Pumpkin"` makes a matching guide. Not ne
 | `src/hardware/` | Pin map and drivers: MAX7219 eyes, mouth LED, status LED, BOOT button |
 | `src/core/` | Settings (saved in flash), WiFi and captive portal (from Scribe Evolution), constants |
 | `src/web/` | Web server and JSON API |
-| `web/` | The pages: buttons, setup, settings |
+| `web/` | The pages: buttons, show creator, setup, settings |
 | `test/` | Golden tests: the C++ effects frame-for-frame against the MicroPython originals; `test/api/`: the web API cases |
 | `docs/instructions/` | The printed one-page guide for the 2026 WiFi upgrade |
 | `docs/testing/` | The checks before posting that need phones and routers |
@@ -174,9 +173,19 @@ function, add one line to the table).
 
 ## Credits
 
-- Original pumpkin eyes code and tutorial by [GurgleApps](https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico).
+- Original pumpkin eyes code and tutorial by [GurgleApps](https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico)
+  ([gurgleapps/pico-pumpkin](https://github.com/gurgleapps/pico-pumpkin)). This project began in 2023 as a
+  fork of it, called pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with
+  the move to the ESP32-C3.
 - WiFi setup, captive portal and web server patterns from Adam's Scribe Evolution project.
+- Libraries: [ArduinoJson](https://arduinojson.org/) (MIT),
+  [ESPAsyncWebServer and AsyncTCP](https://github.com/esphome/ESPAsyncWebServer) (LGPL 3.0), and
+  [arduino-esp32](https://github.com/espressif/arduino-esp32) (LGPL 2.1), each under its own licence.
 - Eyes: MAX7219 8x8 matrices ([these, Amazon UK](https://amzn.eu/d/e5Kw5vX)); mouth: a common-anode RGB LED
   ([these](https://amzn.eu/d/9fQ5G3V)).
 
-Licence: GNU General Public License (GPL), as the original.
+## Licence
+
+GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). The
+original GurgleApps code is released under the GPL without a version number, which lets anyone choose
+any version; this project uses version 3 or later.
