@@ -1,5 +1,5 @@
-// Every picture from the pumpkin: the eyes and shapes from matrix_fonts.py.
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// Every picture from the pumpkin. The eyes and many shapes (hearts, stars, bunnies, invaders...) are from
+// GurgleApps' original pumpkin (github.com/gurgleapps/pico-pumpkin, GPL); the rest are the family's own.
 
 #include "display/sprites.h"
 

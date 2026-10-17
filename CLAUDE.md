@@ -40,7 +40,7 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
 
 ```
 pio run -e supermini            # build firmware (also regenerates src/generated/web_assets.h from web/)
-pio test -e native              # golden-frame tests: C++ effects vs the MicroPython originals
+pio test -e native              # golden-frame tests: C++ effects vs recordings of the MicroPython originals
 python3 tools/mock_server.py    # web pages with a fake API, no board needed
 python3 scripts/build_release.py  # release/ images: full (new board, 0x0) and ota (Settings page upload)
 tools/make_instructions.sh      # one-page A4 wiring + setup PDF
@@ -127,12 +127,14 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
 
 That's it: the button appears on the page, the surprise show can pick it, and `pio test -e native`
 smoke-tests it at extreme settings (effects from the old Pico are also compared frame by frame against
-the MicroPython originals). Leave brightness at
+recordings of the MicroPython originals in `test/golden/`). Leave brightness at
 `maxBright()` when the effect ends (`explode()` does). Avoid long full-brightness, all-on frames (battery
 current).
 
-## Legacy
+## History and licence
 
-`legacy/pico-micropython/` is the 2023-24 MicroPython version for the Raspberry Pi Pico, plus the Mac
-tools that drove it over USB. Frozen: the original Pico pumpkin still runs it, but new work goes in the C++ firmware.
-The golden tests read it, so don't change it.
+The 2023-24 MicroPython version for the Raspberry Pi Pico (a fork of gurgleapps/pico-pumpkin) was removed
+from this repo in October 2026; it's in the git history before then. `test/golden/` holds recordings of
+what it did, which the native tests compare against: they're fixed now, so
+don't regenerate them. The eye pictures, many shapes, the first six eye animations and the scrolling font are
+GurgleApps' GPL work, so the whole repo is GPL-3.0-or-later (`LICENSE`).

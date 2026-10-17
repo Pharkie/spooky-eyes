@@ -1,7 +1,7 @@
 #pragma once
 // The fonts: textFont for words, and the sprite fonts, where each letter is one picture, so
 // scrolling a "message" like " 12 " flies the picture across the eyes. Missing characters are blank.
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// textFont is GurgleApps' (GPL); the sprite fonts are the pumpkin's own.
 
 #include "display/font.h"
 

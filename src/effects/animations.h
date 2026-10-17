@@ -1,6 +1,6 @@
 #pragma once
 // The eye animations from eyes_ani.json, and the player that runs them (the old anim_runner).
-// Generated once from the MicroPython originals by tools/gen_sprites.py; edit by hand from now on.
+// The first six are GurgleApps' originals (GPL); the rest are the family's.
 //
 // The old anim_runner called show_char(font[l], font[r]), and show_char put its first picture on the
 // RIGHT eye as you look at the pumpkin. So JSON "l" pictures were shown on your right. The steps

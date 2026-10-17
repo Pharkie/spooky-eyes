@@ -1,7 +1,7 @@
 // Effect tests: the C++ effects against the MicroPython originals, and every effect at the extremes.
 //
-// Golden tests: tools/capture_python_frames.py ran the old main.py with fake hardware and wrote down
-// every frame, wait, brightness change, SAY line and mouth colour change into test/golden/<id>.txt.
+// Golden tests: a capture script (since retired, with the MicroPython code, from this repo) ran the old
+// main.py with fake hardware and wrote down every frame, wait, brightness change, SAY line and mouth colour change into test/golden/<id>.txt.
 // Here each effect runs on a RecordingEngine and the two recordings are compared line by line. Waits may
 // differ by 1 ms (Python rounds seconds to milliseconds). The old pumpkin is frozen, so effects added
 // since have no golden file; that's fine.
@@ -52,8 +52,8 @@ void tearDown()
 
 // ---- Golden files ----
 
-// Golden recordings that aren't buttons, and the C++ that should do the same thing. The Python side
-// of each is in EXTRA in tools/capture_python_frames.py. Every other id is looked up with findEffect().
+// Golden recordings that aren't buttons, and the C++ that should do the same thing. Every other id is
+// looked up with findEffect().
 using Runner = void (*)(Engine &);
 
 struct ExtraCase
@@ -893,10 +893,10 @@ static void test_text_window()
         {"AB", -17, kBlank},
         {"AB", -9, kBlank},
         {"AB", -8, kBlank},
-        {"AB", -5, {0x01, 0x03, 0x06, 0x06, 0x07, 0x06, 0x06, 0x00}},
-        {"AB", -1, {0x18, 0x3c, 0x66, 0x66, 0x7e, 0x66, 0x66, 0x00}},
-        {"AB", 0, {0x30, 0x78, 0xcc, 0xcc, 0xfc, 0xcc, 0xcc, 0x00}},
-        {"AB", 3, {0x87, 0xc3, 0x63, 0x63, 0xe3, 0x63, 0x67, 0x00}},
+        {"AB", -5, {0x01, 0x03, 0x06, 0x07, 0x06, 0x06, 0x06, 0x00}},
+        {"AB", -1, {0x1c, 0x36, 0x63, 0x7f, 0x63, 0x63, 0x63, 0x00}},
+        {"AB", 0, {0x38, 0x6c, 0xc6, 0xfe, 0xc6, 0xc6, 0xc6, 0x00}},
+        {"AB", 3, {0xc7, 0x63, 0x33, 0xf3, 0x33, 0x33, 0x37, 0x00}},
         {"AB", 7, {0x7e, 0x33, 0x33, 0x3e, 0x33, 0x33, 0x7e, 0x00}},
         {"AB", 8, {0xfc, 0x66, 0x66, 0x7c, 0x66, 0x66, 0xfc, 0x00}},
         {"AB", 13, {0x80, 0xc0, 0xc0, 0x80, 0xc0, 0xc0, 0x80, 0x00}},
@@ -904,12 +904,12 @@ static void test_text_window()
         {"AB", 17, kBlank},
         {"AB", 24, kBlank},
         // '$' isn't in the font, so it's a gap
-        {"A$1", 3, {0x80, 0xc0, 0x60, 0x60, 0xe0, 0x60, 0x60, 0x00}},
+        {"A$1", 3, {0xc0, 0x60, 0x30, 0xf0, 0x30, 0x30, 0x30, 0x00}},
         {"A$1", 7, kBlank},
         {"A$1", 8, kBlank},
-        {"A$1", 13, {0x06, 0x0e, 0x06, 0x06, 0x06, 0x06, 0x1f, 0x00}},
-        {"A$1", 16, {0x30, 0x70, 0x30, 0x30, 0x30, 0x30, 0xfc, 0x00}},
-        {"A$1", 17, {0x60, 0xe0, 0x60, 0x60, 0x60, 0x60, 0xf8, 0x00}},
+        {"A$1", 13, {0x03, 0x07, 0x03, 0x03, 0x03, 0x03, 0x0f, 0x00}},
+        {"A$1", 16, {0x18, 0x38, 0x18, 0x18, 0x18, 0x18, 0x7e, 0x00}},
+        {"A$1", 17, {0x30, 0x70, 0x30, 0x30, 0x30, 0x30, 0xfc, 0x00}},
         {"A$1", 23, kBlank},
         {"", -3, kBlank},
         {"", 0, kBlank},
