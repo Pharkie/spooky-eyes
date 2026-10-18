@@ -45,6 +45,7 @@ pio test -e native              # golden-frame tests: C++ effects vs recordings 
 python3 tools/mock_server.py    # web pages with a fake API, no board needed
 python3 scripts/build_release.py  # release/ images: full (new board, 0x0) and ota (Settings page upload)
 tools/make_instructions.sh      # one-page A4 wiring + setup PDF
+python3 tools/effects_index.py  # docs/effects.md + docs/effects/*.gif: every effect animated (Pillow + a C++ compiler)
 python3 tools/api_check.py --mock   # API cases (test/api/cases.py) on the mock, every WiFi mode
 python3 tools/api_check.py --board http://pumpkin.local [--compare]  # same cases on a board (puts its settings back)
 python3 tools/flash_check.py release/…-full.bin  # erase + flash + check the first boot log (when Adam asks)
