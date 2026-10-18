@@ -45,16 +45,54 @@ Most of the pictures and effects were designed by a six-year-old Halloween fan.
 
 ## Quick start
 
-**👉 [The one-page guide (PDF)](docs/instructions/2026-wifi-upgrade.pdf)** has the wiring diagram and the
-setup steps. In short:
+Got a pumpkin in the post? It's already flashed and wired: skip to **Switch on**, or just follow
+**👉 [the one-page guide (PDF)](docs/instructions/2026-wifi-upgrade.pdf)** that came with it.
 
-1. **Wire it** as the diagram shows (pins below).
-2. **Switch on.** The eyes start the show, and scroll how to join the pumpkin's own WiFi: network
-   `Spooky Pumpkin`, password `spookyeyes`.
-3. **Join that WiFi** on a phone. A setup page pops up (or open `http://pumpkin.local`): name your pumpkin,
-   pick your WiFi, type its password, tap **Connect**. The pumpkin checks the password first, restarts, joins
-   your WiFi, and opens the buttons by itself.
-4. **Play.** From then on, `http://pumpkin.local` on any phone, tablet or laptop on your WiFi.
+### 1. Flash the firmware
+
+No toolchain needed: a ready-made firmware file and a web browser.
+
+1. Download `spooky-pumpkin-eyes-<version>-full.bin` from the
+   [latest release](https://github.com/Pharkie/spooky-eyes/releases/latest).
+2. Plug the ESP32-C3 SuperMini into your computer with a USB-C **data** cable.
+3. In Chrome or Edge, open Espressif's [web flasher](https://espressif.github.io/esptool-js/): **Connect**
+   and pick the board's port, **Erase Flash**, then add the file at address `0x0` and **Program**.
+   Prefer a terminal? `pip install esptool`, then
+   `esptool --chip esp32c3 write-flash -e 0x0 spooky-pumpkin-eyes-<version>-full.bin`.
+   If it can't connect, hold the board's BOOT button while plugging the cable in.
+4. Unplug it. Done: it's a pumpkin brain now.
+
+### 2. Wire it
+
+<p align="center">
+  <img src="docs/assets/wiring.png" alt="Wiring diagram: the eye from behind, the mouth LED and the battery pack, to the ESP32-C3 from underneath" width="100%">
+</p>
+
+The board is drawn from **underneath**, where its pin names are printed; the eye from **behind**.
+
+- **Power:** battery pack **+** → `5V`, **−** → `G`. The first eye's `VCC` and `GND` join the same two.
+- **The first eye** (its *input* header): `DIN` → `5`, `CS` → `6`, `CLK` → `7`.
+- **The second eye:** its input header to the first eye's **output** header, pin for pin: `VCC`→`VCC`,
+  `GND`→`GND`, `DOUT`→`DIN`, `CS`→`CS`, `CLK`→`CLK`. Five short wires, or the little pin headers that come
+  with the modules.
+- The eye wired to the board is the **right eye as you look at the pumpkin**; the chained one is the left.
+- **Mouth LED:** the long leg (+) → `3.3`; red → `4`, green → `3`, blue → `1`. Mixed up the short legs? The
+  mouth just shows other colours.
+
+New to these LED modules? [GurgleApps' original tutorial](https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico)
+shows the matrices and the eye-to-eye chain step by step (with a Raspberry Pi Pico, so its pins differ).
+
+### 3. Switch on
+
+The eyes start the show, and scroll how to join the pumpkin's own WiFi: network `Spooky Pumpkin`,
+password `spookyeyes`.
+
+### 4. Connect it to your WiFi (optional)
+
+Join that WiFi on a phone. A setup page pops up (or open `http://pumpkin.local`): name your pumpkin, pick
+your WiFi, type its password, tap **Connect**. The pumpkin checks the password first, restarts, joins your
+WiFi, and opens the buttons by itself. From then on, `http://pumpkin.local` on any phone, tablet or laptop
+on your WiFi.
 
 WiFi is optional: save just a name, or tap "just use the buttons", and the pumpkin keeps its own WiFi.
 
@@ -80,10 +118,13 @@ WiFi is optional: save just a name, or tap "just use the buttons", and the pumpk
 
 ## Hardware
 
+A handful of parts:
+
 - An **ESP32-C3 SuperMini** board
 - Two **MAX7219 8×8 LED matrices**, daisy-chained ([these, Amazon UK](https://amzn.eu/d/e5Kw5vX))
 - A **common-anode RGB LED** for the mouth ([these](https://amzn.eu/d/9fQ5G3V))
 - A **3 × AA battery box** (about 4.5 V into the 5V pin), or a USB power bank in the USB-C socket
+- Wires: the jumper leads that come with the matrices do nicely
 
 | Wire | SuperMini pin |
 |---|---|
@@ -179,10 +220,11 @@ What needs real phones and routers is in
 python3 scripts/build_release.py
 ```
 
-This writes two images to `release/` (gitignored). Keep them private, never on a public GitHub release:
-the release build includes `local/credits.h`, whose names aren't for the public repo. Tag the commit you
-flash (e.g. `git tag 2026.10.1`), and bump `FIRMWARE_VERSION` for every image handed out, so a pumpkin's
-Settings page can show that an update worked.
+This writes two images to `release/` (gitignored). A build in a checkout with `local/credits.h` includes
+that private credit, so keep those files private. `python3 scripts/build_release.py --public` builds
+without it, into `release/public/`, checks the images are clean, and those are the ones to attach to a
+GitHub release. Tag the commit you flash (e.g. `git tag 2026.10.2`), and bump `FIRMWARE_VERSION` for every
+image handed out, so a pumpkin's Settings page can show that an update worked.
 
 - `spooky-pumpkin-eyes-<version>-full.bin`: for a new board, flashed at address 0x0.
 - `spooky-pumpkin-eyes-<version>-ota.bin`: to update a pumpkin that's already running, from its Settings

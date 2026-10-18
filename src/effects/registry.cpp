@@ -13,8 +13,8 @@
 // Who made the Minecraft effects, for their heading: "Minecraft (Eyes Edition, by ...)". Real names stay
 // out of this public repo, so the name lives in local/credits.h (not in git) as
 //   #define MINECRAFT_BY "Name"
-// and builds without that file leave the "by" out.
-#if __has_include("../../local/credits.h")
+// and builds without that file, or with -DPUBLIC_BUILD (scripts/build_release.py --public), leave the "by" out.
+#if !defined(PUBLIC_BUILD) && __has_include("../../local/credits.h")
 #include "../../local/credits.h"
 #endif
 #ifdef MINECRAFT_BY
