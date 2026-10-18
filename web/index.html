@@ -40,19 +40,20 @@
 </main>
 <script>
 // If the page's own script never arrives (the pumpkin restarted mid-load, or the phone was still changing
-// WiFi), reload once by itself, as a person would. If that doesn't help, say so rather than sitting on
+// WiFi) in 15 s, reload once by itself, as a person would. If that doesn't help, say so rather than sitting on
 // "Waking up..." for ever. (common.js clears the mark once it has loaded.)
 setTimeout(function () {
   if (typeof Pumpkin !== 'undefined') return; // (a top-level const, so not window.Pumpkin)
   var mark = 'reloaded ' + location.pathname, tried = true;
-  try { tried = sessionStorage.getItem(mark) === '1'; sessionStorage.setItem(mark, '1'); } catch (e) { /* no storage */ }
+  try { tried = sessionStorage.getItem(mark) === '1'; sessionStorage.setItem(mark, '1'); } catch (e) { tried = true; }
   if (!tried) { location.reload(); return; }
   var note = document.createElement('p');
+  note.id = 'load-note'; // common.js removes it if the script turns up after all
   note.className = 'notice problem';
   note.setAttribute('role', 'alert');
   note.textContent = 'The page didn\u2019t load properly. Reload it to try again.';
   document.body.insertBefore(note, document.body.firstChild);
-}, 6000);
+}, 15000);
 </script>
 <script src="/common.js"></script>
 <script>
@@ -456,7 +457,7 @@ setTimeout(function () {
 
   async function showWifiNotice(tries = 1) {
     try {
-      const status = await loadStatus();
+      const status = await loadStatus({ timeout: 6000 });
       if (status.buttonsHeartbeatMs) HEARTBEAT_MS = status.buttonsHeartbeatMs;
       const notice = $('wifi-notice');
       if (status.mode === 'setup') {
@@ -477,7 +478,8 @@ setTimeout(function () {
         return showWifiNotice(tries + 1);
       }
       setStatus('Oops, can’t reach the pumpkin.');
-      err.textContent = e.message;
+      // The buttons box already says it (with a Try again button) if that failed too
+      if (!document.querySelector('#effects .error')) err.textContent = e.message;
     }
   }
 
@@ -487,7 +489,8 @@ setTimeout(function () {
   // Opening the page pauses the show (buttons mode), once it's on screen
   if (onScreen()) expect((player) => player.mode === 'buttons');
   heartbeat();
-  loadEffects().then(() => showWifiNotice());
+  loadEffects();
+  showWifiNotice();
   listen({ status: showPlayer, say: speak });
 })();
 </script>

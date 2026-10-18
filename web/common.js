@@ -8,8 +8,11 @@ const Pumpkin = (() => {
   // GET or POST some JSON. Every POST carries "X-Pumpkin: 1": the pumpkin refuses POSTs without it,
   // which stops other websites sending it requests (cheap CSRF protection). Throws an Error with a
   // message worth showing; error.needsBoot is true if the BOOT button has to be pressed first.
-  // This script arrived: a later stall may reload the page by itself again (see the pages' first script)
+  // This script arrived: a later stall may reload the page by itself again (see the pages' first script),
+  // and a "didn't load properly" note from a slow load is wrong now
   try { sessionStorage.removeItem('reloaded ' + location.pathname); } catch (e) { /* no storage */ }
+  const loadNote = document.getElementById('load-note');
+  if (loadNote) loadNote.remove();
 
   async function request(path, { method = 'GET', body, timeout = 10000 } = {}) {
     const init = { method, headers: {}, cache: 'no-store' };
@@ -56,8 +59,8 @@ const Pumpkin = (() => {
     document.title = name + (document.body.dataset.title || '');
   }
 
-  async function loadStatus() {
-    const status = await get('/api/status');
+  async function loadStatus(options) {
+    const status = await get('/api/status', options);
     showName(status.name);
     return status;
   }
