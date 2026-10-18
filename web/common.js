@@ -164,7 +164,7 @@ const Pumpkin = (() => {
   // "💥 Creeper" for an effect from /api/effects
   const effectName = (fx) => fx.emoji + ' ' + fx.label;
 
-  // Effect tiles in sections (Pictures, Minecraft...), in the order the firmware lists them, as an
+  // Effect tiles in sections (Pictures, That Blocky Game...), in the order the firmware lists them, as an
   // accordion: one section open at a time, the last one opened remembered under storeKey (the first
   // section to begin with). Each header shows the section's first emoji, its name and how many effects
   // it has; each section has its colour (the g-minecraft etc. classes in style.css). Each tile is a

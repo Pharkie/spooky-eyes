@@ -17,8 +17,6 @@ mouth, run by a tiny ESP32-C3 board with WiFi. Switch it on and it plays its own
 any phone, tablet or laptop and the show pauses for you: about 50 buttons, a talking pumpkin, and a box for
 scrolling your own words across the eyes.
 
-Most of the pictures and effects were designed by a six-year-old Halloween fan.
-
 ### Reasons to love it
 
 - **Works straight out of the box.** Switch on and the show starts: blinks, winks, bats, ghosts, a witch on a

@@ -1,6 +1,6 @@
 # Phrases from %PHRASES in legacy/pico-micropython/tools/pumpkin-buttons.pl, by tools/capture_python_frames.py.
 # <id> <phrase>; an id on its own has no phrase.
-minecraft Minecraft eyes!
+minecraft Blocky eyes!
 pumpkin Chomp chomp chomp!
 invaders The space invaders are coming!
 trees Merry Christmas!
