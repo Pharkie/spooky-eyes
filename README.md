@@ -1,51 +1,85 @@
-# Spooky Pumpkin Eyes
+<p align="center">
+  <img src="docs/instructions/assets/2024-header.png" alt="The All Hallows Spooky Pumpkin Eyes" width="70%">
+</p>
 
-**[Colour guide (PDF)](docs/instructions/2026-wifi-upgrade.pdf)**: wiring and setup on one page.
+<p align="center">
+  <img src="docs/assets/eyes-demo.gif" alt="The eyes blinking and winking, a creeper exploding, a witch flying past, Pac-Man, and the eyes rolling" width="412">
+</p>
 
-LED eyes for a Halloween pumpkin: two 8x8 LED matrices and a colour-changing mouth LED, run by an ESP32-C3
-SuperMini with WiFi. Out of the box it plays a show of eyes, pictures and messages. Open its web page on a
-phone, tablet or laptop and the show pauses for buttons: one for each of about 50 effects (creepers, a witch on a broomstick,
-Pac-Man, a Nether portal...), a talking pumpkin (the phone or laptop speaks along), and a box for scrolling your own
-words across the eyes. The show page builds your own show from effects and messages (it saves as you go), and
-that's what the pumpkin plays at switch-on.
+**Two glowing eyes. One pumpkin. A phone full of buttons.**
 
-Pictures, effects and ideas by a six-year-old Halloween fan.
+Spooky Pumpkin Eyes turns a Halloween pumpkin into a character: two 8×8 LED eyes and a colour-changing
+mouth, run by a tiny ESP32-C3 board with WiFi. Switch it on and it plays its own show. Open its web page on
+any phone, tablet or laptop and the show pauses for you: about 50 buttons, a talking pumpkin, and a box for
+scrolling your own words across the eyes.
 
-## For the people with a pumpkin
+Most of the pictures and effects were designed by a six-year-old Halloween fan.
 
-The one-page guide is in [docs/instructions/](docs/instructions/): how to connect the wires from the old
-Raspberry Pi Pico to the new board, and how to set up the WiFi. In short:
+### Reasons to love it
 
-1. Switch on. With no home WiFi saved, the pumpkin makes its own WiFi network called "Spooky Pumpkin",
-   and its eyes scroll how to join it. The password is `spookyeyes`.
-2. Join it on a phone, tablet or laptop. A setup page pops up (or open http://pumpkin.local or http://192.168.4.1): give the pumpkin a name (e.g.
-   "Jack's Pumpkin"), pick your home WiFi (it must be 2.4 GHz), type its password, tap Connect.
-   The pumpkin tries the password first (up to 30 seconds) and only saves one that works. WiFi is
-   optional: save just a name, or tap "just use the buttons" at the bottom, and the pumpkin keeps its own
-   WiFi.
-3. The pumpkin restarts, joins your WiFi, and scrolls its web address across its eyes:
-   `http://pumpkin.local  or  192.168.1.23`. The setup page waits for it and opens the buttons by itself;
-   later, open that address on any phone, tablet or laptop on the same WiFi (if `pumpkin.local` doesn't
-   open, type the numbers). The WiFi name and address are the same on every pumpkin (one per house), so the
-   guide can print them; the name you give it is what it scrolls on its eyes.
+- **Works straight out of the box.** Switch on and the show starts: blinks, winks, bats, ghosts, a witch on a
+  broomstick, Pac-Man, a Nether portal, round and round.
+- **A button for everything.** About 50 effects on one page, from eyes and pictures to Minecraft and games.
+  Each press interrupts the last, so mash away.
+- **A talking pumpkin.** Your phone speaks each effect's line as it plays ("Hissss!"). Pick any voice your
+  phone has.
+- **Your own words.** Type anything and it scrolls across the eyes.
+- **Design your own show.** Add, remove and reorder blocks on the show page. It saves as you go, and that's
+  what plays at switch-on.
+- **No app, no cloud, no account.** Plain web pages, served by the pumpkin itself at `http://pumpkin.local`.
+  Your WiFi password is stored on the board and never sent anywhere.
+- **Doorstep-ready.** Carried out of WiFi range, it makes its own WiFi so trick-or-treaters' phones can
+  still press the buttons.
+- **Runs on 3 AA batteries.** The processor idles, the mouth LED is dimmed, and the pumpkin's own WiFi
+  switches off when nobody's using it.
+- **One printed page to set it up.** [The guide](docs/instructions/2026-wifi-upgrade.pdf): wiring diagram,
+  WiFi setup and troubleshooting on one sheet of A4.
 
-If the eyes say "Join WiFi..." again after that, the password was probably wrong: join the pumpkin's WiFi
-again and the setup page says what went wrong. If it loses home WiFi for 3 minutes (carried out to the
-doorstep, say) it makes its own network again, so you can still join it and open http://pumpkin.local or
-http://192.168.4.1. It rejoins home WiFi when it's back in range, unless its own WiFi has been unused for
-10 minutes and switched off by then: then switch it off and on.
+<p align="center">
+  <img src="docs/assets/pages.jpg" alt="The setup page, the buttons page and the show page on a phone" width="100%">
+</p>
 
-The BOOT button on the board: a quick press scrolls the address again (and unlocks firmware updates for 5
-minutes, which only work on the home WiFi); hold it for 5 seconds to make it forget the home WiFi. That
-erases the WiFi name and password from the board's memory, so do it before passing the pumpkin on. If the
-eyes say "New batteries please", they mean it: weak batteries can't power the WiFi.
+## Quick start
 
-To make the batteries last, the pumpkin's own WiFi (before it's set up, or on the doorstep) switches off when
-nobody has used it for 10 minutes. On your home WiFi it stays connected, dozing between messages, so the page
-always works. The show carries on as usual. To get its own WiFi back, press BOOT quickly or switch the
-pumpkin off and on. You can turn this off in Settings ("Save batteries").
+**👉 [The one-page guide (PDF)](docs/instructions/2026-wifi-upgrade.pdf)** has the wiring diagram and the
+setup steps. In short:
 
-## Wiring (ESP32-C3 SuperMini)
+1. **Wire it** as the diagram shows (pins below).
+2. **Switch on.** The eyes start the show, and scroll how to join the pumpkin's own WiFi: network
+   `Spooky Pumpkin`, password `spookyeyes`.
+3. **Join that WiFi** on a phone. A setup page pops up (or open `http://pumpkin.local`): name your pumpkin,
+   pick your WiFi, type its password, tap **Connect**. The pumpkin checks the password first, restarts, joins
+   your WiFi, and opens the buttons by itself.
+4. **Play.** From then on, `http://pumpkin.local` on any phone, tablet or laptop on your WiFi.
+
+WiFi is optional: save just a name, or tap "just use the buttons", and the pumpkin keeps its own WiFi.
+
+<details>
+<summary><b>Good to know</b> (what the eyes mean, the BOOT button, batteries)</summary>
+
+- **"Join WiFi…" again after setup?** The password was probably wrong: join the pumpkin's WiFi again and
+  the setup page says what went wrong.
+- **On the doorstep.** Out of reach of your WiFi for 3 minutes, the pumpkin makes its own network again, so
+  you can still join it and open `http://pumpkin.local` or `http://192.168.4.1`. Back in range it rejoins
+  your WiFi, unless its own WiFi has been unused for 10 minutes and switched off by then: then switch it
+  off and on.
+- **The BOOT button** on the board: a quick press scrolls the address again (and unlocks firmware updates
+  for 5 minutes, which only work on your WiFi). Hold it for 5 seconds to forget your WiFi. That erases the
+  WiFi name and password from the board's memory, so do it before passing the pumpkin on.
+- **"New batteries please"** means it: weak batteries can't power the WiFi.
+- **Saving batteries.** The pumpkin's own WiFi (before it's set up, or on the doorstep) switches off when
+  nobody has used it for 10 minutes; the show carries on. On your WiFi it stays connected, dozing between
+  messages, so the page always works. A quick BOOT press, or switching off and on, brings its own WiFi
+  back. You can turn this off in Settings ("Save batteries").
+
+</details>
+
+## Hardware
+
+- An **ESP32-C3 SuperMini** board
+- Two **MAX7219 8×8 LED matrices**, daisy-chained ([these, Amazon UK](https://amzn.eu/d/e5Kw5vX))
+- A **common-anode RGB LED** for the mouth ([these](https://amzn.eu/d/9fQ5G3V))
+- A **3 × AA battery box** (about 4.5 V into the 5V pin), or a USB power bank in the USB-C socket
 
 | Wire | SuperMini pin |
 |---|---|
@@ -59,11 +93,24 @@ pumpkin off and on. You can turn this off in Settings ("Save batteries").
 | Mouth LED green | 3 |
 | Mouth LED blue | 1 |
 
-The pin map lives in [src/hardware/board.h](src/hardware/board.h). Power is 3 AA batteries (about 4.5 V)
-into the 5V pin, or a USB power bank in the USB-C socket. WiFi draws more than the old Pico, so fresh
-batteries help.
+The pin map lives in [src/hardware/board.h](src/hardware/board.h). WiFi draws more than the old Raspberry Pi
+Pico this project started on, so fresh batteries help.
 
-## Building
+## How it works
+
+- **C++ firmware** on the ESP32-C3 (Arduino framework, built with PlatformIO). The effects are portable
+  code with no Arduino headers, so they run in tests on your computer too.
+- **The web pages are compiled into the firmware**, gzipped, so there's no filesystem to upload and a
+  firmware update updates the pages too.
+- **Its own WiFi with a captive portal** until it's set up: join "Spooky Pumpkin" and the setup page pops up.
+  On your WiFi it answers at `pumpkin.local`.
+- **A talking pumpkin** by server-sent events: the pumpkin tells the page what to say, and the phone says
+  it with its own speech voices.
+- **Updates from the Settings page** over WiFi, with a 30-second trial: firmware that crashes is rolled
+  back by the bootloader.
+- **Battery care:** 80 MHz CPU, a PWM-dimmed mouth LED, and the pumpkin's own WiFi off when idle.
+
+## Building and hacking
 
 You need [PlatformIO](https://platformio.org/) (`pip install platformio`).
 
@@ -75,13 +122,15 @@ pio test -e native                # effect tests on this computer, no board need
 python3 tools/mock_server.py      # try the web pages in a browser with a fake pumpkin
 ```
 
-The web pages in `web/` are compiled into the firmware, so there's no separate filesystem upload, and a
-firmware update updates the pages too.
-
 Over USB the board also takes simple serial commands: `list`, `play creeper`, `say Hello`, `show`,
 `name Jack's Pumpkin`, `status`, `unlock` (a short BOOT press), `fs`, `help`.
 
-### Testing
+**Adding an effect** is a function in `src/effects/effects.cpp` and one line in the table in
+`src/effects/registry.cpp`: the button appears on the page, the surprise show can pick it, and the tests
+smoke-test it. [CLAUDE.md](CLAUDE.md) explains how the pieces fit together.
+
+<details>
+<summary><b>Testing</b></summary>
 
 ```
 pio test -e native                                   # the effects, frame by frame
@@ -117,7 +166,10 @@ no crash, brownout or restart. `--log-file boot.log` checks a saved log instead.
 What needs real phones and routers is in
 [docs/testing/pre-posting-checklist.md](docs/testing/pre-posting-checklist.md).
 
-### Making a release
+</details>
+
+<details>
+<summary><b>Making a release and preparing pumpkins</b></summary>
 
 ```
 python3 scripts/build_release.py
@@ -125,7 +177,7 @@ python3 scripts/build_release.py
 
 This writes two images to `release/` (gitignored). Keep them private, never on a public GitHub release:
 the release build includes `local/credits.h`, whose names aren't for the public repo. Tag the commit you
-flash (e.g. `git tag 2026.10.0`), and bump `FIRMWARE_VERSION` for every image handed out, so a pumpkin's
+flash (e.g. `git tag 2026.10.1`), and bump `FIRMWARE_VERSION` for every image handed out, so a pumpkin's
 Settings page can show that an update worked.
 
 - `spooky-pumpkin-eyes-<version>-full.bin`: for a new board, flashed at address 0x0.
@@ -133,10 +185,8 @@ Settings page can show that an update worked.
   page (no cable needed; it must be on the home WiFi, and you'll be asked to press the BOOT button on the
   board first).
 
-### Preparing pumpkins for posting
-
-Every board gets the same firmware and leaves identical: it's called "Spooky Pumpkin" until its new
-owner names it on the setup page (or later in Settings). Nothing to track per person.
+Every board gets the same firmware and leaves identical: it's called "Spooky Pumpkin" until its new owner
+names it on the setup page (or later in Settings). Nothing to track per person.
 
 1. Erase and flash each board over USB. Erasing matters: it clears any test WiFi details and old settings.
    ```
@@ -152,7 +202,10 @@ owner names it on the setup page (or later in Settings). Nothing to track per pe
 3. Print the guide, [docs/instructions/2026-wifi-upgrade.pdf](docs/instructions/2026-wifi-upgrade.pdf),
    once per pumpkin (`tools/make_instructions.sh` rebuilds it from the HTML next to it).
 
-## How the code is organised
+</details>
+
+<details>
+<summary><b>How the code is organised</b></summary>
 
 | Folder | What's there |
 |---|---|
@@ -167,17 +220,28 @@ owner names it on the setup page (or later in Settings). Nothing to track per pe
 | `docs/instructions/` | The printed one-page guide for the 2026 WiFi upgrade |
 | `docs/testing/` | The checks before posting that need phones and routers |
 
-[CLAUDE.md](CLAUDE.md) explains how the pieces fit together, including how to add an effect (write the
-function, add one line to the table).
+</details>
+
+## Like this project?
+
+If it made a pumpkin grin, give it a ⭐ so other Halloween tinkerers can find it.
+
+## LLM generated, human reviewed
+
+This code was written with [Claude Code](https://claude.com/claude-code) (Anthropic), mostly on Claude Opus
+5.5 and Fable 5.1, directed and reviewed throughout by the human author. The firmware was tested on real
+boards and phones, with automated tests for the effects and the web API, and reviewed for security and
+privacy before the pumpkins were posted. Still, it has had limited manual review: make your own checks, and
+use it at your own risk.
 
 ## Credits
 
 - Original pumpkin eyes code and tutorial by [GurgleApps](https://gurgleapps.com/learn/projects/8x8-led-matrix-halloween-jack-o-lantern-pumpkin-project-with-a-pico)
   ([gurgleapps/pico-pumpkin](https://github.com/gurgleapps/pico-pumpkin), GPL): the eye pictures, many of
-  the shapes, the first eye animations and the scrolling font are theirs. This project began in 2023 as a fork of it, called
-  pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with the move to the
-  ESP32-C3 and a rewrite in C++. The 2023-24 MicroPython version isn't kept here any more: it lives on in
-  the history before then, and in GurgleApps' repo.
+  the shapes, the first eye animations and the scrolling font are theirs. This project began in 2023 as a
+  fork of it, called pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with
+  the move to the ESP32-C3 and a rewrite in C++. The 2023-24 MicroPython version isn't kept here any more: it
+  lives on in the history before then, and in GurgleApps' repo.
 - WiFi setup, captive portal and web server patterns from Adam's Scribe Evolution project.
 - Libraries: [ArduinoJson](https://arduinojson.org/) (MIT),
   [ESPAsyncWebServer and AsyncTCP](https://github.com/esphome/ESPAsyncWebServer) (LGPL 3.0), and
@@ -188,5 +252,5 @@ function, add one line to the table).
 ## Licence
 
 GNU General Public License, version 3 or (at your option) any later version: see [LICENSE](LICENSE). It
-includes GurgleApps' GPL pictures, animations and font, released under the GPL without a version number (which
-lets anyone choose any version); this project uses version 3 or later throughout.
+includes GurgleApps' GPL pictures, animations and font, released under the GPL without a version number
+(which lets anyone choose any version); this project uses version 3 or later throughout.
