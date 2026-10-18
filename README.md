@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="docs/instructions/assets/2024-header.png" alt="The All Hallows Spooky Pumpkin Eyes" width="70%">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/title-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/title-light.png">
+    <img src="docs/assets/title-light.png" alt="The All Hallows Spooky Pumpkin Eyes" width="70%">
+  </picture>
 </p>
 
 <p align="center">
