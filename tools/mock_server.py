@@ -179,7 +179,7 @@ EFFECT_ENTRY = re.compile(
 # A block of the default show in show.cpp: {ShowBlock::Kind::Effect, "creeper"} or {ShowBlock::Kind::Words, "..."}
 SHOW_ENTRY = re.compile(r"\{\s*(?:ShowBlock::)?Kind::(Effect|Words)\s*,\s*" + C_STRING + r"\s*\}")
 GROUP_NAME = re.compile(r'case\s+EffectGroup::(\w+)\s*:\s*return\s+"([^"]*)"')
-# groupTitle()'s Minecraft heading, as built without local/credits.h (the "by" credit)
+# groupTitle()'s blocky-game heading, as built without local/credits.h (the "by" credit)
 MINECRAFT_TITLE = re.compile(r'#else\s+#define MINECRAFT_TITLE\s+"([^"]*)"')
 
 
@@ -215,7 +215,7 @@ def load_effects():
 def load_group_titles():
     """groupTitle(): section headings that differ from the group's name."""
     match = MINECRAFT_TITLE.search(REGISTRY.read_text(encoding="utf-8"))
-    return {"Minecraft": match.group(1)} if match else {}
+    return {"Blocky": match.group(1)} if match else {}
 
 
 GROUP_TITLES = load_group_titles()

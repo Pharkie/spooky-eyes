@@ -191,7 +191,7 @@ const Pumpkin = (() => {
       header.innerHTML = '<span class="e" aria-hidden="true"></span><span class="acc-name"></span> ' +
         '<span class="acc-count"></span><span class="chev" aria-hidden="true">▾</span>';
       header.querySelector('.e').textContent = list[0].emoji;
-      // "Minecraft (Eyes Edition)": the bit in brackets goes smaller, on a line of its own
+      // "That Blocky Game (Eyes Edition)": the bit in brackets goes smaller, on a line of its own
       const [, title, aside] = /^(.*?)(?:\s*(\(.*\)))?$/.exec(titles[group] || group);
       const name = header.querySelector('.acc-name');
       name.textContent = title;
