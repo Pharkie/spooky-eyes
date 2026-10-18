@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#define FIRMWARE_VERSION "2026.10.3"
+#define FIRMWARE_VERSION "2026.10.4"
 
 namespace PumpkinTime
 {

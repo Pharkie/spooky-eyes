@@ -27,7 +27,7 @@
 #         24 Effect  halloween  m.scroll_message(T, ' Happy Halloween! ', 0.03)
 # c++:    for (const ShowBlock &block : defaultShow()) playBlock(engine, block)
 # 3644 events. Do not edit: re-run the capture script instead.
-S Minecraft eyes!
+S Blocky eyes!
 M
 F ff818199998181ff ff818199998181ff
 W 1000

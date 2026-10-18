@@ -45,7 +45,7 @@ namespace
         {"trees", "Christmas trees", "🎄", EffectGroup::Pictures, "Merry Christmas!", trees, true},
         {"hearts", "Hearts", "❤️", EffectGroup::Pictures, "I love you!", hearts, true},
         // Minecraft
-        {"minecraft", "Minecraft eyes", "🟩", EffectGroup::Minecraft, "Minecraft eyes!", minecraft, true},
+        {"minecraft", "Blocky eyes", "🟩", EffectGroup::Minecraft, "Blocky eyes!", minecraft, true},
         {"creeper", "Creeper", "💥", EffectGroup::Minecraft, nullptr, creeperExplode, true},
         {"diamond", "Diamond", "💎", EffectGroup::Minecraft, "Diamonds!", diamond, true},
         {"sword", "Sword", "🗡️", EffectGroup::Minecraft, "Swish! Swoosh!", sword, true},

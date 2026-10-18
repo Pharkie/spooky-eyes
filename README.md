@@ -17,8 +17,6 @@ mouth, run by a tiny ESP32-C3 board with WiFi. Switch it on and it plays its own
 any phone, tablet or laptop and the show pauses for you: about 50 buttons, a talking pumpkin, and a box for
 scrolling your own words across the eyes.
 
-Most of the pictures and effects were designed by a six-year-old Halloween fan.
-
 ### Reasons to love it
 
 - **Works straight out of the box.** Switch on and the show starts: blinks, winks, bats, ghosts, a witch on a
@@ -287,8 +285,10 @@ use it at your own risk.
   ([gurgleapps/pico-pumpkin](https://github.com/gurgleapps/pico-pumpkin), GPL): the eye pictures, many of
   the shapes, the first eye animations and the scrolling font are theirs. This project began in 2023 as a
   fork of it, called pico-pumpkin while it ran on a Raspberry Pi Pico; it became spooky-eyes in 2026 with
-  the move to the ESP32-C3 and a rewrite in C++. The 2023-24 MicroPython version isn't kept here any more: it
-  lives on in the history before then, and in GurgleApps' repo.
+  the move to the ESP32-C3 and a rewrite in C++. The 2023-24 MicroPython version isn't in the current tree,
+  but it's still in this repo's git history
+  ([legacy/pico-micropython at the last commit before it was removed](https://github.com/Pharkie/spooky-eyes/tree/876fc9d/legacy/pico-micropython))
+  and in GurgleApps' repo.
 - WiFi setup, captive portal and web server patterns from Adam's Scribe Evolution project.
 - Libraries: [ArduinoJson](https://arduinojson.org/) (MIT),
   [ESPAsyncWebServer and AsyncTCP](https://github.com/esphome/ESPAsyncWebServer) (LGPL 3.0), and

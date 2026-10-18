@@ -1,8 +1,9 @@
 # Spooky Pumpkin Eyes: notes for Claude
 
 Halloween pumpkin: two daisy-chained MAX7219 8x8 LED matrices ("eyes") and a common-anode RGB "mouth" LED on
-an ESP32-C3 SuperMini, C++/Arduino via PlatformIO. Phones control it over WiFi. A six-year-old designed most
-of the pictures and effects; four pumpkins were posted to friends and family in October 2026.
+an ESP32-C3 SuperMini, C++/Arduino via PlatformIO. Phones control it over WiFi. A six-year-old designed many
+of the newer pictures and effects (the eyes, shapes, first animations and font are GurgleApps' work); five
+pumpkins were posted to friends and family in October 2026.
 
 ## Golden rules
 
