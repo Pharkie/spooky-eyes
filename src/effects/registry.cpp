@@ -10,7 +10,8 @@
 #include "effects/effects.h"
 #include "effects/primitives.h"
 
-// Who made the Minecraft effects, for their heading: "Minecraft (Eyes Edition, by ...)". Real names stay
+// Who made the blocky-game effects, for their heading: "That Blocky Game (Eyes Edition, by ...)". (Not the
+// game's trademarked name: "that blocky game" is how everyone refers to it anyway.) Real names stay
 // out of this public repo, so the name lives in local/credits.h (not in git) as
 //   #define MINECRAFT_BY "Name"
 // and builds without that file, or with -DPUBLIC_BUILD (scripts/build_release.py --public), leave the "by" out.
@@ -18,9 +19,9 @@
 #include "../../local/credits.h"
 #endif
 #ifdef MINECRAFT_BY
-#define MINECRAFT_TITLE "Minecraft (Eyes Edition, by " MINECRAFT_BY ")"
+#define MINECRAFT_TITLE "That Blocky Game (Eyes Edition, by " MINECRAFT_BY ")"
 #else
-#define MINECRAFT_TITLE "Minecraft (Eyes Edition)"
+#define MINECRAFT_TITLE "That Blocky Game (Eyes Edition)"
 #endif
 
 namespace
@@ -111,7 +112,7 @@ const char *groupName(EffectGroup group)
     case EffectGroup::Pictures:
         return "Pictures";
     case EffectGroup::Minecraft:
-        return "Minecraft";
+        return "Blocky";
     case EffectGroup::Eyes:
         return "Eyes";
     case EffectGroup::Games:

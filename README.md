@@ -23,7 +23,8 @@ Most of the pictures and effects were designed by a six-year-old Halloween fan.
 
 - **Works straight out of the box.** Switch on and the show starts: blinks, winks, bats, ghosts, a witch on a
   broomstick, Pac-Man, a Nether portal, round and round.
-- **A button for everything.** About 50 effects on one page, from eyes and pictures to Minecraft and games.
+- **A button for everything.** About 50 effects on one page, from eyes and pictures to creepers, endermen
+  and games.
   Each press interrupts the last, so mash away.
 - **A talking pumpkin.** Your phone speaks each effect's line as it plays ("Hissss!"). Pick any voice your
   phone has.
@@ -294,6 +295,8 @@ use it at your own risk.
   [arduino-esp32](https://github.com/espressif/arduino-esp32) (LGPL 2.1), each under its own licence.
 - Eyes: MAX7219 8x8 matrices ([these, Amazon UK](https://amzn.eu/d/e5Kw5vX)); mouth: a common-anode RGB LED
   ([these](https://amzn.eu/d/9fQ5G3V)).
+- The "That Blocky Game" effects are a six-year-old's fan art. Minecraft is a trademark of Mojang
+  Synergies AB; this project isn't affiliated with or endorsed by Mojang or Microsoft.
 
 ## Licence
 

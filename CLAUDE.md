@@ -33,7 +33,7 @@ of the pictures and effects; four pumpkins were posted to friends and family in 
   whole when they're forgotten or changed: NVS only marks removed entries, so the old password would stay
   readable in flash. They're never logged or returned by the API.
 - The repo is public: no real people's names in it. Credits with names go in `local/credits.h` (gitignored,
-  in the main checkout where releases are built), e.g. `#define MINECRAFT_BY "..."` for the Minecraft heading
+  in the main checkout where releases are built), e.g. `#define MINECRAFT_BY "..."` for the "That Blocky Game" heading
   (`groupTitle()` in `src/effects/registry.cpp`).
 
 ## Commands
