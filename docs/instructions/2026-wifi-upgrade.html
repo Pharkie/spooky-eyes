@@ -183,9 +183,8 @@
       <h2>New in 2026</h2>
       <ul>
         <li><svg class="icon" aria-hidden="true"><use href="#i-show"/></svg>Design your own show</li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg>A button pad to trigger effects</li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-pad"/></svg>A button for every effect</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-talk"/></svg><span>A talking pumpkin <small>(on your phone)</small></span></li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-words"/></svg>Your own words</li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-battery"/></svg>Longer battery life</li>
       </ul>
     </div>
@@ -201,8 +200,8 @@
   <section class="abs bottom steps" id="bottom">
     <div class="keep-clear-head"></div>
     <div class="keep-clear-raven"></div>
-    <div class="step"><span class="n">4</span><span class="lead">Connect to your WiFi</span> (optional).
-      On a phone, tablet or laptop, join the WiFi Spooky Eyes makes:
+    <div class="step"><span class="n">4</span><span class="lead">Connect Spooky Eyes to your WiFi</span> (optional).
+      Join its WiFi on a phone, tablet or laptop:
       <!-- In the order you use them: join the network, then open the setup page. pumpkin.local works on Spooky Eyes'
            own WiFi too (the firmware starts mDNS with it); 192.168.4.1 is there for phones that don't do .local. -->
       <div class="wifi-card">
@@ -221,8 +220,8 @@
         off and on, then join again (switching mobile data off can help).</p>
       <p><b>Spooky Pumpkin WiFi gone?</b> Unused for 10 minutes, it switches off to save batteries: press BOOT.</p>
       <p><b>Page won’t open later?</b> Check your phone is on your WiFi, or switch Spooky Eyes off and on.</p>
-      <p><b>On the doorstep?</b> Out of reach of your WiFi for 3 minutes, Spooky Eyes brings back the Spooky
-        Pumpkin WiFi: join and open pumpkin.local. Back indoors? Switch off and on to rejoin your WiFi.</p>
+      <p><b>Out of reach of your WiFi?</b> Out of range for 3 minutes, Spooky Eyes brings back the Spooky
+        Pumpkin WiFi: join and open pumpkin.local. Back in range? Switch off and on to rejoin your WiFi.</p>
       <p><b>BOOT button</b> (on the board): press to repeat the address; hold 5 seconds to forget your WiFi
         (do this before passing Spooky Eyes on).</p>
       <p><b>No WiFi to hand?</b> On the setup page, “just use the buttons” works on Spooky Eyes’ own WiFi.</p>
@@ -534,9 +533,6 @@ function drawDiagram() {
   const label = { x: LOOP.right + 3, y: LOOP.top + 2.9 };   // above the + wire's way to the board
   el("text", { x: label.x, y: label.y, "font-family": HAND, "font-size": pt(10.5), fill: INK, "letter-spacing": 0.2 }, bat,
      "BATTERY PACK");
-  const often = el("text", { "font-family": BODY, "font-style": "italic", "font-size": pt(8), fill: "#4a3f38" }, bat);
-  ["(often already joined", "to the eye’s wires)"].forEach((t, k) =>
-    el("tspan", { x: label.x, y: label.y + 2.7 + k * 2.65 }, often, t));
 
   // ---- draw: the wires ----
   const wires = g({ fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" });
