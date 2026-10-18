@@ -44,6 +44,9 @@ firmware, every POST needs the "X-Pumpkin: 1" header. Python standard library on
 Its replies (status codes, JSON shapes and error messages) should match the firmware's exactly:
 tools/api_check.py checks both against the same cases (test/api/cases.py), and --compare runs them on a
 board and here side by side. Lengths are counted in UTF-8 bytes, as the firmware does.
+
+Careful: after a WiFi save the mock answers address http://pumpkin.local, as the firmware does, so the
+setup page then opens whatever pumpkin.local is on YOUR network (a real pumpkin, if one's about).
 """
 
 import argparse
