@@ -21,3 +21,6 @@ release/
 
 # Personal files kept out of the repo (e.g. the 2024 instructions sheet, which has a sign-off)
 local/
+
+# Photos and videos of the finished pumpkins (local only)
+Finished photo video/
