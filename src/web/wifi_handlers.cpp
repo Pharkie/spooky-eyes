@@ -164,6 +164,7 @@ namespace web
         void handleSave(AsyncWebServerRequest *request, JsonDocument &body)
         {
             Settings updated = settings::get();
+            const String oldName = updated.pumpkinName;
             updated.wifiPassword = ""; // no password sent = an open network
             String error;
             // Rough limits here; settings::save() has the final say (8-63 characters, or 64 hex digits)
@@ -189,6 +190,11 @@ namespace web
             // save() tidies the name, so read back what it kept
             const Settings saved = settings::get();
             LOG("WEB", "Saved home WiFi \"%s\"; restarting to join it", saved.wifiSsid.c_str());
+            if (saved.pumpkinName != oldName)
+            {
+                settings::noteRenamed(); // the eyes say the new name once it's back
+                LOG("WEB", "Renamed to \"%s\"", saved.pumpkinName.c_str());
+            }
 
             JsonDocument doc;
             doc["ok"] = true;

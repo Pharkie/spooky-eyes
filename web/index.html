@@ -155,10 +155,25 @@ setTimeout(function () {
 
   // ---- Buttons, built from the firmware's list of effects ----
 
-  // Just after a restart or a change of WiFi the first tries can go nowhere: try again by itself a few
-  // times before saying so
-  const AUTO_TRIES = 4;
+  // Just after a restart or a change of WiFi the first tries can go nowhere: keep trying by itself. After
+  // a few misses, reload the page once (a fresh page finds the pumpkin where a stuck one doesn't, which
+  // is what a person's refresh does), then keep trying for a couple of minutes before saying so.
+  const AUTO_TRIES = 15;
+  const RELOAD_AFTER = 3;
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Reload, once in two minutes (sessionStorage remembers across the reload). False if it already has.
+  function reloadOnce() {
+    try {
+      const key = 'api-reload ' + location.pathname;
+      if (Date.now() - (Number(sessionStorage.getItem(key)) || 0) < 120000) return false;
+      sessionStorage.setItem(key, String(Date.now()));
+    } catch (e) {
+      return false;
+    }
+    location.reload();
+    return true;
+  }
 
   async function loadEffects(tries = 1) {
     const box = $('effects');
@@ -168,6 +183,8 @@ setTimeout(function () {
       effectAccordion(box, data.effects, { storeKey: 'section', titles: data.groupTitles });
     } catch (e) {
       if (e.unreachable && tries < AUTO_TRIES) {
+        if (tries === RELOAD_AFTER && reloadOnce()) return;
+        if (tries >= RELOAD_AFTER) setStatus('Still waking up the pumpkin\u2026 Is this phone on the same WiFi as it?');
         await pause(2000);
         return loadEffects(tries + 1);
       }

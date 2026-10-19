@@ -70,7 +70,7 @@ run it again whenever an effect changes.
 | | Effect | The pumpkin says |
 |---|---|---|
 | <img src="effects/dice.gif" width="218" alt="Roll the dice"> | 🎲 **Roll the dice** | "Rolling the dice!" |
-| <img src="effects/magic.gif" width="218" alt="Magic pumpkin"> | 🎱 **Magic pumpkin** | "Hmm, let me think." |
+| <img src="effects/magic.gif" width="218" alt="Ask the Magic 8-Ball"> | 🎱 **Ask the Magic 8-Ball** | "Hmm, let me think." |
 | <img src="effects/boo.gif" width="218" alt="3, 2, 1… BOO!"> | 😱 **3, 2, 1… BOO!** |  |
 | <img src="effects/fruit.gif" width="218" alt="Fruit machine"> | 🎰 **Fruit machine** | "Spin to win!" |
 | <img src="effects/surprise.gif" width="218" alt="Surprise show"> | 🔀 **Surprise show** | "Surprise!" |
