@@ -15,6 +15,10 @@ one with a temporary `FIRMWARE_VERSION` such as `2026.10.0-test`, or the update 
 Board -> the viewer's right eye (the left one seen from behind) -> its DOUT header -> the other eye's DIN
 header. If anything looks swapped, fix the wiring, not the code.
 
+Random, flickering gobbledygook on an eye (often with a hot board) is not wiring or firmware: the 8x8 LED
+block has gone back into the module's round-pin socket upside down. The socket isn't keyed, so mark the
+block's top before pulling it out to solder.
+
 - [ ] Switch-on: the far eye has no stray dots and doesn't stay fully lit.
 - [ ] Wink left and Wink right wink the right eyes; Cross-eyed turns the pupils in towards the nose.
 - [ ] Your own words: upright, not mirrored, entering at the right eye's right edge and reaching the left
