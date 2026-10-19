@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#define FIRMWARE_VERSION "2026.10.4"
+#define FIRMWARE_VERSION "2026.10.5"
 
 namespace PumpkinTime
 {
@@ -41,6 +41,8 @@ constexpr uint32_t kBootUnlockMs = PumpkinTime::Minutes(5);
 // show passes, and then the show plays on by itself: WiFi is optional, and the password shouldn't scroll
 // at trick-or-treaters all night. A short BOOT press shows them again.
 constexpr int kSetupMessageRepeats = 1;
+// Scrolled once, with the new name after it, when the pumpkin is renamed
+constexpr const char *kRenamedMessagePrefix = " My name is now ";
 
 // Saving batteries. With the "save batteries" setting on (the default), the pumpkin's own WiFi (setup, or
 // the doorstep fallback) switches off after this long with nobody using it: no page or API request, no page

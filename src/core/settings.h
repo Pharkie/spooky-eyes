@@ -38,4 +38,9 @@ namespace settings
 
     // Clear the home WiFi name and password (the pumpkin goes back to setup mode after a restart)
     void forgetWifi();
+
+    // A new name saved together with the WiFi is announced on the eyes after the restart that follows:
+    // the web handler notes it, and main.cpp takes the note at boot (true once, then cleared).
+    void noteRenamed();
+    bool takeRenamed();
 }

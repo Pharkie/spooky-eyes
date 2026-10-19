@@ -283,6 +283,7 @@ namespace web
             if (saved.pumpkinName != oldName)
             {
                 LOG("WEB", "Renamed to \"%s\"", saved.pumpkinName.c_str());
+                player::announce(String(kRenamedMessagePrefix) + saved.pumpkinName + " ");
             }
             JsonDocument doc;
             doc["ok"] = true;

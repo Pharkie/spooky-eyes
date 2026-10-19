@@ -116,6 +116,8 @@ void setup()
     settings::begin();
     show_store::begin(); // the saved show, which the player loads
     player::begin();     // eyes show a picture straight away; loop() starts the show
+    if (settings::takeRenamed()) // named on the setup page just before this restart: say so, then the WiFi news
+        player::announce(String(kRenamedMessagePrefix) + settings::get().pumpkinName + " ");
 
     // A short press on the BOOT button shows how to reach it again, or brings the WiFi back if it's off
     // (to save batteries, or after brownouts): a restart joins the home WiFi or starts the setup WiFi

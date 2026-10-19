@@ -297,15 +297,19 @@ namespace web
             }
         };
 
-        // Checked first: notes that someone's using the pumpkin, then lets the other handlers have the
-        // request. The one place requests are counted, so the WiFi stays on while they come (a firmware
-        // upload, one long request, also notes each piece as it arrives).
+        // Checked first: notes that someone's using the pumpkin and logs the request (a line each, so the
+        // serial log shows what a phone asked for and when), then lets the other handlers have it. The one
+        // place requests are counted, so the WiFi stays on while they come (a firmware upload, one long
+        // request, also notes each piece as it arrives).
         class ActivityHandler : public AsyncWebHandler
         {
         public:
-            bool canHandle(AsyncWebServerRequest *) override
+            bool canHandle(AsyncWebServerRequest *request) override
             {
                 network::noteActivity();
+                if (!isProbePath(request->url())) // (the captive portal logs those)
+                    LOG("WEB", "%s %s from %s for \"%s\"", request->methodToString(), request->url().c_str(),
+                        request->client()->remoteIP().toString().c_str(), request->host().c_str());
                 return false;
             }
         };

@@ -75,7 +75,7 @@ namespace
         {"crosseyed", "Cross-eyed", "🤪", EffectGroup::Eyes, "Ooh, I'm going cross-eyed!", crossEyed, true},
         // Games
         {"dice", "Roll the dice", "🎲", EffectGroup::Games, "Rolling the dice!", rollDice, true},
-        {"magic", "Magic pumpkin", "🎱", EffectGroup::Games, "Hmm, let me think.", magicAnswer, true},
+        {"magic", "Ask the Magic 8-Ball", "🎱", EffectGroup::Games, "Hmm, let me think.", magicAnswer, true},
         {"boo", "3, 2, 1… BOO!", "😱", EffectGroup::Games, nullptr, countdownBoo, true},
         {"fruit", "Fruit machine", "🎰", EffectGroup::Games, "Spin to win!", fruitMachine, true},
         {"surprise", "Surprise show", "🔀", EffectGroup::Games, "Surprise!", surpriseShow, false},

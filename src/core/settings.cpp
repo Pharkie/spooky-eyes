@@ -34,6 +34,7 @@ namespace
 
     // NVS keys (15 characters at most)
     constexpr const char *kKeyName = "name";
+    constexpr const char *kKeyRenamed = "renamed"; // noteRenamed(): say the new name after the restart
     constexpr const char *kKeySsid = "wifi_ssid";
     constexpr const char *kKeyPassword = "wifi_pass";
     constexpr const char *kKeyBrightness = "brightness";
@@ -402,6 +403,30 @@ namespace settings
             current.wifiPassword = "";
         }
         LOG("SETTINGS", "Home WiFi forgotten");
+    }
+
+    void noteRenamed()
+    {
+        Lock saving(saveMutex);
+        Preferences prefs;
+        if (prefs.begin(kNamespace, false))
+        {
+            prefs.putBool(kKeyRenamed, true);
+            prefs.end();
+        }
+    }
+
+    bool takeRenamed()
+    {
+        Lock saving(saveMutex);
+        Preferences prefs;
+        if (!prefs.begin(kNamespace, false))
+            return false;
+        const bool renamed = prefs.getBool(kKeyRenamed, false);
+        if (renamed)
+            prefs.remove(kKeyRenamed);
+        prefs.end();
+        return renamed;
     }
 
     bool checkWifi(const String &ssid, const String &password, String &error)

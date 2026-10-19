@@ -92,6 +92,9 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
   itself (WiFi is optional); on home WiFi, "http://pumpkin.local
   or <IP>" once. A short BOOT press repeats it. After two brownout restarts in a row (one can be a knock
   to the battery box) it skips WiFi and asks for new batteries; BOOT still restarts it to try again.
+  A new name scrolls " My name is now <name> " once: at once from the Settings page, or first thing after
+  the restart that follows the setup page (`settings::noteRenamed()` / `takeRenamed()`). The web server
+  logs one line per request (method, path, phone, Host), so the serial log shows a phone's hand-off.
 - **WiFi** is ported from Scribe Evolution (`~/dev/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
   `src/core/network.cpp`): pre-scan, connect, AP+STA fallback with captive DNS, mDNS, reconnects, status LED.
   Unlike Scribe, the setup WiFi ("Spooky Pumpkin") and web address (`pumpkin.local`) are fixed, not made from
