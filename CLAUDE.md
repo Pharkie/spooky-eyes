@@ -95,7 +95,7 @@ press (`boot_button::pressFromSerial()`, carried out by the network task).
   A new name scrolls " My name is now <name> " once: at once from the Settings page, or first thing after
   the restart that follows the setup page (`settings::noteRenamed()` / `takeRenamed()`). The web server
   logs one line per request (method, path, phone, Host), so the serial log shows a phone's hand-off.
-- **WiFi** is ported from Scribe Evolution (`~/dev/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
+- **WiFi** is ported from Scribe Evolution (`~/dev/_archive/Scribe Evolution/VS Code Workspace/Git repo/scribe`,
   `src/core/network.cpp`): pre-scan, connect, AP+STA fallback with captive DNS, mDNS, reconnects, status LED.
   Unlike Scribe, the setup WiFi ("Spooky Pumpkin") and web address (`pumpkin.local`) are fixed, not made from
   the name (`kSetupApName`, `kHostname`): one pumpkin per house, and the guide prints them. mDNS answers on
